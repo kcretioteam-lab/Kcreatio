@@ -1,0 +1,50 @@
+services:
+  - type: web
+    name: kcreatio-backend
+    runtime: node
+    region: oregon
+    rootDir: backend
+    buildCommand: npm install && npm run build
+    startCommand: node dist/server.js
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: 22.x
+      - key: PORT
+        value: 10000
+      - key: GMAIL_TESTING_MODE
+        value: "true"
+      - key: META_OAUTH_ENABLED
+        value: "false"
+      - key: ENABLE_JOBS
+        value: "true"
+      - key: JWT_ACCESS_SECRET
+        sync: false
+      - key: JWT_REFRESH_SECRET
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: RAZORPAY_KEY_ID
+        sync: false
+      - key: RAZORPAY_KEY_SECRET
+        sync: false
+      - key: RAZORPAY_WEBHOOK_SECRET
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: FROM_EMAIL
+        sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_CALLBACK_URL
+        sync: false
+      - key: FRONTEND_URL
+        sync: false
