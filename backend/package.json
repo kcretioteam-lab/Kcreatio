@@ -13,6 +13,14 @@
   "license": "ISC",
   "dependencies": {
     "@supabase/supabase-js": "^2.108.2",
+    "@types/archiver": "^8.0.0",
+    "@types/bcrypt": "^6.0.0",
+    "@types/cookie-parser": "^1.4.10",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/node": "^26.0.0",
+    "@types/node-cron": "^3.0.11",
     "archiver": "^8.0.0",
     "bcrypt": "^6.0.0",
     "cookie-parser": "^1.4.7",
@@ -29,20 +37,12 @@
     "pdfmake": "^0.3.11",
     "razorpay": "^2.9.6",
     "resend": "^6.14.0",
+    "typescript": "^6.0.3",
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@types/archiver": "^8.0.0",
-    "@types/bcrypt": "^6.0.0",
-    "@types/cookie-parser": "^1.4.10",
-    "@types/cors": "^2.8.19",
-    "@types/express": "^5.0.6",
-    "@types/jsonwebtoken": "^9.0.10",
-    "@types/node": "^26.0.0",
-    "@types/node-cron": "^3.0.11",
     "nodemon": "^3.1.14",
     "ts-node": "^10.9.2",
-    "tsx": "^4.22.4",
-    "typescript": "^6.0.3"
+    "tsx": "^4.22.4"
   }
 }
