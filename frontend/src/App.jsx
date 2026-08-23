@@ -37,19 +37,20 @@ export function useTheme() { return useContext(ThemeContext); }
 
 function AppInitializer() { return null; }
 
-// TESTING BYPASS — all pages accessible without login. Revert before production.
+// Auth-enforced route guard: redirects unauthenticated users to /login
 function ProtectedRoute({ children }) {
+  const { user, loading } = useAuth();
+  if (loading) return <SkeletonPage />;
+  if (!user) return <Navigate to="/login" replace />;
   return children;
 }
-// ORIGINAL (restore for production):
-// function ProtectedRoute({ children }) {
-//   const { user, loading } = useAuth();
-//   if (loading) return <SkeletonPage />;
-//   if (!user) return <Navigate to="/login" replace />;
-//   return children;
-// }
 
-function PublicOnlyRoute({ children }) { return children; }
+function PublicOnlyRoute({ children }) {
+  const { user, loading } = useAuth();
+  if (loading) return <SkeletonPage />;
+  if (user) return <Navigate to="/dashboard" replace />;
+  return children;
+}
 
 // Helper: wrap protected pages with error boundary + transition
 function Protected({ children }) {

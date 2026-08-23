@@ -1,4 +1,4 @@
-import { createContext, useContext, useReducer, useCallback } from 'react';
+import { createContext, useContext, useReducer, useCallback, useEffect } from 'react';
 import api from '../utils/api.js';
 import { canAccess as canAccessFn } from '../utils/planConfig.js';
 
@@ -28,8 +28,8 @@ const MOCK_USER = {
 // ─────────────────────────────────────────────────────────────────────────────
 
 const initialState = {
-  user: MOCK_USER,
-  loading: false,
+  user: import.meta.env.DEV ? MOCK_USER : null,
+  loading: !import.meta.env.DEV,
   error: null,
 };
 
@@ -56,13 +56,21 @@ export function AuthProvider({ children }) {
       const res = await api.get('/auth/me');
       dispatch({ type: 'SET_USER', payload: res.data });
     } catch (e) {
-      // Only clear user on auth failures (401/403), not on server errors
       if (e?.response?.status === 401 || e?.response?.status === 403) {
         dispatch({ type: 'CLEAR_USER' });
+      } else {
+        // 5xx or network error: stop loading so ProtectedRoute can redirect to login
+        dispatch({ type: 'SET_LOADING', payload: false });
       }
-      // On 5xx or network error: keep current user state (DB may not be configured yet)
     }
   }, []);
+
+  // In production: verify session cookie on mount so ProtectedRoute works correctly
+  useEffect(() => {
+    if (import.meta.env.PROD) {
+      fetchUser();
+    }
+  }, [fetchUser]);
 
   const login = useCallback(async (identifier, password) => {
     dispatch({ type: 'SET_LOADING', payload: true });
