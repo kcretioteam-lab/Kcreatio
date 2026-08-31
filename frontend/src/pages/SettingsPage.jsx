@@ -1,11 +1,12 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Pencil, Trash2, Star, Plus, ChevronDown, ChevronUp, Check, Camera } from 'lucide-react';
+import { Pencil, Trash2, Star, Plus, ChevronDown, ChevronUp, Check, Camera, ShieldCheck } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth.jsx';
 import { useIsMobile } from '../hooks/useIsMobile.js';
 import Input from '../components/ui/Input.jsx';
 import Modal from '../components/ui/Modal.jsx';
 import { useToast } from '../hooks/useToast.jsx';
 import api from '../utils/api.js';
+import { openSubscriptionCheckout } from '../utils/razorpay.js';
 import { PLAN_DISPLAY, PLAN_HIERARCHY } from '../utils/planConfig.js';
 
 const SECTIONS = ['Profile', 'Tax Profile', 'Invoice Settings', 'Billing', 'Notifications', 'Security', 'Export', 'Integrations', 'Danger Zone'];
@@ -576,25 +577,77 @@ function BillingSection({ user, onPlanChange }) {
   const currentPlan = status?.plan || user?.plan || 'basic';
   const currentLevel = PLAN_HIERARCHY[currentPlan] ?? 0;
 
+  // After the user authorizes payment, the plan is activated by the Razorpay
+  // `subscription.charged` webhook — which can lag a few seconds. Re-check status
+  // a handful of times so the UI reflects the new plan without a manual refresh.
+  const pollForActivation = useCallback(async (tries = 0) => {
+    try {
+      const res = await api.get('/payments/status');
+      setStatus(res.data);
+      if (['starter', 'pro', 'business'].includes(res.data?.plan)) {
+        onPlanChange?.();
+        return true;
+      }
+    } catch { /* keep polling */ }
+    if (tries >= 4) return false;
+    await new Promise(r => setTimeout(r, 2500));
+    return pollForActivation(tries + 1);
+  }, [onPlanChange]);
+
   const handleUpgrade = async (targetPlan) => {
     setActionLoading(targetPlan);
+    setConfirmModal(null);
+    const d = PLAN_DISPLAY[targetPlan];
+    const isPaidNow = ['starter', 'pro', 'business'].includes(currentPlan);
+
     try {
-      // If already on a paid plan, use change-plan endpoint
-      if (['starter', 'pro', 'business'].includes(currentPlan) && currentPlan !== targetPlan) {
-        await api.post('/payments/change-plan', { plan: targetPlan });
-        toast.success(`Plan change to ${PLAN_DISPLAY[targetPlan]?.name} initiated. Takes effect next billing cycle.`);
-      } else {
-        // New subscription
-        await api.post('/payments/create-subscription', { plan: targetPlan, period: annual ? 'annual' : 'monthly' });
-        toast.success(`Subscription created. Complete payment in the Razorpay window.`);
+      // 1. Ask the backend to create (or switch to) the Razorpay subscription.
+      //    Both endpoints return { subscriptionId } for the checkout step.
+      const endpoint = isPaidNow && currentPlan !== targetPlan
+        ? '/payments/change-plan'
+        : '/payments/create-subscription';
+      const res = await api.post(endpoint, { plan: targetPlan, period: 'monthly' });
+      const subscriptionId = res.data?.subscriptionId;
+
+      // change-plan may take effect next cycle without a fresh authorization step
+      if (!subscriptionId) {
+        toast.success(res.data?.message || `Plan change to ${d?.name} initiated. Takes effect next billing cycle.`);
+        await fetchStatus();
+        onPlanChange?.();
+        setActionLoading('');
+        return;
       }
-      await fetchStatus();
-      onPlanChange?.();
+
+      // 2. Open Razorpay Checkout to authorize the subscription.
+      await openSubscriptionCheckout({
+        subscriptionId,
+        planName: d?.name || targetPlan,
+        amount: d?.price || 0,
+        user,
+        onSuccess: async () => {
+          toast.info('Payment authorized — activating your plan…');
+          const activated = await pollForActivation();
+          toast.success(
+            activated
+              ? `You're now on the ${d?.name} plan.`
+              : 'Payment received. Your plan will activate in a moment — refresh if it doesn\'t update.'
+          );
+          await fetchStatus();
+          onPlanChange?.();
+          setActionLoading('');
+        },
+        onDismiss: () => {
+          toast.error('Payment cancelled — your plan was not changed.');
+          setActionLoading('');
+        },
+        onError: (msg) => {
+          toast.error(msg);
+          setActionLoading('');
+        },
+      });
     } catch (e) {
-      toast.error(e.response?.data?.message || 'Failed to update plan');
-    } finally {
+      toast.error(e.response?.data?.message || 'Failed to start the upgrade. Please try again.');
       setActionLoading('');
-      setConfirmModal(null);
     }
   };
 
@@ -701,10 +754,16 @@ function BillingSection({ user, onPlanChange }) {
           <h3 style={{ fontSize: 'var(--text-md)', fontWeight: 700, color: 'var(--text-primary)' }}>
             {['starter', 'pro', 'business'].includes(currentPlan) ? 'Change Plan' : 'Choose a Plan'}
           </h3>
-          {/* Monthly / Annual toggle */}
+          {/* Monthly / Annual toggle — annual billing not wired to Razorpay yet (monthly plans only) */}
           <div style={{ display: 'inline-flex', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 'var(--radius-full)', padding: 3, gap: 2 }}>
-            {[{ label: 'Monthly', val: false }, { label: 'Annual (2m free)', val: true }].map(opt => (
-              <button key={String(opt.val)} onClick={() => setAnnual(opt.val)} style={{ padding: 'var(--space-1) var(--space-3)', borderRadius: 'var(--radius-full)', fontWeight: 600, fontSize: 'var(--text-xs)', border: 'none', cursor: 'pointer', background: annual === opt.val ? 'var(--accent)' : 'transparent', color: annual === opt.val ? '#fff' : 'var(--text-muted)', fontFamily: 'inherit' }}>
+            {[{ label: 'Monthly', val: false, disabled: false }, { label: 'Annual · soon', val: true, disabled: true }].map(opt => (
+              <button
+                key={String(opt.val)}
+                onClick={() => { if (!opt.disabled) setAnnual(opt.val); }}
+                disabled={opt.disabled}
+                title={opt.disabled ? 'Annual billing is coming soon' : undefined}
+                style={{ padding: 'var(--space-1) var(--space-3)', borderRadius: 'var(--radius-full)', fontWeight: 600, fontSize: 'var(--text-xs)', border: 'none', cursor: opt.disabled ? 'not-allowed' : 'pointer', background: annual === opt.val ? 'var(--accent)' : 'transparent', color: annual === opt.val ? '#fff' : 'var(--text-muted)', opacity: opt.disabled ? 0.45 : 1, fontFamily: 'inherit' }}
+              >
                 {opt.label}
               </button>
             ))}
@@ -757,6 +816,13 @@ function BillingSection({ user, onPlanChange }) {
               </div>
             );
           })}
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginTop: 'var(--space-5)', paddingTop: 'var(--space-4)', borderTop: '1px solid var(--border)' }}>
+          <ShieldCheck size={14} style={{ color: 'var(--text-muted)', flexShrink: 0 }} aria-hidden="true" />
+          <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>
+            Payments are processed securely by Razorpay. Billed monthly in INR · cancel anytime.
+          </span>
         </div>
       </div>
 
