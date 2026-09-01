@@ -1,4 +1,4 @@
-import { createContext, useContext, useReducer, useCallback } from 'react';
+import { createContext, useContext, useReducer, useCallback, useEffect } from 'react';
 import api from '../utils/api.js';
 import { canAccess as canAccessFn } from '../utils/planConfig.js';
 
@@ -28,7 +28,12 @@ const MOCK_USER = {
 // ─────────────────────────────────────────────────────────────────────────────
 
 const initialState = {
-  user: MOCK_USER,
+  // Dev bypass only applies in dev builds — matches the same import.meta.env.DEV
+  // gate api.js uses for the X-Dev-User-Id header. Without this check, every
+  // production page load started "logged in" as MOCK_USER before the real
+  // session was ever checked, which also made Sign Out look broken: clearing
+  // the real session worked, but any reload reset state right back to MOCK_USER.
+  user: import.meta.env.DEV ? MOCK_USER : null,
   loading: false,
   error: null,
 };
@@ -63,6 +68,12 @@ export function AuthProvider({ children }) {
       // On 5xx or network error: keep current user state (DB may not be configured yet)
     }
   }, []);
+
+  // Rehydrate the real session from the httpOnly cookie on first load. Previously
+  // only SettingsPage called this — every other page relied on MOCK_USER (always
+  // populated) to avoid a blank state, which silently masked a real logged-in
+  // user's session never being restored on refresh anywhere else in the app.
+  useEffect(() => { fetchUser(); }, [fetchUser]);
 
   const login = useCallback(async (identifier, password) => {
     dispatch({ type: 'SET_LOADING', payload: true });
