@@ -99,7 +99,7 @@ router.post('/send-otp', validateBody(SendOtpSchema), async (req: Request, res: 
   // Send email via Resend if configured, otherwise log in dev
   const { sendOtpEmail } = await import('../services/emailService.js').catch(() => ({ sendOtpEmail: null }));
   if (sendOtpEmail) {
-    await sendOtpEmail(email, otp, purpose).catch(() => null);
+    await sendOtpEmail(email, otp, purpose).catch((err) => console.error('OTP email send failed:', err));
   } else {
     console.log(`[DEV] OTP for ${email} (${purpose}): ${otp}`);
   }
