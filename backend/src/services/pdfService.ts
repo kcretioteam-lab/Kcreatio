@@ -154,7 +154,7 @@ export function generateInvoicePdf(data: InvoiceData): Promise<Buffer> {
 
       // Footer
       {
-        text: 'Generated with Kcreatio',
+        text: 'Generated with Kcretio',
         fontSize: 7,
         color: '#CCC',
         alignment: 'center',

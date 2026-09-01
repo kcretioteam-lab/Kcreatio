@@ -351,10 +351,10 @@ function buildClassicHTML(inv, user, t, plan) {
       </div>
     </div>
   </div>` : ''}
-  <div class="footer">Computer-generated invoice &nbsp;·&nbsp; Kcreatio &nbsp;·&nbsp; Subject to GST as applicable</div>
+  <div class="footer">Computer-generated invoice &nbsp;·&nbsp; Kcretio &nbsp;·&nbsp; Subject to GST as applicable</div>
 </div>
 <script>window.onload = function() { window.print(); };</script>
-${plan === 'basic' ? `<div style="position:fixed;bottom:8px;left:0;right:0;text-align:center;font-size:9px;color:#94a3b8;font-family:Inter,sans-serif;letter-spacing:0.04em;pointer-events:none;">Created with Kcreatio — Basic Plan · kcreatio.in</div>` : ''}
+${plan === 'basic' ? `<div style="position:fixed;bottom:8px;left:0;right:0;text-align:center;font-size:9px;color:#94a3b8;font-family:Inter,sans-serif;letter-spacing:0.04em;pointer-events:none;">Created with Kcretio — Basic Plan · kcreatio.com</div>` : ''}
 </body></html>`;
 }
 
@@ -511,9 +511,9 @@ ${inv.include_terms && inv.terms_text ? `
   <strong>Terms &amp; Conditions:</strong>
   <div style="margin-top:4px;white-space:pre-line;color:#666;font-size:9px">${inv.terms_text}</div>
 </div>` : ''}
-<div style="margin-top:16px;text-align:center;font-size:8px;color:#ccc">Computer-generated invoice · Kcreatio · Subject to GST as applicable</div>
+<div style="margin-top:16px;text-align:center;font-size:8px;color:#ccc">Computer-generated invoice · Kcretio · Subject to GST as applicable</div>
 <script>window.onload = function() { window.print(); };</script>
-${plan === 'basic' ? `<div style="position:fixed;bottom:8px;left:0;right:0;text-align:center;font-size:9px;color:#94a3b8;font-family:Inter,sans-serif;letter-spacing:0.04em;pointer-events:none;">Created with Kcreatio — Basic Plan · kcreatio.in</div>` : ''}
+${plan === 'basic' ? `<div style="position:fixed;bottom:8px;left:0;right:0;text-align:center;font-size:9px;color:#94a3b8;font-family:Inter,sans-serif;letter-spacing:0.04em;pointer-events:none;">Created with Kcretio — Basic Plan · kcreatio.com</div>` : ''}
 </body></html>`;
 }
 
@@ -667,9 +667,9 @@ ${inv.include_terms && inv.terms_text ? `
   <strong>Terms &amp; Conditions:</strong>
   <div style="margin-top:4px;white-space:pre-line;color:#666;font-size:9px">${inv.terms_text}</div>
 </div>` : ''}
-<div style="margin-top:16px;text-align:center;font-size:8px;color:#ccc">Computer-generated invoice · Kcreatio · Subject to GST as applicable</div>
+<div style="margin-top:16px;text-align:center;font-size:8px;color:#ccc">Computer-generated invoice · Kcretio · Subject to GST as applicable</div>
 <script>window.onload = function() { window.print(); };</script>
-${plan === 'basic' ? `<div style="position:fixed;bottom:8px;left:0;right:0;text-align:center;font-size:9px;color:#94a3b8;font-family:Inter,sans-serif;letter-spacing:0.04em;pointer-events:none;">Created with Kcreatio — Basic Plan · kcreatio.in</div>` : ''}
+${plan === 'basic' ? `<div style="position:fixed;bottom:8px;left:0;right:0;text-align:center;font-size:9px;color:#94a3b8;font-family:Inter,sans-serif;letter-spacing:0.04em;pointer-events:none;">Created with Kcretio — Basic Plan · kcreatio.com</div>` : ''}
 </body></html>`;
 }
 
@@ -2139,7 +2139,7 @@ function ClassicPreview({ form, calc, invoiceNumber, user, template }) {
         )}
 
         <div style={{ marginTop: 16, textAlign: 'center', fontSize: 8, color: '#ccc' }}>
-          Computer-generated invoice · Kcreatio · GST compliant per Rule 46 CGST Rules
+          Computer-generated invoice · Kcretio · GST compliant per Rule 46 CGST Rules
         </div>
       </div>
 
@@ -2250,7 +2250,7 @@ function CorporatePreview({ form, calc, invoiceNumber, user, template }) {
             </div>
           </div>
         )}
-        <div style={{ marginTop: 8, fontSize: 8, color: '#ccc', textAlign: 'center' }}>Computer-generated invoice · Kcreatio · GST compliant per Rule 46</div>
+        <div style={{ marginTop: 8, fontSize: 8, color: '#ccc', textAlign: 'center' }}>Computer-generated invoice · Kcretio · GST compliant per Rule 46</div>
       </div>
     </div>
   );
@@ -2344,7 +2344,7 @@ function MinimalPreview({ form, calc, invoiceNumber, user, template }) {
           </div>
         </div>
       )}
-      <div style={{ marginTop: 8, fontSize: 7, color: '#ccc', textAlign: 'center' }}>Computer-generated invoice · Kcreatio · GST compliant per Rule 46</div>
+      <div style={{ marginTop: 8, fontSize: 7, color: '#ccc', textAlign: 'center' }}>Computer-generated invoice · Kcretio · GST compliant per Rule 46</div>
     </div>
   );
 }

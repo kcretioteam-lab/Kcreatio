@@ -1,5 +1,5 @@
 /**
- * LandingPageV6 — Kcreatio
+ * LandingPageV6 — Kcretio
  * Hero: cinematic 5-scene scroll narrative (HeroV6)
  * Below fold: features, social proof, pricing, final CTA
  */
@@ -112,7 +112,7 @@ function Navbar() {
           fontSize: 15, fontWeight: 700, color: 'rgba(255,255,255,0.9)',
           letterSpacing: '-0.02em', fontFamily: 'system-ui, sans-serif',
         }}>
-          Kcreatio
+          Kcretio
         </span>
       </Link>
 
@@ -316,7 +316,7 @@ function PainSolutionSection() {
           <h2 style={{ fontSize: S.h2, fontWeight: 700, color: S.text, letterSpacing: '-0.03em', margin: '0 0 48px', textAlign: 'center', fontFamily: 'system-ui, sans-serif' }}>
             Zoho Books is for retail. Tally is for accountants.
             <br />
-            <span style={{ color: S.muted, fontWeight: 400 }}>Kcreatio is for you.</span>
+            <span style={{ color: S.muted, fontWeight: 400 }}>Kcretio is for you.</span>
           </h2>
         </Reveal>
 
@@ -359,7 +359,7 @@ function PainSolutionSection() {
 
 const TESTIMONIALS = [
   {
-    quote: "I was chasing Mamaearth for payment for 3 weeks. Turns out they needed a GST invoice with the exact GSTIN format. Kcreatio fixed this in my first session.",
+    quote: "I was chasing Mamaearth for payment for 3 weeks. Turns out they needed a GST invoice with the exact GSTIN format. Kcretio fixed this in my first session.",
     name: "Priya S.",
     handle: "@priyacooks",
     followers: "182K YouTube",
@@ -705,7 +705,7 @@ function Footer() {
             fontSize: 11, fontWeight: 900, color: '#fff', fontFamily: 'system-ui, sans-serif',
           }}>C</div>
           <span style={{ fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.5)', fontFamily: 'system-ui, sans-serif' }}>
-            Kcreatio
+            Kcretio
           </span>
         </div>
         <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.22)', margin: 0, fontFamily: 'system-ui, sans-serif' }}>
