@@ -17,10 +17,14 @@ const MAX_FAILED_ATTEMPTS = 5;
 const OTP_EXPIRY_MINUTES = 10;
 const RESET_TOKEN_EXPIRY_MINUTES = 60;
 
+// Frontend (Netlify) and backend (Render) live on different domains in production —
+// that's cross-site, so cookies need SameSite=None (paired with Secure) to survive
+// the trip. Locally, frontend/backend share "localhost" (same-site), so Strict is
+// fine and safer there.
 const COOKIE_OPTIONS = {
   httpOnly: true,
   secure: process.env.NODE_ENV === 'production',
-  sameSite: 'strict' as const,
+  sameSite: (process.env.NODE_ENV === 'production' ? 'none' : 'strict') as 'none' | 'strict',
   path: '/',
 };
 
@@ -597,9 +601,8 @@ router.delete('/account', authenticate, async (req: AuthRequest, res: Response):
     return;
   }
 
-  const cookieOpts = { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax' as const };
-  res.clearCookie('access_token', cookieOpts);
-  res.clearCookie('refresh_token', cookieOpts);
+  res.clearCookie('access_token', COOKIE_OPTIONS);
+  res.clearCookie('refresh_token', COOKIE_OPTIONS);
   res.json({ message: 'Account permanently deleted' });
 });
 
