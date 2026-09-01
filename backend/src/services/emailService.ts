@@ -8,7 +8,15 @@ async function send(to: string, subject: string, html: string) {
     console.log(`[EMAIL-DEV] To: ${to} | Subject: ${subject}`);
     return;
   }
-  await resend.emails.send({ from: FROM, to, subject, html });
+  // The Resend SDK resolves with { data, error } instead of throwing on API-level
+  // failures (invalid/unverified from-domain, etc.) — checking only for a thrown
+  // exception silently missed these, so email sends could "succeed" while
+  // actually rejected by Resend.
+  const { data, error } = await resend.emails.send({ from: FROM, to, subject, html });
+  if (error) {
+    throw new Error(`Resend error: ${error.message || JSON.stringify(error)}`);
+  }
+  console.log(`[EMAIL] Sent to ${to} | id: ${data?.id}`);
 }
 
 export async function sendOtpEmail(to: string, otp: string, purpose: 'email_verify' | 'password_reset') {
