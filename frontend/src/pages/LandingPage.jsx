@@ -63,8 +63,8 @@ function Reveal({ children, delay = 0, style: extra }) {
 
 const FAQ_ITEMS = [
   {
-    q: 'Do I need a CA to use Kcreatio?',
-    a: 'No. Kcreatio handles your day-to-day GST invoicing, TDS tracking, and advance tax planning automatically. You can still use a CA for final ITR filing — we make their job easier by giving them a clean annual summary.',
+    q: 'Do I need a CA to use Kcretio?',
+    a: 'No. Kcretio handles your day-to-day GST invoicing, TDS tracking, and advance tax planning automatically. You can still use a CA for final ITR filing — we make their job easier by giving them a clean annual summary.',
   },
   {
     q: 'I have a GSTIN. How do I set it up?',
@@ -202,7 +202,7 @@ export default function LandingPage() {
               justifyContent: 'center', fontWeight: 800, fontSize: 13, color: '#fff', flexShrink: 0,
             }}>C</div>
             <span style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: 'var(--text-sm)', letterSpacing: '-0.01em' }}>
-              Kcreatio
+              Kcretio
             </span>
           </Link>
 
@@ -362,7 +362,7 @@ export default function LandingPage() {
                 color: "#8B5CF6",
               },
               {
-                quote: "Got a GST notice in March. Found Kcreatio. Haven't missed a deadline since. The advance tax planner alone is worth it.",
+                quote: "Got a GST notice in March. Found Kcretio. Haven't missed a deadline since. The advance tax planner alone is worth it.",
                 name: "Arjun S.",
                 role: "Finance Creator · 95K subs",
                 initials: "AS",
@@ -539,7 +539,7 @@ export default function LandingPage() {
               <thead>
                 <tr>
                   <th style={{ padding: 'var(--space-3) var(--space-4)', textAlign: 'left', color: 'var(--text-muted)', fontWeight: 600, fontSize: 'var(--text-xs)', letterSpacing: '0.04em', borderBottom: '1px solid var(--border)' }}>Feature</th>
-                  {['Kcreatio', 'Google Sheets', 'Zoho Books', 'CA', 'ClearTax'].map((col, ci) => (
+                  {['Kcretio', 'Google Sheets', 'Zoho Books', 'CA', 'ClearTax'].map((col, ci) => (
                     <th key={col} style={{
                       padding: 'var(--space-3) var(--space-4)',
                       textAlign: 'center',
@@ -822,14 +822,14 @@ export default function LandingPage() {
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
           <div aria-hidden="true" style={{ width: 22, height: 22, background: 'var(--accent)', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 11, color: '#fff' }}>C</div>
-          <span style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)' }}>Kcreatio · Built for Indian creators</span>
+          <span style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)' }}>Kcretio · Built for Indian creators</span>
         </div>
         <div style={{ display: 'flex', gap: 'var(--space-5)' }}>
           {['Privacy Policy', 'Terms of Service', 'Contact'].map(l => (
             <a key={l} href="#" style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>{l}</a>
           ))}
         </div>
-        <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-disabled)' }}>© 2025 Kcreatio</span>
+        <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-disabled)' }}>© 2025 Kcretio</span>
       </footer>
     </div>
   );

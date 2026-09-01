@@ -46,13 +46,13 @@ function PasswordStrengthIndicator({ password }) {
 }
 
 // Terms & Conditions text for modal
-const TERMS_TEXT = `Kcreatio Terms of Service
+const TERMS_TEXT = `Kcretio Terms of Service
 
 1. Acceptance of Terms
 By creating an account, you agree to these terms.
 
 2. Service Description
-Kcreatio provides GST invoicing, TDS tracking, advance tax planning, and financial management tools for Indian content creators.
+Kcretio provides GST invoicing, TDS tracking, advance tax planning, and financial management tools for Indian content creators.
 
 3. Data Privacy
 Your financial data is encrypted and stored securely. We do not share your data with third parties except as required by law.
@@ -64,10 +64,10 @@ You are responsible for the accuracy of information you enter. Tax estimates are
 Subscriptions auto-renew until cancelled. Cancellations take effect at the end of the billing period.
 
 6. Intellectual Property
-All content, designs, and software are property of Kcreatio.
+All content, designs, and software are property of Kcretio.
 
 7. Disclaimer
-Tax calculations are estimates based on prevailing laws. Kcreatio is not a licensed CA or tax advisor.
+Tax calculations are estimates based on prevailing laws. Kcretio is not a licensed CA or tax advisor.
 
 8. Governing Law
 These terms are governed by the laws of India, subject to jurisdiction of courts in Bengaluru.`;
@@ -226,7 +226,7 @@ export default function AuthPage({ defaultMode = 'register' }) {
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
             <div aria-hidden="true" style={{ width: 24, height: 24, background: 'var(--accent)', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 11, color: '#fff' }}>C</div>
-            <span style={{ fontWeight: 700, fontSize: 'var(--text-sm)', color: 'var(--text-primary)' }}>Kcreatio</span>
+            <span style={{ fontWeight: 700, fontSize: 'var(--text-sm)', color: 'var(--text-primary)' }}>Kcretio</span>
           </div>
         </div>
 
@@ -264,7 +264,7 @@ export default function AuthPage({ defaultMode = 'register' }) {
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', marginBottom: 'var(--space-10)' }}>
                 <div aria-hidden="true" style={{ width: 32, height: 32, background: 'var(--accent)', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 15, color: '#fff', flexShrink: 0 }}>C</div>
-                <span style={{ fontWeight: 700, fontSize: 'var(--text-md)', color: 'var(--text-primary)' }}>Kcreatio</span>
+                <span style={{ fontWeight: 700, fontSize: 'var(--text-md)', color: 'var(--text-primary)' }}>Kcretio</span>
               </div>
               <h2 style={{ fontFamily: "'Instrument Serif', Georgia, serif", fontSize: 'clamp(22px, 2vw, 30px)', fontWeight: 400, lineHeight: 1.2, color: 'var(--text-primary)', marginBottom: 'var(--space-6)', letterSpacing: '-0.01em' }}>
                 Your financial OS.<br />
