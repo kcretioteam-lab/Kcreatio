@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { supabase } from '../lib/supabase.js';
 import { validateBody } from '../middleware/validateBody.js';
 import { authenticate, AuthRequest } from '../middleware/auth.js';
+import { isDisposableEmail } from '../lib/disposableEmail.js';
 
 const router = Router();
 
@@ -74,6 +75,24 @@ router.post('/send-otp', validateBody(SendOtpSchema), async (req: Request, res: 
     const { data: user } = await supabase.from('users').select('id').eq('email', email).maybeSingle();
     // Always return success to prevent email enumeration
     if (!user) { res.json({ sent: true }); return; }
+  }
+
+  // For email_verify (registration), catch an already-registered email here
+  // instead of letting them burn an OTP + verify it, only to be rejected at
+  // the final /register step. Unlike password_reset, revealing this is normal
+  // signup UX (every major product does it) — not an enumeration concern.
+  // Also reject known disposable/throwaway domains (Yopmail, Mailinator, etc.)
+  // — real providers like Gmail/Outlook/Yahoo are unaffected.
+  if (purpose === 'email_verify') {
+    if (isDisposableEmail(email)) {
+      res.status(422).json({ error: 'VALIDATION_ERROR', message: 'Temporary/disposable email addresses are not allowed. Please use a permanent email.', field: 'email', statusCode: 422 });
+      return;
+    }
+    const { data: user } = await supabase.from('users').select('id').eq('email', email).maybeSingle();
+    if (user) {
+      res.status(409).json({ error: 'EMAIL_EXISTS', message: 'An account with this email already exists. Please sign in instead.', field: 'email', statusCode: 409 });
+      return;
+    }
   }
 
   // Rate limit: max 3 OTPs per email per 15 minutes
