@@ -28,7 +28,17 @@ api.interceptors.response.use(
   (res) => res,
   async (error) => {
     const original = error.config;
-    if (error.response?.status === 401 && !original._retry) {
+    // A 401 on these two IS the expected, normal outcome for "not logged in yet"
+    // (checked on every app boot by fetchUser()) — it's not a mid-session expiry
+    // that warrants a silent refresh-and-retry. Letting it through here means
+    // fetchUser()'s own handler clears user state and loading cleanly, so
+    // ProtectedRoute redirects via React Router — no hard reload, no loop.
+    // Without this, a logged-out visit to any page triggered: 401 on /auth/me →
+    // refresh attempt → 401 again (no session at all) → hard window.location
+    // redirect to /login → which re-mounts the app → fetches /auth/me again →
+    // same 401 → same failed refresh → same hard redirect, forever.
+    const isAuthCheck = original?.url?.includes('/auth/me') || original?.url?.includes('/auth/refresh');
+    if (error.response?.status === 401 && !original._retry && !isAuthCheck) {
       if (isRefreshing) {
         return new Promise((resolve, reject) => {
           failedQueue.push({ resolve, reject });
