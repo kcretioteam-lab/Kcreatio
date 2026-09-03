@@ -98,7 +98,13 @@ export function AuthProvider({ children }) {
 
   const login = useCallback(async (identifier, password) => {
     fetchAbortRef.current?.abort(); // this login supersedes any in-flight session check
-    dispatch({ type: 'SET_LOADING', payload: true });
+    // Deliberately NOT dispatching SET_LOADING here — AuthPage already tracks its
+    // own local loading state for the submit button. Dispatching the shared
+    // context loading flag made PublicOnlyRoute/ProtectedRoute (which gate on
+    // it) swap the whole page to <SkeletonPage/> on every login attempt,
+    // unmounting AuthPage mid-request — so a failed login's setErrors() call
+    // landed on an already-unmounted component and silently vanished, making
+    // failed logins look like a blank flash back to an empty form.
     try {
       const res = await api.post('/auth/login', { identifier, password });
       dispatch({ type: 'SET_USER', payload: res.data.user });
@@ -113,7 +119,7 @@ export function AuthProvider({ children }) {
 
   const register = useCallback(async (name, email, password, extras = {}) => {
     fetchAbortRef.current?.abort(); // same race as login() — a fresh registration supersedes it
-    dispatch({ type: 'SET_LOADING', payload: true });
+    // Same reasoning as login() above — AuthPage tracks its own loading state.
     try {
       const res = await api.post('/auth/register', {
         name, email, password,
