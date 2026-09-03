@@ -34,7 +34,11 @@ const initialState = {
   // session was ever checked, which also made Sign Out look broken: clearing
   // the real session worked, but any reload reset state right back to MOCK_USER.
   user: import.meta.env.DEV ? MOCK_USER : null,
-  loading: false,
+  // In production, start in "loading" until the session check below resolves —
+  // ProtectedRoute waits on this before deciding whether to redirect to /login,
+  // so a real logged-in user refreshing the page doesn't get bounced out during
+  // the brief window before fetchUser() confirms their session.
+  loading: !import.meta.env.DEV,
   error: null,
 };
 
@@ -61,19 +65,26 @@ export function AuthProvider({ children }) {
       const res = await api.get('/auth/me');
       dispatch({ type: 'SET_USER', payload: res.data });
     } catch (e) {
-      // Only clear user on auth failures (401/403), not on server errors
       if (e?.response?.status === 401 || e?.response?.status === 403) {
         dispatch({ type: 'CLEAR_USER' });
+      } else {
+        // 5xx or network error: stop loading so ProtectedRoute can redirect to login
+        dispatch({ type: 'SET_LOADING', payload: false });
       }
-      // On 5xx or network error: keep current user state (DB may not be configured yet)
     }
   }, []);
 
-  // Rehydrate the real session from the httpOnly cookie on first load. Previously
-  // only SettingsPage called this — every other page relied on MOCK_USER (always
-  // populated) to avoid a blank state, which silently masked a real logged-in
-  // user's session never being restored on refresh anywhere else in the app.
-  useEffect(() => { fetchUser(); }, [fetchUser]);
+  // Rehydrate the real session from the httpOnly cookie on first load, in
+  // production only. Previously only SettingsPage called fetchUser() — every
+  // other page relied on MOCK_USER (always populated) to avoid a blank state,
+  // which silently masked a real logged-in user's session never being
+  // restored on refresh anywhere else in the app. Skipped in dev since
+  // MOCK_USER already covers that case without touching the network.
+  useEffect(() => {
+    if (import.meta.env.PROD) {
+      fetchUser();
+    }
+  }, [fetchUser]);
 
   const login = useCallback(async (identifier, password) => {
     dispatch({ type: 'SET_LOADING', payload: true });
