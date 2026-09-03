@@ -96,8 +96,14 @@ export default function App() {
                 <Route path="/v3" element={<LandingPageV3 />} />
                 <Route path="/v5" element={<LandingPageV5 />} />
                 <Route path="/v6" element={<LandingPageV6 />} />
-                <Route path="/login" element={<PublicOnlyRoute><AuthPage defaultMode="login" /></PublicOnlyRoute>} />
-                <Route path="/register" element={<PublicOnlyRoute><AuthPage defaultMode="register" /></PublicOnlyRoute>} />
+                {/* key forces a fresh AuthPage instance on /login <-> /register navigation —
+                    otherwise React Router keeps the same component mounted (same type, same
+                    spot in the tree) and only updates the defaultMode prop, which AuthPage
+                    reads just once via useState(defaultMode) and never re-syncs. Without the
+                    key, the URL changes but the form content stays frozen on whichever mode
+                    it first mounted with, until a full page refresh forces a remount. */}
+                <Route path="/login" element={<PublicOnlyRoute><AuthPage key="login" defaultMode="login" /></PublicOnlyRoute>} />
+                <Route path="/register" element={<PublicOnlyRoute><AuthPage key="register" defaultMode="register" /></PublicOnlyRoute>} />
                 <Route path="/auth" element={<Navigate to="/login" replace />} />
                 <Route path="/forgot-password" element={<ForgotPasswordPage />} />
                 <Route path="/reset-password" element={<ResetPasswordPage />} />
