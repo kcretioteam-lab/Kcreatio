@@ -83,7 +83,7 @@ router.get('/annual', checkPlan('pro'), async (req: AuthRequest, res: Response):
   const netPnL = totalIncome - totalExpenses;
 
   const summary = [
-    `Kcreatio — Annual Summary FY ${fy}`,
+    `Kcretio — Annual Summary FY ${fy}`,
     `Generated: ${new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}`,
     `Creator: ${user?.name || ''} | ${user?.email || ''}`,
     `GSTIN: ${user?.gstin || 'Not set'} | PAN: ${user?.pan || 'Not set'}`,

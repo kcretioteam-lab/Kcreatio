@@ -67,7 +67,7 @@ export default function Sidebar({ collapsed, onToggle }) {
         }}>C</div>
         {!collapsed && (
           <span style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: 'var(--text-base)', whiteSpace: 'nowrap', letterSpacing: '-0.01em' }}>
-            Kcreatio
+            Kcretio
           </span>
         )}
       </div>

@@ -169,7 +169,7 @@ export default function InvoicePreview({ form, calc, invoiceNumber, user }) {
         )}
 
         <div style={{ marginTop: 'var(--space-5)', textAlign: 'center', fontSize: 10, color: 'var(--text-disabled)' }}>
-          Generated with Kcreatio
+          Generated with Kcretio
         </div>
       </div>
     </div>

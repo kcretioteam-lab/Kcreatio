@@ -129,7 +129,7 @@ export default function OnboardingChecklist() {
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
           <span style={{ fontSize: 'var(--text-sm)', fontWeight: 700, color: 'var(--text-primary)' }}>
-            Get started with Kcreatio
+            Get started with Kcretio
           </span>
           <span style={{
             fontSize: 'var(--text-xs)',

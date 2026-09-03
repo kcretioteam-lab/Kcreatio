@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { supabase } from '../lib/supabase.js';
 import { validateBody } from '../middleware/validateBody.js';
 import { authenticate, AuthRequest } from '../middleware/auth.js';
+import { isDisposableEmail } from '../lib/disposableEmail.js';
 
 const router = Router();
 
@@ -17,10 +18,14 @@ const MAX_FAILED_ATTEMPTS = 5;
 const OTP_EXPIRY_MINUTES = 10;
 const RESET_TOKEN_EXPIRY_MINUTES = 60;
 
+// Frontend (Netlify) and backend (Render) live on different domains in production —
+// that's cross-site, so cookies need SameSite=None (paired with Secure) to survive
+// the trip. Locally, frontend/backend share "localhost" (same-site), so Strict is
+// fine and safer there.
 const COOKIE_OPTIONS = {
   httpOnly: true,
   secure: process.env.NODE_ENV === 'production',
-  sameSite: 'strict' as const,
+  sameSite: (process.env.NODE_ENV === 'production' ? 'none' : 'strict') as 'none' | 'strict',
   path: '/',
 };
 
@@ -72,6 +77,24 @@ router.post('/send-otp', validateBody(SendOtpSchema), async (req: Request, res: 
     if (!user) { res.json({ sent: true }); return; }
   }
 
+  // For email_verify (registration), catch an already-registered email here
+  // instead of letting them burn an OTP + verify it, only to be rejected at
+  // the final /register step. Unlike password_reset, revealing this is normal
+  // signup UX (every major product does it) — not an enumeration concern.
+  // Also reject known disposable/throwaway domains (Yopmail, Mailinator, etc.)
+  // — real providers like Gmail/Outlook/Yahoo are unaffected.
+  if (purpose === 'email_verify') {
+    if (isDisposableEmail(email)) {
+      res.status(422).json({ error: 'VALIDATION_ERROR', message: 'Temporary/disposable email addresses are not allowed. Please use a permanent email.', field: 'email', statusCode: 422 });
+      return;
+    }
+    const { data: user } = await supabase.from('users').select('id').eq('email', email).maybeSingle();
+    if (user) {
+      res.status(409).json({ error: 'EMAIL_EXISTS', message: 'An account with this email already exists. Please sign in instead.', field: 'email', statusCode: 409 });
+      return;
+    }
+  }
+
   // Rate limit: max 3 OTPs per email per 15 minutes
   const fifteenMinsAgo = new Date(Date.now() - 15 * 60 * 1000).toISOString();
   const { count } = await supabase
@@ -95,7 +118,7 @@ router.post('/send-otp', validateBody(SendOtpSchema), async (req: Request, res: 
   // Send email via Resend if configured, otherwise log in dev
   const { sendOtpEmail } = await import('../services/emailService.js').catch(() => ({ sendOtpEmail: null }));
   if (sendOtpEmail) {
-    await sendOtpEmail(email, otp, purpose).catch(() => null);
+    await sendOtpEmail(email, otp, purpose).catch((err) => console.error('OTP email send failed:', err));
   } else {
     console.log(`[DEV] OTP for ${email} (${purpose}): ${otp}`);
   }
@@ -597,9 +620,8 @@ router.delete('/account', authenticate, async (req: AuthRequest, res: Response):
     return;
   }
 
-  const cookieOpts = { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax' as const };
-  res.clearCookie('access_token', cookieOpts);
-  res.clearCookie('refresh_token', cookieOpts);
+  res.clearCookie('access_token', COOKIE_OPTIONS);
+  res.clearCookie('refresh_token', COOKIE_OPTIONS);
   res.json({ message: 'Account permanently deleted' });
 });
 
