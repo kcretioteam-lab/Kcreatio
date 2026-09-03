@@ -1,4 +1,4 @@
-import { createContext, useContext, useReducer, useCallback, useEffect } from 'react';
+import { createContext, useContext, useReducer, useCallback, useEffect, useRef } from 'react';
 import api from '../utils/api.js';
 import { canAccess as canAccessFn } from '../utils/planConfig.js';
 
@@ -60,11 +60,21 @@ function authReducer(state, action) {
 export function AuthProvider({ children }) {
   const [state, dispatch] = useReducer(authReducer, initialState);
 
+  // Tracks the in-flight boot-time /auth/me check so login()/register() can
+  // cancel it — otherwise a slow session check fired while the user was still
+  // on the login page could resolve with 401 *after* a fresh login succeeded,
+  // clobbering the just-set real user with CLEAR_USER and bouncing back to
+  // /login right after getting in.
+  const fetchAbortRef = useRef(null);
+
   const fetchUser = useCallback(async () => {
+    const controller = new AbortController();
+    fetchAbortRef.current = controller;
     try {
-      const res = await api.get('/auth/me');
+      const res = await api.get('/auth/me', { signal: controller.signal });
       dispatch({ type: 'SET_USER', payload: res.data });
     } catch (e) {
+      if (e?.code === 'ERR_CANCELED') return; // superseded by login/register, ignore
       if (e?.response?.status === 401 || e?.response?.status === 403) {
         dispatch({ type: 'CLEAR_USER' });
       } else {
@@ -87,6 +97,7 @@ export function AuthProvider({ children }) {
   }, [fetchUser]);
 
   const login = useCallback(async (identifier, password) => {
+    fetchAbortRef.current?.abort(); // this login supersedes any in-flight session check
     dispatch({ type: 'SET_LOADING', payload: true });
     try {
       const res = await api.post('/auth/login', { identifier, password });
@@ -101,6 +112,7 @@ export function AuthProvider({ children }) {
   }, []);
 
   const register = useCallback(async (name, email, password, extras = {}) => {
+    fetchAbortRef.current?.abort(); // same race as login() — a fresh registration supersedes it
     dispatch({ type: 'SET_LOADING', payload: true });
     try {
       const res = await api.post('/auth/register', {
