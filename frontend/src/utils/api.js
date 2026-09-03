@@ -28,17 +28,20 @@ api.interceptors.response.use(
   (res) => res,
   async (error) => {
     const original = error.config;
-    // A 401 on these two IS the expected, normal outcome for "not logged in yet"
-    // (checked on every app boot by fetchUser()) — it's not a mid-session expiry
-    // that warrants a silent refresh-and-retry. Letting it through here means
-    // fetchUser()'s own handler clears user state and loading cleanly, so
-    // ProtectedRoute redirects via React Router — no hard reload, no loop.
-    // Without this, a logged-out visit to any page triggered: 401 on /auth/me →
-    // refresh attempt → 401 again (no session at all) → hard window.location
-    // redirect to /login → which re-mounts the app → fetches /auth/me again →
-    // same 401 → same failed refresh → same hard redirect, forever.
-    const isAuthCheck = original?.url?.includes('/auth/me') || original?.url?.includes('/auth/refresh');
-    if (error.response?.status === 401 && !original._retry && !isAuthCheck) {
+    // A 401 from any of these public, unauthenticated auth-flow endpoints means
+    // something entirely different from "your session token expired mid-use" —
+    // wrong password, unknown email, expired OTP, etc. It should surface to the
+    // caller as-is, never trigger a silent refresh-and-retry: there IS no
+    // session to refresh yet, so that refresh attempt would itself 401 (with a
+    // backend message like "No refresh token"), and its error — not the actual
+    // login/register failure reason — is what ends up shown to the user, on top
+    // of an unwanted hard window.location redirect. (The /auth/me case here also
+    // prevents a genuine infinite reload loop: a logged-out visit to any page
+    // fires /auth/me → 401 → refresh attempt → 401 again → hard redirect to
+    // /login → app re-mounts → /auth/me again → same loop, forever.)
+    const PUBLIC_AUTH_PATHS = ['/auth/me', '/auth/refresh', '/auth/login', '/auth/register', '/auth/send-otp', '/auth/verify-otp', '/auth/forgot-password', '/auth/reset-password'];
+    const isPublicAuthCall = PUBLIC_AUTH_PATHS.some((p) => original?.url?.includes(p));
+    if (error.response?.status === 401 && !original._retry && !isPublicAuthCall) {
       if (isRefreshing) {
         return new Promise((resolve, reject) => {
           failedQueue.push({ resolve, reject });
