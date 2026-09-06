@@ -5,7 +5,6 @@ import { Eye, EyeOff, FileText, Receipt, Calculator, CheckCircle2, Loader2, Arro
 import { useIsMobile } from '../hooks/useIsMobile.js';
 import Input from '../components/ui/Input.jsx';
 import api from '../utils/api.js';
-import Modal from '../components/ui/Modal.jsx';
 import { useTheme } from '../App.jsx';
 
 const BRAND_BULLETS = [
@@ -45,33 +44,6 @@ function PasswordStrengthIndicator({ password }) {
   );
 }
 
-// Terms & Conditions text for modal
-const TERMS_TEXT = `Kcretio Terms of Service
-
-1. Acceptance of Terms
-By creating an account, you agree to these terms.
-
-2. Service Description
-Kcretio provides GST invoicing, TDS tracking, advance tax planning, and financial management tools for Indian content creators.
-
-3. Data Privacy
-Your financial data is encrypted and stored securely. We do not share your data with third parties except as required by law.
-
-4. User Responsibilities
-You are responsible for the accuracy of information you enter. Tax estimates are indicative only — consult a CA for ITR filing.
-
-5. Payments & Subscriptions
-Subscriptions auto-renew until cancelled. Cancellations take effect at the end of the billing period.
-
-6. Intellectual Property
-All content, designs, and software are property of Kcretio.
-
-7. Disclaimer
-Tax calculations are estimates based on prevailing laws. Kcretio is not a licensed CA or tax advisor.
-
-8. Governing Law
-These terms are governed by the laws of India, subject to jurisdiction of courts in Bengaluru.`;
-
 export default function AuthPage({ defaultMode = 'register' }) {
   const [mode, setMode] = useState(defaultMode);
   const [name, setName] = useState('');
@@ -103,7 +75,6 @@ export default function AuthPage({ defaultMode = 'register' }) {
   // T&C state
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [marketingEmails, setMarketingEmails] = useState(true);
-  const [termsModalOpen, setTermsModalOpen] = useState(false);
 
   // OTP cooldown timer
   useEffect(() => {
@@ -477,13 +448,13 @@ export default function AuthPage({ defaultMode = 'register' }) {
                   <input type="checkbox" checked={termsAccepted} onChange={e => setTermsAccepted(e.target.checked)} style={{ marginTop: 2, accentColor: 'var(--accent)', flexShrink: 0 }} />
                   <span>
                     I agree to the{' '}
-                    <button type="button" onClick={() => setTermsModalOpen(true)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--accent)', textDecoration: 'underline', fontSize: 'inherit', padding: 0, fontFamily: 'inherit' }}>
+                    <a href="/terms" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)', textDecoration: 'underline' }}>
                       Terms of Service
-                    </button>
+                    </a>
                     {' '}and{' '}
-                    <button type="button" onClick={() => setTermsModalOpen(true)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--accent)', textDecoration: 'underline', fontSize: 'inherit', padding: 0, fontFamily: 'inherit' }}>
+                    <a href="/privacy" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)', textDecoration: 'underline' }}>
                       Privacy Policy
-                    </button>
+                    </a>
                     {' '}<span style={{ color: 'var(--danger-text)' }}>*</span>
                   </span>
                 </label>
@@ -528,18 +499,6 @@ export default function AuthPage({ defaultMode = 'register' }) {
           </p>
         </div>
       </div>
-
-      {/* T&C Modal */}
-      <Modal isOpen={termsModalOpen} onClose={() => setTermsModalOpen(false)} title="Terms of Service">
-        <pre style={{ fontSize: 'var(--text-xs)', color: 'var(--text-body)', lineHeight: 1.7, whiteSpace: 'pre-wrap', fontFamily: 'inherit', margin: 0 }}>
-          {TERMS_TEXT}
-        </pre>
-        <button
-          onClick={() => { setTermsAccepted(true); setTermsModalOpen(false); }}
-          style={{ marginTop: 'var(--space-4)', padding: 'var(--space-2) var(--space-4)', background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 'var(--radius-md)', fontWeight: 600, fontSize: 'var(--text-sm)', cursor: 'pointer', fontFamily: 'inherit' }}>
-          Accept & Close
-        </button>
-      </Modal>
 
       <style>{`
         @keyframes spin { to { transform: rotate(360deg); } }
