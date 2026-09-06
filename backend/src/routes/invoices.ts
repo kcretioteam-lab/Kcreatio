@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { supabase } from '../lib/supabase.js';
 import { authenticate, AuthRequest } from '../middleware/auth.js';
 import { validateBody } from '../middleware/validateBody.js';
+import { getFrontendUrl } from '../lib/env.js';
 import {
   calculateGst,
   getFinancialYear,
@@ -546,7 +547,7 @@ router.post('/:id/payment-confirm-token', async (req: AuthRequest, res: Response
     payment_confirm_expires_at: expiresAt,
   }).eq('id', inv.id);
 
-  const confirmUrl = `${process.env.FRONTEND_URL}/confirm-payment/${rawToken}`;
+  const confirmUrl = `${getFrontendUrl()}/confirm-payment/${rawToken}`;
   res.json({ url: confirmUrl, expiresAt });
 });
 
