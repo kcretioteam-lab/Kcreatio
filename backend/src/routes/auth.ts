@@ -669,7 +669,10 @@ router.get('/google/callback', async (req: Request, res: Response): Promise<void
     });
 
     const payload = ticket.getPayload();
-    if (!payload?.sub || !payload?.email) {
+    // payload.email_verified === false means Google itself isn't vouching that this
+    // person actually owns the email — without this check, a token like that could
+    // still be used to create/link an account by that email address. Reject it.
+    if (!payload?.sub || !payload?.email || payload.email_verified === false) {
       res.redirect(`${frontendUrl}/login?error=oauth_failed`);
       return;
     }
