@@ -7,6 +7,7 @@ import { supabase } from '../lib/supabase.js';
 import { validateBody } from '../middleware/validateBody.js';
 import { authenticate, AuthRequest } from '../middleware/auth.js';
 import { isDisposableEmail } from '../lib/disposableEmail.js';
+import { getFrontendUrl } from '../lib/env.js';
 
 const router = Router();
 
@@ -486,7 +487,7 @@ router.post('/forgot-password', validateBody(ForgotPasswordSchema), async (req: 
       expires_at: expiresAt,
     });
 
-    const resetLink = `${process.env.FRONTEND_URL}/reset-password?token=${rawToken}&email=${encodeURIComponent(email)}`;
+    const resetLink = `${getFrontendUrl()}/reset-password?token=${rawToken}&email=${encodeURIComponent(email)}`;
 
     const { sendPasswordResetEmail } = await import('../services/emailService.js').catch(() => ({ sendPasswordResetEmail: null }));
     if (sendPasswordResetEmail) {
@@ -644,7 +645,7 @@ router.get('/google', (req: Request, res: Response): void => {
 // GET /auth/google/callback — exchange code for tokens, upsert user
 router.get('/google/callback', async (req: Request, res: Response): Promise<void> => {
   const { code } = req.query as { code?: string };
-  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+  const frontendUrl = getFrontendUrl();
 
   if (!code) {
     res.redirect(`${frontendUrl}/login?error=oauth_failed`);
@@ -743,7 +744,7 @@ router.get('/google/callback', async (req: Request, res: Response): Promise<void
 router.get('/gmail/connect', authenticate, (req: AuthRequest, res: Response): void => {
   const params = new URLSearchParams({
     client_id: process.env.GOOGLE_CLIENT_ID || '',
-    redirect_uri: `${process.env.FRONTEND_URL?.replace(':5173', ':4000') || 'http://localhost:4000'}/api/v1/auth/gmail/callback`,
+    redirect_uri: `${req.protocol}://${req.get('host')}/api/v1/auth/gmail/callback`,
     response_type: 'code',
     scope: 'https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/gmail.readonly email profile',
     access_type: 'offline',
@@ -756,7 +757,7 @@ router.get('/gmail/connect', authenticate, (req: AuthRequest, res: Response): vo
 // GET /auth/gmail/callback — store gmail tokens on user
 router.get('/gmail/callback', async (req: Request, res: Response): Promise<void> => {
   const { code, state } = req.query as { code?: string; state?: string };
-  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+  const frontendUrl = getFrontendUrl();
 
   if (!code || !state) {
     res.redirect(`${frontendUrl}/settings?gmail=error`);
@@ -766,7 +767,7 @@ router.get('/gmail/callback', async (req: Request, res: Response): Promise<void>
   try {
     const { userId } = JSON.parse(Buffer.from(state, 'base64').toString());
     const { OAuth2Client } = await import('google-auth-library');
-    const callbackUrl = `${process.env.FRONTEND_URL?.replace(':5173', ':4000') || 'http://localhost:4000'}/api/v1/auth/gmail/callback`;
+    const callbackUrl = `${req.protocol}://${req.get('host')}/api/v1/auth/gmail/callback`;
     const oauthClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID, process.env.GOOGLE_CLIENT_SECRET, callbackUrl);
 
     const { tokens } = await oauthClient.getToken(code as string);

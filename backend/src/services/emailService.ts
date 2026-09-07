@@ -1,4 +1,5 @@
 import { Resend } from 'resend';
+import { getFrontendUrl } from '../lib/env.js';
 
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 const FROM = process.env.FROM_EMAIL || 'noreply@kcreatio.com';
@@ -53,7 +54,7 @@ export async function sendWelcomeEmail(to: string, name: string) {
       <h2 style="font-size:18px;font-weight:600;margin:0 0 8px;">Welcome, ${name}! 🎉</h2>
       <p style="color:#94a3b8;margin:0 0 16px;">Your 28-day free trial has started. You have full Pro access.</p>
       <p style="color:#94a3b8;margin:0 0 24px;">Start by creating your first GST-compliant invoice in under 30 seconds.</p>
-      <a href="${process.env.FRONTEND_URL}/invoices/new" style="display:inline-block;background:#E8921A;color:#fff;font-weight:700;padding:14px 32px;border-radius:8px;text-decoration:none;">Create First Invoice →</a>
+      <a href="${getFrontendUrl()}/invoices/new" style="display:inline-block;background:#E8921A;color:#fff;font-weight:700;padding:14px 32px;border-radius:8px;text-decoration:none;">Create First Invoice →</a>
     </div>`;
   await send(to, `Welcome to Kcretio, ${name}!`, html);
 }
@@ -114,7 +115,7 @@ export async function sendAdvanceTaxReminder(to: string, opts: {
         <div style="margin-bottom:8px;"><span style="color:#64748b;font-size:12px;text-transform:uppercase;letter-spacing:0.06em;">Amount Due</span><br><strong style="font-size:24px;color:#E8921A;font-variant-numeric:tabular-nums;">${opts.amount}</strong></div>
         <div><span style="color:#64748b;font-size:12px;text-transform:uppercase;letter-spacing:0.06em;">Due Date</span><br><strong>${opts.dueDate}</strong></div>
       </div>
-      <a href="${process.env.FRONTEND_URL}/tax-planner" style="display:inline-block;background:#E8921A;color:#fff;font-weight:700;padding:14px 32px;border-radius:8px;text-decoration:none;margin-bottom:16px;">View Tax Planner →</a>
+      <a href="${getFrontendUrl()}/tax-planner" style="display:inline-block;background:#E8921A;color:#fff;font-weight:700;padding:14px 32px;border-radius:8px;text-decoration:none;margin-bottom:16px;">View Tax Planner →</a>
       <p style="color:#64748b;font-size:12px;">Late payment attracts 1% interest per month under Section 234B/234C.</p>
     </div>`;
   await send(to, `${urgency}Advance Tax ${opts.quarter} due in ${opts.daysLeft} days — ${opts.amount}`, html);

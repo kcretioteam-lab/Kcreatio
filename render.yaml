@@ -48,3 +48,8 @@ services:
         sync: false
       - key: FRONTEND_URL
         sync: false
+      # Comma-separated in FRONTEND_URL (for CORS). PRIMARY_FRONTEND_URL picks
+      # the one origin used to build actual links (password reset, OAuth
+      # redirects, confirmation emails) — see backend/src/lib/env.ts.
+      - key: PRIMARY_FRONTEND_URL
+        sync: false

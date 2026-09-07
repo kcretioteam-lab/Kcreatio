@@ -17,6 +17,8 @@ import LandingPageV6 from './pages/LandingPageV6.jsx';
 import AuthPage from './pages/AuthPage.jsx';
 import ForgotPasswordPage from './pages/ForgotPasswordPage.jsx';
 import ResetPasswordPage from './pages/ResetPasswordPage.jsx';
+import TermsPage from './pages/TermsPage.jsx';
+import PrivacyPage from './pages/PrivacyPage.jsx';
 import NotFoundPage from './pages/NotFoundPage.jsx';
 
 // Lazy: code-split per route
@@ -107,6 +109,8 @@ export default function App() {
                 <Route path="/auth" element={<Navigate to="/login" replace />} />
                 <Route path="/forgot-password" element={<ForgotPasswordPage />} />
                 <Route path="/reset-password" element={<ResetPasswordPage />} />
+                <Route path="/terms" element={<TermsPage />} />
+                <Route path="/privacy" element={<PrivacyPage />} />
                 {/* Brand-facing payment confirmation — no auth, handled by backend */}
                 <Route path="/confirm-payment/:token" element={<Navigate to="/" replace />} />
 
