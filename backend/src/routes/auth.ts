@@ -188,7 +188,7 @@ router.post('/register', validateBody(RegisterSchema), async (req: Request, res:
 
   // Validate the email verification token
   try {
-    const payload = jwt.verify(verificationToken, process.env.JWT_ACCESS_SECRET!) as { email: string; purpose: string };
+    const payload = jwt.verify(verificationToken, process.env.JWT_ACCESS_SECRET!, { algorithms: ['HS256'] }) as { email: string; purpose: string };
     if (payload.email !== email || payload.purpose !== 'email_verify') {
       res.status(422).json({ error: 'VALIDATION_ERROR', message: 'Email verification required', field: 'email', statusCode: 422 });
       return;
@@ -327,7 +327,7 @@ router.post('/refresh', async (req: Request, res: Response): Promise<void> => {
   }
 
   try {
-    const payload = jwt.verify(token, process.env.JWT_REFRESH_SECRET!) as { sub: string; tv?: number };
+    const payload = jwt.verify(token, process.env.JWT_REFRESH_SECRET!, { algorithms: ['HS256'] }) as { sub: string; tv?: number };
 
     const { data: user } = await supabase
       .from('users')
@@ -631,6 +631,22 @@ export default router;
 // ── Google OAuth (Login / Signup) ──────────────────────────────────────────────
 // GET /auth/google — redirect to Google consent screen
 router.get('/google', (req: Request, res: Response): void => {
+  // Anti-forgery nonce: without this, an attacker could start their own OAuth
+  // flow, then trick a victim's browser into hitting /google/callback with the
+  // attacker's authorization code — logging the victim into the attacker's
+  // account without either of them intending it ("login CSRF"). We generate a
+  // one-time value, hand it to Google as `state`, and store it in a short-lived
+  // cookie scoped to the callback path; the callback rejects anything that
+  // doesn't match.
+  const stateNonce = crypto.randomBytes(16).toString('hex');
+  res.cookie('google_oauth_state', stateNonce, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax', // must still be sent on the top-level redirect back from accounts.google.com
+    path: '/api/v1/auth/google/callback',
+    maxAge: 5 * 60 * 1000,
+  });
+
   const params = new URLSearchParams({
     client_id: process.env.GOOGLE_CLIENT_ID || '',
     redirect_uri: process.env.GOOGLE_CALLBACK_URL || `${req.protocol}://${req.get('host')}/api/v1/auth/google/callback`,
@@ -638,16 +654,19 @@ router.get('/google', (req: Request, res: Response): void => {
     scope: 'openid email profile',
     access_type: 'offline',
     prompt: 'select_account',
+    state: stateNonce,
   });
   res.redirect(`https://accounts.google.com/o/oauth2/v2/auth?${params}`);
 });
 
 // GET /auth/google/callback — exchange code for tokens, upsert user
 router.get('/google/callback', async (req: Request, res: Response): Promise<void> => {
-  const { code } = req.query as { code?: string };
+  const { code, state } = req.query as { code?: string; state?: string };
   const frontendUrl = getFrontendUrl();
+  const expectedState = req.cookies?.google_oauth_state;
+  res.clearCookie('google_oauth_state', { path: '/api/v1/auth/google/callback' });
 
-  if (!code) {
+  if (!code || !state || !expectedState || state !== expectedState) {
     res.redirect(`${frontendUrl}/login?error=oauth_failed`);
     return;
   }
@@ -767,8 +786,29 @@ router.get('/gmail/callback', async (req: Request, res: Response): Promise<void>
     return;
   }
 
+  // `state` is plain, unsigned base64 — anyone could craft one embedding an
+  // arbitrary victim's userId, complete their OWN Google consent, and hit this
+  // callback directly to attach their Gmail account to someone else's Kcretio
+  // profile (this route had no login check of its own). We don't use the shared
+  // `authenticate` middleware here because a failed check should send the user
+  // back to Settings with a friendly error, not a raw 401 — so it's verified
+  // inline instead, and cross-checked against who `state` claims to be.
+  const sessionToken = req.cookies?.access_token;
+  let sessionUserId: string | null = null;
+  try {
+    const sessionPayload = jwt.verify(sessionToken, process.env.JWT_ACCESS_SECRET!, { algorithms: ['HS256'] }) as { sub: string };
+    sessionUserId = sessionPayload.sub;
+  } catch {
+    res.redirect(`${frontendUrl}/settings?gmail=error`);
+    return;
+  }
+
   try {
     const { userId } = JSON.parse(Buffer.from(state, 'base64').toString());
+    if (userId !== sessionUserId) {
+      res.redirect(`${frontendUrl}/settings?gmail=error`);
+      return;
+    }
     const { OAuth2Client } = await import('google-auth-library');
     const callbackUrl = `${req.protocol}://${req.get('host')}/api/v1/auth/gmail/callback`;
     const oauthClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID, process.env.GOOGLE_CLIENT_SECRET, callbackUrl);
