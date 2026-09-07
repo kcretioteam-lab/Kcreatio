@@ -17,6 +17,7 @@ import {
   Act6Ecosystem, ComparisonTable, Pricing,
   FAQ, Act7Return, Footer,
 } from './LandingPageV6Acts.jsx';
+import LogoMark from '../components/ui/LogoMark.jsx';
 
 // ─── CursorGlow ───────────────────────────────────────────────────────────────
 
@@ -334,12 +335,7 @@ function Navbar() {
         pointerEvents: 'auto',
       }}>
         <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: 8, textDecoration: 'none' }}>
-          <div style={{
-            width: 28, height: 28,
-            background: 'linear-gradient(135deg, #E8921A 0%, #c8711a 100%)',
-            borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontWeight: 900, fontSize: 13, color: '#fff',
-          }}>K</div>
+          <LogoMark size={28} />
           <span style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: 14, letterSpacing: '-0.02em' }}>
             Kcretio
           </span>

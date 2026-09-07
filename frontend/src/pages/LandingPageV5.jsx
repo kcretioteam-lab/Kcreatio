@@ -1,5 +1,5 @@
 /**
- * LandingPageV5 — CreatiFlow Cinematic Experience
+ * LandingPageV5 — Kcretio Cinematic Experience
  * One continuous story in 7 acts. Pure React + CSS. No new libraries.
  * Core metaphor: FLOW — everything flows.
  */
@@ -11,6 +11,7 @@ import {
   Zap, Shield, RefreshCw, Check, Sun, Moon, Menu, X,
 } from 'lucide-react';
 import { useTheme } from '../App.jsx';
+import LogoMark from '../components/ui/LogoMark.jsx';
 
 // ─── utils ───────────────────────────────────────────────────────────────────
 
@@ -305,14 +306,9 @@ function Navbar() {
       >
         {/* Logo */}
         <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: 8, textDecoration: 'none' }}>
-          <div style={{
-            width: 28, height: 28,
-            background: 'linear-gradient(135deg, #E8921A 0%, #c8711a 100%)',
-            borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontWeight: 900, fontSize: 13, color: '#fff',
-          }}>C</div>
+          <LogoMark size={28} />
           <span style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: 14, letterSpacing: '-0.02em' }}>
-            CreatiFlow
+            Kcretio
           </span>
         </Link>
 
@@ -824,21 +820,21 @@ const JOURNEY = [
   {
     step: '03', icon: TrendingDown, color: '#a78bfa',
     title: '₹11,800 TDS deducted at source.',
-    body: 'Mamaearth pays ₹1,06,200. CreatiFlow records the ₹11,800 TDS before you even check your account. Form 16A? Already tracked.',
+    body: 'Mamaearth pays ₹1,06,200. Kcretio records the ₹11,800 TDS before you even check your account. Form 16A? Already tracked.',
     tag: 'Form 16A: awaiting',
     detail: 'Net received: ₹1,06,200 · TDS: ₹11,800 · Cert pending',
   },
   {
     step: '04', icon: IndianRupee, color: '#f59e0b',
     title: 'Income logged. P&L updated.',
-    body: 'Payment hits your account. CreatiFlow auto-logs it. Running totals current. Gross income, net income, deductions — all live.',
+    body: 'Payment hits your account. Kcretio auto-logs it. Running totals current. Gross income, net income, deductions — all live.',
     tag: 'No spreadsheet needed',
     detail: 'FY 2024-25 gross: ₹38,40,000 · Net: ₹33,12,000',
   },
   {
     step: '05', icon: Calendar, color: '#fb923c',
     title: 'Sep 15 arrives. You pay zero penalty.',
-    body: 'CreatiFlow calculated your Q3 advance tax 14 days before the deadline. Reminder sent. ₹18,400 paid. No interest. No CA panic calls.',
+    body: 'Kcretio calculated your Q3 advance tax 14 days before the deadline. Reminder sent. ₹18,400 paid. No interest. No CA panic calls.',
     tag: '14-day reminder sent',
     detail: 'Q3 advance tax: ₹18,400 · Penalty avoided: ₹2,460',
   },
@@ -954,7 +950,7 @@ function Act4HowItWorks() {
                 One deal. Fully handled.
               </h2>
               <p style={{ fontSize: 15, color: 'var(--text-body)', lineHeight: 1.7 }}>
-                Follow Riya's journey — from brand deal to filed ITR. CreatiFlow handles every step.
+                Follow Riya's journey — from brand deal to filed ITR. Kcretio handles every step.
               </p>
             </div>
           </Reveal>
@@ -1107,7 +1103,7 @@ const IMPACTS = [
   {
     icon: Shield, color: '#4ade80',
     headline: 'One less thing to think about.',
-    subline: 'CGST, SGST, IGST — CreatiFlow picks the right one based on your state codes. You never think about it.',
+    subline: 'CGST, SGST, IGST — Kcretio picks the right one based on your state codes. You never think about it.',
     before: 'GST Automation', stat: '₹0', statLabel: 'penalty risk',
   },
   {
@@ -1205,7 +1201,7 @@ function Act5Impact() {
               }}>Life improvements.</span>
             </h2>
             <p style={{ fontSize: 'clamp(15px, 1.8vw, 18px)', color: 'var(--text-body)', lineHeight: 1.7, maxWidth: 500, margin: '0 auto' }}>
-              Every tool in CreatiFlow is designed to give you back time, money, and mental space.
+              Every tool in Kcretio is designed to give you back time, money, and mental space.
             </p>
           </div>
         </Reveal>
@@ -1349,7 +1345,7 @@ function Act6Ecosystem() {
             {[
               ['Everything synced', 'Log a deal → invoice auto-drafted. Payment received → income logged. TDS deducted → Form 16A tracked.'],
               ['Nothing manual', 'No copying between apps. No Excel formulas. No "wait let me calculate this." Just create.'],
-              ['Always current', 'Open CreatiFlow anytime and see exactly where your business stands. Live. Accurate. Complete.'],
+              ['Always current', 'Open Kcretio anytime and see exactly where your business stands. Live. Accurate. Complete.'],
             ].map(([title, desc], i) => (
               <Reveal key={i} delay={i * 100}>
                 <div style={{ display: 'flex', gap: 14, padding: '18px 0', borderBottom: i < 2 ? '1px solid var(--border)' : 'none' }}>
@@ -1621,8 +1617,8 @@ function Footer() {
           {/* Brand */}
           <div style={{ maxWidth: 260 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-              <div style={{ width: 28, height: 28, background: 'linear-gradient(135deg, #E8921A, #c8711a)', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: 13, color: '#fff' }}>C</div>
-              <span style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: 15 }}>CreatiFlow</span>
+              <LogoMark size={28} />
+              <span style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: 15 }}>Kcretio</span>
             </div>
             <p style={{ fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.7 }}>
               The financial operating system for Indian content creators. Built for creators, by people who care about them.
@@ -1649,7 +1645,7 @@ function Footer() {
         </div>
         <div style={{ height: 1, background: 'var(--border)', marginBottom: 24 }} />
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
-          <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>© 2025 CreatiFlow. Built with ♥ for Indian creators.</span>
+          <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>© 2025 Kcretio. Built with ♥ for Indian creators.</span>
           <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>GST compliant per Rule 46 CGST Rules 2017</span>
         </div>
       </div>

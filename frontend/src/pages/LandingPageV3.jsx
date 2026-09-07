@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Sun, Moon, Menu, X, FileText, TrendingDown, Calendar, Briefcase, BarChart2, Download, Lock, Shield, RefreshCw, Check, IndianRupee, ArrowRight } from 'lucide-react';
 import { useTheme } from '../App.jsx';
 import { useScrollProgress } from '../hooks/useScrollProgress.js';
+import LogoMark from '../components/ui/LogoMark.jsx';
 
 // ── Prefers-reduced-motion check ──────────────────────────────────────────────
 function pRM() {
@@ -149,24 +150,7 @@ function Navbar() {
           to="/"
           style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', textDecoration: 'none' }}
         >
-          <div
-            aria-hidden="true"
-            style={{
-              width: 26,
-              height: 26,
-              background: 'linear-gradient(135deg, var(--accent) 0%, #c8711a 100%)',
-              borderRadius: 7,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontWeight: 800,
-              fontSize: 13,
-              color: '#fff',
-              flexShrink: 0,
-            }}
-          >
-            C
-          </div>
+          <LogoMark size={26} />
           <span
             style={{
               fontWeight: 700,
@@ -175,7 +159,7 @@ function Navbar() {
               letterSpacing: '-0.02em',
             }}
           >
-            CreatiFlow
+            Kcretio
           </span>
         </Link>
 
@@ -542,7 +526,7 @@ export function Act1Dream() {
               : 'opacity 0.55s cubic-bezier(0.16,1,0.3,1) 0ms, transform 0.55s cubic-bezier(0.16,1,0.3,1) 0ms',
           }}
         >
-          CreatiFlow handles GST invoicing, TDS tracking, and advance tax — so you never have to think about them.
+          Kcretio handles GST invoicing, TDS tracking, and advance tax — so you never have to think about them.
         </p>
 
         {/* CTA row */}
@@ -1740,7 +1724,7 @@ export function Act3TurningPoint() {
         <R delay={250}>
           <p style={{ fontSize: 'var(--text-lg)', color: 'var(--text-muted)', lineHeight: 1.7 }}>
             Every task that used to pile up — handled automatically.<br/>
-            You send the invoice. CreatiFlow does the rest.
+            You send the invoice. Kcretio does the rest.
           </p>
         </R>
       </div>
@@ -1815,7 +1799,7 @@ const JOURNEY = [
     num: '03', icon: TrendingDown, color: 'var(--danger)',
     label: 'TDS LOGGED',
     title: '₹11,800 TDS deducted.',
-    desc: 'CreatiFlow records it before Riya even checks her account.',
+    desc: 'Kcretio records it before Riya even checks her account.',
     stat: 'Form 16A: Awaiting',
     statColor: 'var(--warning-text)',
   },
@@ -1831,7 +1815,7 @@ const JOURNEY = [
     num: '05', icon: Calendar, color: 'var(--warning)',
     label: 'TAX HANDLED',
     title: 'Sep 15 arrives.',
-    desc: 'CreatiFlow already calculated her Q3 advance tax. She pays ₹18,400. Zero penalty.',
+    desc: 'Kcretio already calculated her Q3 advance tax. She pays ₹18,400. Zero penalty.',
     stat: '14-day reminder sent',
     statColor: 'var(--accent)',
   },
@@ -2255,7 +2239,7 @@ function UniverseNetwork() {
           margin: '0 auto',
         }}
         role="img"
-        aria-label="Network diagram showing CreatiFlow connecting brand deals, invoices, payments, GST, TDS, analytics, and CA export"
+        aria-label="Network diagram showing Kcretio connecting brand deals, invoices, payments, GST, TDS, analytics, and CA export"
       >
         {/* SVG connector lines */}
         <svg
@@ -2534,7 +2518,7 @@ export function Act7Return() {
   return (
     <section
       role="region"
-      aria-label="Start creating — CreatiFlow handles the rest"
+      aria-label="Start creating — Kcretio handles the rest"
       style={{
         position: 'relative',
         overflow: 'hidden',
@@ -3288,8 +3272,8 @@ export function V3Pricing() {
 
 const FAQ_DATA = [
   {
-    q: 'Do I need a CA to use CreatiFlow?',
-    a: "No. CreatiFlow handles day-to-day GST invoicing, TDS tracking, and advance tax planning automatically. Your CA still files your ITR once a year — but instead of spending 2 hours sorting your records, they get a clean ZIP file and you're done in 20 minutes.",
+    q: 'Do I need a CA to use Kcretio?',
+    a: "No. Kcretio handles day-to-day GST invoicing, TDS tracking, and advance tax planning automatically. Your CA still files your ITR once a year — but instead of spending 2 hours sorting your records, they get a clean ZIP file and you're done in 20 minutes.",
   },
   {
     q: 'I have a GSTIN. How do I set it up?',
@@ -3297,7 +3281,7 @@ const FAQ_DATA = [
   },
   {
     q: "What if I don't have a GSTIN yet?",
-    a: "You can use CreatiFlow to track income, TDS, and deals without a GSTIN. GST registration is mandatory once your turnover crosses ₹20 lakhs/year — we'll remind you when you're approaching that threshold.",
+    a: "You can use Kcretio to track income, TDS, and deals without a GSTIN. GST registration is mandatory once your turnover crosses ₹20 lakhs/year — we'll remind you when you're approaching that threshold.",
   },
   {
     q: 'Is my financial data safe?',
@@ -3503,7 +3487,7 @@ export function V3Footer() {
                 display: 'block',
               }}
             >
-              CreatiFlow
+              Kcretio
             </span>
             <span
               style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}
@@ -3544,7 +3528,7 @@ export function V3Footer() {
         <span
           style={{ fontSize: 'var(--text-xs)', color: 'var(--text-disabled)' }}
         >
-          Made with ♥ for Indian creators · © 2025 CreatiFlow
+          Made with ♥ for Indian creators · © 2025 Kcretio
         </span>
       </div>
     </footer>

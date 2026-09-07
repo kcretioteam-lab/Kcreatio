@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Sun, Moon, Menu, X, Lock, Shield, RefreshCw, Calendar, FileText, Eye, Download } from 'lucide-react';
 import ChaosHero from '../components/hero/ChaosHero.jsx';
 import { useTheme } from '../App.jsx';
+import LogoMark from '../components/ui/LogoMark.jsx';
 
 // ── Scroll reveal hook ────────────────────────────────────────────────────────
 function useScrollReveal() {
@@ -196,11 +197,7 @@ export default function LandingPage() {
         }}>
           {/* Logo */}
           <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', textDecoration: 'none' }}>
-            <div aria-hidden="true" style={{
-              width: 26, height: 26, background: 'var(--accent)',
-              borderRadius: 7, display: 'flex', alignItems: 'center',
-              justifyContent: 'center', fontWeight: 800, fontSize: 13, color: '#fff', flexShrink: 0,
-            }}>C</div>
+            <LogoMark size={26} />
             <span style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: 'var(--text-sm)', letterSpacing: '-0.01em' }}>
               Kcretio
             </span>
@@ -821,7 +818,7 @@ export default function LandingPage() {
         margin: '0 auto',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
-          <div aria-hidden="true" style={{ width: 22, height: 22, background: 'var(--accent)', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 11, color: '#fff' }}>C</div>
+          <LogoMark size={22} />
           <span style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)' }}>Kcretio · Built for Indian creators</span>
         </div>
         <div style={{ display: 'flex', gap: 'var(--space-5)' }}>

@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="none">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 100" fill="none">
   <defs>
     <linearGradient id="kcretio-bar" x1="20" y1="14" x2="38" y2="86" gradientUnits="userSpaceOnUse">
       <stop offset="0" stop-color="#2563EB"/>
@@ -16,4 +16,5 @@
   <rect x="20" y="14" width="16" height="72" rx="8" fill="url(#kcretio-bar)"/>
   <line x1="36" y1="52" x2="80" y2="16" stroke="url(#kcretio-upper)" stroke-width="16" stroke-linecap="round"/>
   <line x1="36" y1="52" x2="80" y2="88" stroke="url(#kcretio-lower)" stroke-width="16" stroke-linecap="round"/>
+  <text x="102" y="66" font-family="Arial, Helvetica, sans-serif" font-weight="800" font-size="46" letter-spacing="-1" fill="#0F1115">Kcretio</text>
 </svg>

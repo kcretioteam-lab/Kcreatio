@@ -4,6 +4,7 @@ import { Sun, Moon, Menu, X, FileText, TrendingDown, Calendar, Briefcase, BarCha
 import ChaosHero from '../components/hero/ChaosHero.jsx';
 import { useTheme } from '../App.jsx';
 import { useScrollProgress } from '../hooks/useScrollProgress.js';
+import LogoMark from '../components/ui/LogoMark.jsx';
 
 // ── Scroll reveal hook ────────────────────────────────────────────────────────
 function useScrollReveal() {
@@ -102,14 +103,9 @@ function Navbar() {
       }}>
         {/* Logo */}
         <Link to="/v2" style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', textDecoration: 'none' }}>
-          <div aria-hidden="true" style={{
-            width: 26, height: 26,
-            background: 'linear-gradient(135deg, var(--accent) 0%, #c8711a 100%)',
-            borderRadius: 7, display: 'flex', alignItems: 'center',
-            justifyContent: 'center', fontWeight: 800, fontSize: 13, color: '#fff', flexShrink: 0,
-          }}>C</div>
+          <LogoMark size={26} />
           <span style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: 'var(--text-sm)', letterSpacing: '-0.02em' }}>
-            CreatiFlow
+            Kcretio
           </span>
         </Link>
 
@@ -823,7 +819,7 @@ export function MidCTA1() {
     <Reveal>
       <div
         role="region"
-        aria-label="Get started with CreatiFlow"
+        aria-label="Get started with Kcretio"
         style={{
           background: 'var(--surface)',
           borderTop: '1px solid var(--border)',
@@ -858,7 +854,7 @@ export function MidCTA1() {
             fontSize: 'var(--text-base)', color: 'var(--text-muted)',
             lineHeight: 1.65, marginBottom: 'var(--space-8)',
           }}>
-            CreatiFlow handles every one of those frames automatically.
+            Kcretio handles every one of those frames automatically.
           </p>
           <Link
             to="/register"
@@ -1005,7 +1001,7 @@ export function FlowPipeline() {
     <section
       ref={sectionRef}
       role="region"
-      aria-label="How CreatiFlow works — pipeline"
+      aria-label="How Kcretio works — pipeline"
       style={{ ...sectionWrap, textAlign: 'center' }}
     >
       <style>{`
@@ -1141,7 +1137,7 @@ export function FlowPipeline() {
 const JOURNEY_STAGES = [
   { IconComp: Handshake,   num: '01', title: 'Brand Deal',   desc: 'Inquiry arrives. You log it in deals.' },
   { IconComp: FileText,    num: '02', title: 'Invoice Sent',  desc: '30 seconds. GST compliant. PDF ready.' },
-  { IconComp: Minus,       num: '03', title: 'TDS Logged',    desc: '₹4,500 deducted. CreatiFlow records it.' },
+  { IconComp: Minus,       num: '03', title: 'TDS Logged',    desc: '₹4,500 deducted. Kcretio records it.' },
   { IconComp: IndianRupee, num: '04', title: 'Payment In',    desc: '₹40,500 hits your account. Income auto-logged.' },
   { IconComp: BarChart2,   num: '05', title: 'Books Updated', desc: 'P&L updated. Running total current.' },
   { IconComp: Download,    num: '06', title: 'CA Export',     desc: 'One ZIP. 20 minutes with your CA.' },
@@ -1653,7 +1649,7 @@ export function TimeReclaimed() {
   return (
     <section
       role="region"
-      aria-label="Time reclaimed with CreatiFlow"
+      aria-label="Time reclaimed with Kcretio"
       style={{ ...sectionWrap, paddingTop: 'var(--space-16)' }}
     >
       <style>{`
@@ -1675,16 +1671,16 @@ export function TimeReclaimed() {
       </div>
 
       <div className="tr-groups">
-        <BarGroupStatic title="Without CreatiFlow" rows={WITHOUT_ROWS} />
+        <BarGroupStatic title="Without Kcretio" rows={WITHOUT_ROWS} />
         <div className="tr-divider" aria-hidden="true" />
-        <BarGroupStatic title="With CreatiFlow" rows={WITH_ROWS} />
+        <BarGroupStatic title="With Kcretio" rows={WITH_ROWS} />
       </div>
 
       <p style={{
         textAlign: 'center', fontSize: 'var(--text-sm)',
         color: 'var(--text-muted)', marginTop: 'var(--space-10)', lineHeight: 1.6,
       }}>
-        The 12% is handled by CreatiFlow. Automatically.
+        The 12% is handled by Kcretio. Automatically.
       </p>
     </section>
   );
@@ -1852,7 +1848,7 @@ export function FeaturesGrid() {
 
 const TESTIMONIALS_DATA = [
   {
-    quote: "I used to spend two hours before every brand payment hunting for the right invoice format online, second-guessing every field. My first invoice on CreatiFlow took 4 minutes. I've never gone back.",
+    quote: "I used to spend two hours before every brand payment hunting for the right invoice format online, second-guessing every field. My first invoice on Kcretio took 4 minutes. I've never gone back.",
     name: 'Priya R.',
     role: 'Tech Creator · 220K subscribers',
     initials: 'PR',
@@ -1868,7 +1864,7 @@ const TESTIMONIALS_DATA = [
     featured: true,
   },
   {
-    quote: "My CA used to charge ₹18,000 in March just to sort through my records. Last year I handed him the CreatiFlow export ZIP. He called back in 20 minutes. Filing cost ₹4,000.",
+    quote: "My CA used to charge ₹18,000 in March just to sort through my records. Last year I handed him the Kcretio export ZIP. He called back in 20 minutes. Filing cost ₹4,000.",
     name: 'Meera K.',
     role: 'Lifestyle Creator · 210K subscribers',
     initials: 'MK',
@@ -1969,7 +1965,7 @@ const CMP_ROWS = [
   { feature: 'Price',                        vals: ['₹299/mo', 'Free', '₹1,200/mo', '₹5,000/yr'] },
 ];
 
-const CMP_COLS = ['CreatiFlow ★', 'Google Sheets', 'Zoho Books', 'CA Only'];
+const CMP_COLS = ['Kcretio ★', 'Google Sheets', 'Zoho Books', 'CA Only'];
 
 const CMP_MOBILE_CARDS = [
   { feature: 'GST Invoice (creator SAC)',  ours: '✓ Included',       others: 'Not in any competitor' },
@@ -2025,7 +2021,7 @@ function CmpRow({ row }) {
 export function ComparisonTable() {
   return (
     <section
-      aria-label="Why CreatiFlow"
+      aria-label="Why Kcretio"
       style={{ maxWidth: 1000, margin: '0 auto', padding: '0 var(--space-6) var(--space-20)' }}
     >
       <Reveal>
@@ -2326,8 +2322,8 @@ export function PricingSection() {
 
 const FAQ_DATA = [
   {
-    q: 'Do I need a CA to use CreatiFlow?',
-    a: "No. CreatiFlow handles day-to-day GST invoicing, TDS tracking, and advance tax planning automatically. Your CA still files your ITR once a year — but instead of spending 2 hours sorting your records, they get a clean ZIP file and you're done in 20 minutes.",
+    q: 'Do I need a CA to use Kcretio?',
+    a: "No. Kcretio handles day-to-day GST invoicing, TDS tracking, and advance tax planning automatically. Your CA still files your ITR once a year — but instead of spending 2 hours sorting your records, they get a clean ZIP file and you're done in 20 minutes.",
   },
   {
     q: 'I have a GSTIN. How do I set it up?',
@@ -2335,7 +2331,7 @@ const FAQ_DATA = [
   },
   {
     q: "What if I don't have a GSTIN yet?",
-    a: "You can use CreatiFlow to track income, TDS, and deals without a GSTIN. GST registration is mandatory once your turnover crosses ₹20 lakhs/year — we'll remind you when you're approaching that threshold.",
+    a: "You can use Kcretio to track income, TDS, and deals without a GSTIN. GST registration is mandatory once your turnover crosses ₹20 lakhs/year — we'll remind you when you're approaching that threshold.",
   },
   {
     q: 'Is my financial data safe?',
@@ -2508,7 +2504,7 @@ export function FooterV2() {
           </div>
           <div>
             <span style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: 'var(--text-sm)', letterSpacing: '-0.01em', display: 'block' }}>
-              CreatiFlow
+              Kcretio
             </span>
             <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>Everything flows.</span>
           </div>
@@ -2531,7 +2527,7 @@ export function FooterV2() {
 
         {/* Right: copyright */}
         <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-disabled)' }}>
-          © 2025 CreatiFlow · Built for Indian creators
+          © 2025 Kcretio · Built for Indian creators
         </span>
       </div>
     </footer>

@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import LogoMark from '../components/ui/LogoMark.jsx';
 
 const SECTIONS = [
   {
@@ -68,7 +69,7 @@ export default function PrivacyPage() {
     <div style={{ minHeight: '100dvh', background: 'var(--bg)' }}>
       <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: 'var(--space-5) var(--space-6)', borderBottom: '1px solid var(--border)' }}>
         <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', color: 'var(--text-primary)', fontWeight: 600, textDecoration: 'none' }}>
-          <span aria-hidden="true" style={{ width: 28, height: 28, background: 'var(--accent)', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 14, color: '#fff' }}>K</span>
+          <LogoMark size={28} />
           Kcretio
         </Link>
         <Link to="/register" style={{ fontSize: 'var(--text-sm)', color: 'var(--accent)', fontWeight: 600, textDecoration: 'none' }}>← Back to sign up</Link>
