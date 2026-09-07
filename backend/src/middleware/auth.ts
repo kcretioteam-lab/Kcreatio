@@ -22,7 +22,7 @@ export function authenticate(req: AuthRequest, res: Response, next: NextFunction
     return;
   }
   try {
-    const payload = jwt.verify(token, process.env.JWT_ACCESS_SECRET!) as { sub: string; plan: string };
+    const payload = jwt.verify(token, process.env.JWT_ACCESS_SECRET!, { algorithms: ['HS256'] }) as { sub: string; plan: string };
     req.userId = payload.sub;
     req.userPlan = payload.plan;
     next();
