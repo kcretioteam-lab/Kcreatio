@@ -885,7 +885,20 @@ export default function InvoicePage({ initialView }) {
     if (filterStatus !== 'all') params.status = filterStatus;
     api.get('/invoices', { params })
       .then(res => { setInvoices(res.data.invoices || []); setTotalCount(res.data.total || 0); })
-      .catch(() => setInvoices(lsLoad()))
+      .catch(() => {
+        // Dev-only convenience: local dev often has no Supabase configured, so the
+        // API returns 5xx and this lets the UI still be usable. In production this
+        // used to silently show localStorage's fake data instead of the real
+        // (possibly genuinely empty) list — which is how invoices could look saved
+        // in the UI while never having reached the database at all. Now production
+        // just says so and keeps whatever was last successfully loaded, instead of
+        // quietly substituting unsynced local data for the truth.
+        if (import.meta.env.DEV) {
+          setInvoices(lsLoad());
+        } else {
+          toast.error('Could not load your invoices — check your connection and try again.');
+        }
+      })
       .finally(() => setListLoading(false));
   }
 
@@ -981,10 +994,24 @@ export default function InvoicePage({ initialView }) {
       });
       saved = { ...payload, id: res.data.id };
     } catch {
-      const existing = lsLoad();
-      const id = editingId || `local-${Date.now()}`;
-      saved = { ...payload, id };
-      lsSave(editingId ? existing.map(i => i.id===editingId ? saved : i) : [saved, ...existing]);
+      // This used to fall back to localStorage unconditionally, on ANY failure —
+      // a slow/cold-starting backend, a network blip, an expired session, anything.
+      // The invoice would show a normal "Saved!" screen and be fully downloadable
+      // as a PDF, but it was never actually written to the database: gone forever
+      // on a cleared cache or a different device, and never in TDS/GST records.
+      // Now that silent fallback only happens in local dev (matching the documented
+      // dev-without-Supabase convenience elsewhere in the app) — production tells
+      // the user it failed instead of pretending it worked.
+      if (import.meta.env.DEV) {
+        const existing = lsLoad();
+        const id = editingId || `local-${Date.now()}`;
+        saved = { ...payload, id };
+        lsSave(editingId ? existing.map(i => i.id===editingId ? saved : i) : [saved, ...existing]);
+      } else {
+        toast.error('Could not save the invoice — check your connection and try again.');
+        setSubmitting(false);
+        return null;
+      }
     }
     setSubmitting(false);
     refreshUsage();
