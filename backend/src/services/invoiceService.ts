@@ -19,6 +19,17 @@ export interface GstCalculation {
   igstAmount: number | null;
 }
 
+// A state code missing its leading zero ("9" instead of "09"), or with
+// stray whitespace, used to fail the strict comparison below silently and
+// misclassify a same-state invoice as interstate — always IGST instead of
+// CGST+SGST, with no error shown anywhere. Normalizing both sides first
+// closes that gap regardless of how the code was originally typed/stored.
+function normalizeStateCode(code: string): string {
+  if (!code) return '';
+  const trimmed = String(code).trim();
+  return trimmed.length === 1 ? `0${trimmed}` : trimmed;
+}
+
 export function calculateGst(
   baseAmountRupees: number,
   gstRate: GstRate,
@@ -30,8 +41,10 @@ export function calculateGst(
   const gstPaise = Math.round(basePaise * gstRate / 100);
   const totalPaise = basePaise + gstPaise;
 
+  const normCreator = normalizeStateCode(creatorStateCode);
+  const normBrand = normalizeStateCode(brandStateCode);
   const supplyType: 'intrastate' | 'interstate' =
-    creatorStateCode && brandStateCode && creatorStateCode === brandStateCode
+    normCreator && normBrand && normCreator === normBrand
       ? 'intrastate'
       : 'interstate';
 

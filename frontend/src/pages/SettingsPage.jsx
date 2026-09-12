@@ -8,6 +8,7 @@ import { useToast } from '../hooks/useToast.jsx';
 import api from '../utils/api.js';
 import { openSubscriptionCheckout } from '../utils/razorpay.js';
 import { PLAN_DISPLAY, PLAN_HIERARCHY } from '../utils/planConfig.js';
+import { INDIAN_STATES, STATE_MAP } from '../utils/indianStates.js';
 
 const SECTIONS = ['Profile', 'Tax Profile', 'Invoice Settings', 'Billing', 'Notifications', 'Security', 'Export', 'Integrations', 'Danger Zone'];
 
@@ -1589,7 +1590,23 @@ export default function SettingsPage() {
                   <Input id="b-addr" label="Business Address" value={businessForm.business_address} onChange={e => setBusinessForm(p => ({...p, business_address: e.target.value}))} />
                   <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 'var(--space-3)' }}>
                     <Input id="b-prefix" label="Invoice Prefix" value={businessForm.invoice_prefix} onChange={e => setBusinessForm(p => ({...p, invoice_prefix: e.target.value.toUpperCase()}))} placeholder="INV" maxLength={5} hint="2–5 chars, used in invoice numbers" />
-                    <Input id="b-state" label="State Code" value={businessForm.state_code} onChange={e => setBusinessForm(p => ({...p, state_code: e.target.value}))} placeholder="29" maxLength={2} />
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
+                      <label htmlFor="b-state" style={{ fontSize: 'var(--text-sm)', fontWeight: 500, color: 'var(--text-body)' }}>State</label>
+                      <select
+                        id="b-state"
+                        value={businessForm.state_code}
+                        onChange={e => setBusinessForm(p => ({...p, state_code: e.target.value}))}
+                        style={{
+                          padding: 'var(--space-2) var(--space-3)', background: 'var(--surface-2)',
+                          border: '1px solid var(--border)', borderRadius: 'var(--radius-md)',
+                          color: 'var(--text-primary)', fontSize: 'var(--text-base)', width: '100%',
+                          fontFamily: 'inherit',
+                        }}
+                      >
+                        <option value="">Select state</option>
+                        {INDIAN_STATES.map(s => <option key={s.code} value={s.code}>{s.code} — {s.name}</option>)}
+                      </select>
+                    </div>
                   </div>
                   <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-2)' }}>
                     <button onClick={saveBusiness} disabled={savingBusiness} style={{ padding: 'var(--space-2) var(--space-4)', background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 'var(--radius-md)', fontWeight: 600, fontSize: 'var(--text-sm)', cursor: 'pointer', fontFamily: 'inherit' }}>
@@ -1606,7 +1623,7 @@ export default function SettingsPage() {
                   <FieldRow label="GSTIN" value={user?.gstin} />
                   <FieldRow label="PAN" value={user?.pan} />
                   <FieldRow label="Business Address" value={user?.business_address} />
-                  <FieldRow label="State Code" value={user?.state_code} />
+                  <FieldRow label="State" value={user?.state_code ? `${STATE_MAP[user.state_code] || ''} (${user.state_code})` : ''} />
                   <FieldRow label="Invoice Prefix" value={user?.invoice_prefix} />
                 </div>
               )}
