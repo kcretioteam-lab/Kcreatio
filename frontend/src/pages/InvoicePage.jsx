@@ -561,7 +561,7 @@ function buildMinimalHTML(inv, user, t, plan) {
   <div>
     <div class="inv-label">TAX INVOICE</div>
     <div class="inv-num">${inv.invoice_number || '—'}</div>
-    ${inv.reverse_charge === 'Yes' ? '<div style="text-align:right;font-size:9px;color:#e87500;margin-top:2px">REVERSE CHARGE</div>' : ''}
+    ${inv.reverse_charge === 'Yes' ? '<div style="text-align:right;font-size:9px;color:#e87500;margin-top:2px">REVERSE CHARGE APPLICABLE</div>' : ''}
   </div>
 </div>
 <hr class="divider" />
@@ -1972,7 +1972,7 @@ function ClassicPreview({ form, calc, invoiceNumber, user, template }) {
             <div>Date: {form.invoiceDate ? format(new Date(form.invoiceDate + 'T00:00:00'), 'dd MMM yyyy') : '—'}</div>
             <div>Due: {form.dueDate ? format(new Date(form.dueDate + 'T00:00:00'), 'dd MMM yyyy') : '—'}</div>
             {form.reverseCharge === 'Yes' && (
-              <div style={{ marginTop: 4, background: 'rgba(255,255,255,0.2)', borderRadius: 4, padding: '1px 6px', fontSize: 9 }}>REVERSE CHARGE</div>
+              <div style={{ marginTop: 4, background: 'rgba(255,255,255,0.2)', borderRadius: 4, padding: '1px 6px', fontSize: 9 }}>REVERSE CHARGE APPLICABLE</div>
             )}
           </div>
         </div>
@@ -2120,7 +2120,7 @@ function ClassicPreview({ form, calc, invoiceNumber, user, template }) {
         )}
 
         <div style={{ marginTop: 16, textAlign: 'center', fontSize: 8, color: '#ccc' }}>
-          Computer-generated invoice · Kcretio · GST compliant per Rule 46 CGST Rules
+          Computer-generated invoice · Kcretio · Subject to GST as applicable
         </div>
       </div>
 
@@ -2148,6 +2148,9 @@ function CorporatePreview({ form, calc, invoiceNumber, user, template }) {
           <div style={{ fontSize: 8, letterSpacing: '0.12em', opacity: 0.7, textTransform: 'uppercase' }}>TAX INVOICE</div>
           <div style={{ fontSize: 14, fontWeight: 700, marginTop: 2 }}>{invoiceNumber || 'INV/2526/0001'}</div>
           <div style={{ fontSize: 8, border: '1px solid rgba(255,255,255,0.5)', borderRadius: 3, padding: '1px 5px', marginTop: 4, display: 'inline-block' }}>ORIGINAL FOR RECIPIENT</div>
+          {form.reverseCharge === 'Yes' && (
+            <div style={{ fontSize: 8, background: 'rgba(255,255,255,0.2)', borderRadius: 3, padding: '1px 5px', marginTop: 4, display: 'inline-block' }}>REVERSE CHARGE APPLICABLE</div>
+          )}
         </div>
       </div>
 
@@ -2231,7 +2234,7 @@ function CorporatePreview({ form, calc, invoiceNumber, user, template }) {
             </div>
           </div>
         )}
-        <div style={{ marginTop: 8, fontSize: 8, color: '#ccc', textAlign: 'center' }}>Computer-generated invoice · Kcretio · GST compliant per Rule 46</div>
+        <div style={{ marginTop: 8, fontSize: 8, color: '#ccc', textAlign: 'center' }}>Computer-generated invoice · Kcretio · Subject to GST as applicable</div>
       </div>
     </div>
   );
@@ -2259,6 +2262,9 @@ function MinimalPreview({ form, calc, invoiceNumber, user, template }) {
       <div style={{ display: 'flex', gap: 16, fontSize: 9, marginBottom: 12, flexWrap: 'wrap' }}>
         {form.invoiceDate && <div><span style={{ color: '#999', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Date </span><span style={{ fontWeight: 600, color: '#222' }}>{format(new Date(form.invoiceDate + 'T00:00:00'), 'dd MMM yyyy')}</span></div>}
         {form.dueDate && <div><span style={{ color: '#999', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Due </span><span style={{ fontWeight: 600, color: '#222' }}>{format(new Date(form.dueDate + 'T00:00:00'), 'dd MMM yyyy')}</span></div>}
+        {form.reverseCharge === 'Yes' && (
+          <div style={{ color: '#e87500', fontWeight: 700 }}>REVERSE CHARGE APPLICABLE</div>
+        )}
       </div>
 
       {/* Parties */}
@@ -2325,7 +2331,7 @@ function MinimalPreview({ form, calc, invoiceNumber, user, template }) {
           </div>
         </div>
       )}
-      <div style={{ marginTop: 8, fontSize: 7, color: '#ccc', textAlign: 'center' }}>Computer-generated invoice · Kcretio · GST compliant per Rule 46</div>
+      <div style={{ marginTop: 8, fontSize: 7, color: '#ccc', textAlign: 'center' }}>Computer-generated invoice · Kcretio · Subject to GST as applicable</div>
     </div>
   );
 }
