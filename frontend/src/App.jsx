@@ -10,10 +10,6 @@ import ErrorBoundary from './components/ui/ErrorBoundary.jsx';
 
 // Eager: auth-critical
 import LandingPage from './pages/LandingPage.jsx';
-import LandingPageV2 from './pages/LandingPageV2.jsx';
-import LandingPageV3 from './pages/LandingPageV3.jsx';
-import LandingPageV5 from './pages/LandingPageV5.jsx';
-import LandingPageV6 from './pages/LandingPageV6.jsx';
 import AuthPage from './pages/AuthPage.jsx';
 import ForgotPasswordPage from './pages/ForgotPasswordPage.jsx';
 import ResetPasswordPage from './pages/ResetPasswordPage.jsx';
@@ -94,10 +90,6 @@ export default function App() {
               <Routes>
                 {/* Public routes */}
                 <Route path="/" element={<LandingPage />} />
-                <Route path="/v2" element={<LandingPageV2 />} />
-                <Route path="/v3" element={<LandingPageV3 />} />
-                <Route path="/v5" element={<LandingPageV5 />} />
-                <Route path="/v6" element={<LandingPageV6 />} />
                 {/* key forces a fresh AuthPage instance on /login <-> /register navigation —
                     otherwise React Router keeps the same component mounted (same type, same
                     spot in the tree) and only updates the defaultMode prop, which AuthPage
