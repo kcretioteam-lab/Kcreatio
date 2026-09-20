@@ -457,7 +457,7 @@ function EcosystemViz() {
   const [ref, vis] = useInView(0.3);
   const R = 140;
   return (
-    <div ref={ref} style={{ position: 'relative', width: 340, height: 340, flexShrink: 0, margin: '0 auto' }}>
+    <div ref={ref} style={{ position: 'relative', width: 'min(340px, 100%)', aspectRatio: '1 / 1', margin: '0 auto' }}>
       <div aria-hidden="true" style={{ position: 'absolute', top: '50%', left: '50%', width: R * 2, height: R * 2, transform: 'translate(-50%,-50%)', borderRadius: '50%', border: '1px dashed rgba(232,146,26,0.2)', opacity: vis ? 1 : 0, transition: 'opacity 0.8s ease' }} />
       <div style={{ position: 'absolute', top: '50%', left: '50%', width: 72, height: 72, transform: 'translate(-50%,-50%)', borderRadius: '50%', background: 'linear-gradient(135deg, rgba(232,146,26,0.3), rgba(232,146,26,0.1))', border: '2px solid rgba(232,146,26,0.5)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 0 12px rgba(232,146,26,0.06)', opacity: vis ? 1 : 0, transition: 'opacity 0.5s ease', zIndex: 2 }}>
         <span style={{ fontSize: 10, fontWeight: 700, color: '#E8921A', letterSpacing: '0.05em' }}>YOU</span>
@@ -575,7 +575,7 @@ export function ComparisonTable() {
     <section aria-label="Why Kcretio" style={{ maxWidth: 1000, margin: '0 auto', padding: '0 var(--space-6) var(--space-20)' }}>
       <style>{`.cmp-desktop { display:block; overflow-x:auto; } .cmp-mobile { display:none; } @media (max-width:640px) { .cmp-desktop { display:none; } .cmp-mobile { display:flex; flex-direction:column; gap:var(--space-3); } }`}</style>
       <Reveal>
-        <p style={{ fontSize: 'var(--text-xs)', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--accent)', textAlign: 'center', margin: '0 auto var(--space-4)' }}>WHY KCREATIO</p>
+        <p style={{ fontSize: 'var(--text-xs)', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--accent)', textAlign: 'center', margin: '0 auto var(--space-4)' }}>WHY KCRETIO</p>
         <h2 style={{ fontSize: 'var(--text-2xl)', fontWeight: 700, color: 'var(--text-primary)', textAlign: 'center', margin: '0 auto var(--space-10)' }}>Built for this. Nothing else comes close.</h2>
       </Reveal>
       <div className="cmp-desktop">
@@ -859,12 +859,15 @@ export function Footer() {
             <div key={group}>
               <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.1em', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 16 }}>{group}</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {links.map(l => (
-                  <a key={l} href="#" style={{ fontSize: 13, color: 'var(--text-body)', textDecoration: 'none', transition: 'color 0.15s' }}
-                    onMouseEnter={e => e.target.style.color = 'var(--text-primary)'}
-                    onMouseLeave={e => e.target.style.color = 'var(--text-body)'}
-                  >{l}</a>
-                ))}
+                {links.map(l => {
+                  const ROUTES = { Privacy: '/privacy', Terms: '/terms' };
+                  const s = { fontSize: 13, color: 'var(--text-body)', textDecoration: 'none', transition: 'color 0.15s' };
+                  const on = e => { e.target.style.color = 'var(--text-primary)'; };
+                  const off = e => { e.target.style.color = 'var(--text-body)'; };
+                  return ROUTES[l]
+                    ? <Link key={l} to={ROUTES[l]} style={s} onMouseEnter={on} onMouseLeave={off}>{l}</Link>
+                    : <a    key={l} href="#"        style={s} onMouseEnter={on} onMouseLeave={off}>{l}</a>;
+                })}
               </div>
             </div>
           ))}
