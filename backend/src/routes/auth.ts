@@ -3,6 +3,7 @@ import bcrypt from 'bcrypt';
 import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 import { z } from 'zod';
+import rateLimit from 'express-rate-limit';
 import { supabase } from '../lib/supabase.js';
 import { validateBody } from '../middleware/validateBody.js';
 import { authenticate, AuthRequest } from '../middleware/auth.js';
@@ -10,6 +11,14 @@ import { isDisposableEmail } from '../lib/disposableEmail.js';
 import { getFrontendUrl } from '../lib/env.js';
 
 const router = Router();
+
+const authRateLimit = rateLimit({
+  windowMs: 60 * 1000,
+  max: 10,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message: { error: 'RATE_LIMITED', message: 'Too many attempts — please try again in a minute' },
+});
 
 const BCRYPT_ROUNDS = 12;
 const ACCESS_EXPIRY = '15m';
@@ -183,7 +192,7 @@ const RegisterSchema = z.object({
   marketingEmails: z.boolean().default(true),
 });
 
-router.post('/register', validateBody(RegisterSchema), async (req: Request, res: Response): Promise<void> => {
+router.post('/register', authRateLimit, validateBody(RegisterSchema), async (req: Request, res: Response): Promise<void> => {
   const { name, email, phone, password, verificationToken, marketingEmails } = req.body;
 
   // Validate the email verification token
@@ -244,7 +253,7 @@ const LoginSchema = z.object({
   password: z.string().min(1),
 });
 
-router.post('/login', validateBody(LoginSchema), async (req: Request, res: Response): Promise<void> => {
+router.post('/login', authRateLimit, validateBody(LoginSchema), async (req: Request, res: Response): Promise<void> => {
   const { identifier, password } = req.body;
 
   // Try email lookup first, then phone
