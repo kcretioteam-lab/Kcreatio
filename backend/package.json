@@ -14,8 +14,7 @@
   "dependencies": {
     "@supabase/supabase-js": "^2.108.2",
     "@types/archiver": "^8.0.0",
-    "@types/bcrypt": "^6.0.0",
-    "@types/cookie-parser": "^1.4.10",
+    "@types/bcryptjs": "^2.4.6",    "@types/cookie-parser": "^1.4.10",
     "@types/cors": "^2.8.19",
     "@types/disposable-email-domains": "^1.0.6",
     "@types/express": "^5.0.6",
@@ -23,7 +22,7 @@
     "@types/node": "^26.0.0",
     "@types/node-cron": "^3.0.11",
     "archiver": "^8.0.0",
-    "bcrypt": "^6.0.0",
+    "bcryptjs": "^2.4.3",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.6",
     "date-fns": "^4.4.0",
