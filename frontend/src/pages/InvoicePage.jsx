@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { format, addDays } from 'date-fns';
-import { Plus, FileText, Check, AlertCircle, Eye, Download, X, HelpCircle, ChevronUp, ChevronDown, ChevronsUpDown, Lock, Save } from 'lucide-react';
+import { Plus, FileText, Check, AlertCircle, Eye, Download, X, HelpCircle, ChevronUp, ChevronDown, ChevronsUpDown, Lock, Save, Mail } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth.jsx';
 import { useToast } from '../hooks/useToast.jsx';
 import UsageBar from '../components/ui/UsageBar.jsx';
@@ -772,6 +772,11 @@ function BrandPicker({ onSelect, onClose }) {
   return (
     <Modal isOpen title="Load Saved Brand" onClose={onClose}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', minHeight: 200 }}>
+        {/* Info banner — where this data comes from */}
+        <div style={{ padding: 'var(--space-2) var(--space-3)', background: 'var(--accent-dim)', border: '1px solid rgba(232,146,26,0.3)', borderRadius: 'var(--radius-md)', fontSize: 'var(--text-xs)', color: 'var(--text-body)', lineHeight: 1.5 }}>
+          <span style={{ fontWeight: 600 }}>📋 From your invoice history.</span> Brands you've invoiced before appear here for quick re-use. Manage bank accounts, UPI & signatory in{' '}
+          <a href="/settings#invoice" style={{ color: 'var(--accent)', fontWeight: 600, textDecoration: 'underline' }}>Settings → Invoice Settings</a>.
+        </div>
         <input
           autoFocus
           type="text"
@@ -783,9 +788,16 @@ function BrandPicker({ onSelect, onClose }) {
         {loading ? (
           <p style={{ color: 'var(--text-muted)', fontSize: 'var(--text-sm)', textAlign: 'center', padding: 'var(--space-4)' }}>Loading…</p>
         ) : filtered.length === 0 ? (
-          <p style={{ color: 'var(--text-muted)', fontSize: 'var(--text-sm)', textAlign: 'center', padding: 'var(--space-4)' }}>
-            {brands.length === 0 ? 'No past brands found — save your first invoice to build a history.' : 'No brands match your search.'}
-          </p>
+          <div style={{ textAlign: 'center', padding: 'var(--space-4)' }}>
+            <p style={{ color: 'var(--text-muted)', fontSize: 'var(--text-sm)', marginBottom: 'var(--space-2)' }}>
+              {brands.length === 0 ? 'No past brands found yet.' : 'No brands match your search.'}
+            </p>
+            {brands.length === 0 && (
+              <p style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>
+                Save your first invoice to a brand and it will appear here for future quick-fill.
+              </p>
+            )}
+          </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)', maxHeight: 320, overflowY: 'auto' }}>
             {filtered.map((b, i) => (
@@ -1389,7 +1401,7 @@ export default function InvoicePage({ initialView }) {
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-                  <label htmlFor="brandAddress" style={{ fontSize: 'var(--text-sm)', fontWeight: 500, color: 'var(--text-body)' }}>Brand Address *</label>
+                  <label htmlFor="brandAddress" style={{ fontSize: 'var(--text-sm)', fontWeight: 500, color: 'var(--text-body)' }}>Brand Address <span style={{ color: 'var(--danger-text)', fontWeight: 700 }} aria-hidden="true">*</span></label>
                   <Tooltip text="Complete registered address of the brand. Must include city, state, and PIN code. Mandatory on GST invoices per Rule 46." />
                 </div>
                 <textarea id="brandAddress" value={form.brandAddress} onChange={e => update('brandAddress', e.target.value)} onBlur={() => touch('brandAddress')} rows={2} placeholder="123, Business Park, Mumbai, Maharashtra - 400001"
@@ -1444,7 +1456,7 @@ export default function InvoicePage({ initialView }) {
                         {/* Amount first */}
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                            <label style={{ fontSize: 'var(--text-sm)', fontWeight: 500, color: 'var(--text-body)' }}>Amount ₹ *</label>
+                            <label style={{ fontSize: 'var(--text-sm)', fontWeight: 500, color: 'var(--text-body)' }}>Amount ₹ <span style={{ color: 'var(--danger-text)', fontWeight: 700 }} aria-hidden="true">*</span></label>
                             <Tooltip text="Taxable value before GST for this service line." />
                           </div>
                           <input type="number" min="0" step="0.01" value={line.amount}
@@ -1857,7 +1869,7 @@ export default function InvoicePage({ initialView }) {
         </div>{/* end grid */}
         </div>{/* end maxWidth wrapper */}
 
-        {/* ── Action bar — always pinned at bottom, 3 buttons in one row ── */}
+        {/* ── Action bar — always pinned at bottom ── */}
         <div style={{
           position: isMobile ? 'fixed' : 'sticky',
           bottom: isMobile ? 64 : 0,
@@ -1867,9 +1879,11 @@ export default function InvoicePage({ initialView }) {
           padding: 'var(--space-3) var(--space-5)',
           flexShrink: 0,
         }}>
+          {/* Validation hint — only shown after user has touched fields */}
           {!complete && Object.keys(touched).length > 0 && (
-            <p style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', marginBottom: 'var(--space-2)', textAlign: 'center' }}>
-              Fill all required (*) fields to enable invoice creation
+            <p style={{ fontSize: 'var(--text-xs)', color: 'var(--warning-text)', marginBottom: 'var(--space-2)', textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+              <AlertCircle size={12} aria-hidden="true" />
+              Fill all required (<span style={{ color: 'var(--danger-text)', fontWeight: 700 }}>*</span>) fields above to enable invoice creation
             </p>
           )}
           {lastDraftSaved && (
@@ -1877,23 +1891,116 @@ export default function InvoicePage({ initialView }) {
               <AutosaveIndicator lastSaved={lastDraftSaved} />
             </div>
           )}
-          <div style={{ display: 'flex', gap: 'var(--space-2)', maxWidth: 1200, margin: '0 auto', width: '100%' }}>
-            <button type="button" onClick={handleSave} disabled={!complete||submitting}
-              style={{ flex: 1, padding: 'var(--space-3)', background: complete&&!submitting?'var(--surface-2)':'var(--border-2)', color: complete&&!submitting?'var(--text-primary)':'var(--text-disabled)', border: (complete ? '1px solid var(--border)' : '1px solid transparent'), borderRadius: 'var(--radius-md)', fontWeight: 600, fontSize: 'var(--text-sm)', cursor: complete&&!submitting?'pointer':'not-allowed', fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 'var(--space-2)' }}>
-              <Check size={14} aria-hidden="true" />
-              {submitting ? 'Saving…' : 'Save Invoice'}
-            </button>
-            <button type="button" onClick={handleSaveAndDownload} disabled={!complete||submitting}
-              style={{ flex: 1, padding: 'var(--space-3)', background: complete&&!submitting?'var(--accent)':'var(--border-2)', color: complete&&!submitting?'#fff':'var(--text-disabled)', border: 'none', borderRadius: 'var(--radius-md)', fontWeight: 700, fontSize: 'var(--text-sm)', cursor: complete&&!submitting?'pointer':'not-allowed', fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 'var(--space-2)', transition: 'background var(--duration-standard)' }}>
+          <div style={{ display: 'flex', gap: 'var(--space-2)', maxWidth: 1200, margin: '0 auto', width: '100%', flexWrap: isMobile ? 'wrap' : 'nowrap' }}>
+            {/* Primary CTA — Save & Download */}
+            <button
+              type="button"
+              onClick={handleSaveAndDownload}
+              disabled={!complete || submitting}
+              title={!complete ? 'Fill all required (*) fields to enable this button' : 'Save invoice and download as PDF'}
+              style={{
+                flex: isMobile ? '1 1 100%' : 2,
+                padding: 'var(--space-3) var(--space-4)',
+                background: complete && !submitting ? 'var(--accent)' : 'var(--border-2)',
+                color: complete && !submitting ? '#fff' : 'var(--text-disabled)',
+                border: 'none',
+                borderRadius: 'var(--radius-md)',
+                fontWeight: 700,
+                fontSize: 'var(--text-sm)',
+                cursor: complete && !submitting ? 'pointer' : 'not-allowed',
+                fontFamily: 'inherit',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 'var(--space-2)',
+                transition: 'background var(--duration-standard)',
+                boxShadow: complete && !submitting ? '0 2px 8px rgba(232,146,26,0.25)' : 'none',
+              }}
+              onMouseEnter={e => { if (complete && !submitting) e.currentTarget.style.background = 'var(--accent-hover, #d97e10)'; }}
+              onMouseLeave={e => { if (complete && !submitting) e.currentTarget.style.background = 'var(--accent)'; }}
+            >
               <Download size={14} aria-hidden="true" />
               {submitting ? 'Saving…' : 'Save & Download PDF'}
             </button>
-            <button type="button" onClick={() => navigate('/invoices')}
-              style={{ flex: 1, padding: 'var(--space-3)', background: 'var(--danger-dim)', border: '1px solid var(--danger)', borderRadius: 'var(--radius-md)', color: 'var(--danger-text)', fontSize: 'var(--text-sm)', fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 'var(--space-2)', transition: 'background var(--duration-fast)' }}
-              onMouseEnter={e => e.currentTarget.style.background = 'rgba(239,68,68,0.18)'}
-              onMouseLeave={e => e.currentTarget.style.background = 'var(--danger-dim)'}
+
+            {/* Secondary — Save only */}
+            <button
+              type="button"
+              onClick={handleSave}
+              disabled={!complete || submitting}
+              title={!complete ? 'Fill all required (*) fields to enable this button' : 'Save invoice without downloading'}
+              style={{
+                flex: 1,
+                padding: 'var(--space-3) var(--space-4)',
+                background: 'var(--surface-2)',
+                color: complete && !submitting ? 'var(--text-primary)' : 'var(--text-disabled)',
+                border: complete ? '1px solid var(--border)' : '1px solid var(--border)',
+                borderRadius: 'var(--radius-md)',
+                fontWeight: 600,
+                fontSize: 'var(--text-sm)',
+                cursor: complete && !submitting ? 'pointer' : 'not-allowed',
+                fontFamily: 'inherit',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 'var(--space-2)',
+                opacity: complete && !submitting ? 1 : 0.55,
+              }}
             >
-              <X size={13} aria-hidden="true" /> Discard &amp; Close
+              <Check size={14} aria-hidden="true" />
+              {submitting ? 'Saving…' : 'Save Only'}
+            </button>
+
+            {/* Email share */}
+            <button
+              type="button"
+              disabled={!complete || submitting}
+              title={!complete ? 'Fill all required (*) fields to enable sharing' : `Share invoice via email${form.brandEmail ? ` to ${form.brandEmail}` : ''}`}
+              onClick={() => {
+                if (!complete) return;
+                const subject = encodeURIComponent(`Invoice ${nextNumber || ''} — ${form.brandName}`);
+                const body = encodeURIComponent(
+                  `Hi,\n\nPlease find attached / download your GST invoice.\n\nInvoice #: ${nextNumber || '—'}\nBrand: ${form.brandName}\nAmount: ₹${calc.total.toLocaleString('en-IN', { minimumFractionDigits: 2 })}\nDue Date: ${form.dueDate || '—'}\n\nPlease make payment at your earliest convenience.\n\nThank you.`
+                );
+                const to = form.brandEmail ? encodeURIComponent(form.brandEmail) : '';
+                window.open(`mailto:${to}?subject=${subject}&body=${body}`, '_blank');
+              }}
+              style={{
+                flex: 1,
+                padding: 'var(--space-3) var(--space-4)',
+                background: 'var(--surface-2)',
+                color: complete && !submitting ? 'var(--text-primary)' : 'var(--text-disabled)',
+                border: '1px solid var(--border)',
+                borderRadius: 'var(--radius-md)',
+                fontWeight: 600,
+                fontSize: 'var(--text-sm)',
+                cursor: complete && !submitting ? 'pointer' : 'not-allowed',
+                fontFamily: 'inherit',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 'var(--space-2)',
+                opacity: complete && !submitting ? 1 : 0.55,
+              }}
+            >
+              <Mail size={14} aria-hidden="true" />
+              {isMobile ? 'Email' : 'Share via Email'}
+            </button>
+
+            {/* Discard & Close — tertiary, visually de-emphasised */}
+            <button
+              type="button"
+              onClick={() => navigate('/invoices')}
+              title="Discard changes and go back to invoice list"
+              style={{
+                flex: isMobile ? '1 1 auto' : '0 0 auto',
+                padding: 'var(--space-3) var(--space-4)',
+                background: 'transparent',
+                border: '1px solid var(--border)',
+                borderRadius: 'var(--radius-md)',
+                color: 'var(--text-muted)',
+                fontSize: 'var(--text-sm)',
+                fontWeight: 500,
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 'var(--space-2)',
+                transition: 'color var(--duration-fast), border-color var(--duration-fast)',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.color = 'var(--danger-text)'; e.currentTarget.style.borderColor = 'var(--danger)'; }}
+              onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-muted)'; e.currentTarget.style.borderColor = 'var(--border)'; }}
+            >
+              <X size={13} aria-hidden="true" /> {isMobile ? 'Close' : 'Discard & Close'}
             </button>
           </div>
         </div>
@@ -2302,10 +2409,13 @@ function Sect({ title, children, collapsible = false, defaultOpen = true }) {
 }
 
 function SField({ id, label, children, error, value, onChange, onBlur, tooltip }) {
+  const labelNode = typeof label === 'string' && label.includes(' *')
+    ? <>{label.replace(' *', '')} <span style={{ color: 'var(--danger-text)', fontWeight: 700 }} aria-hidden="true">*</span></>
+    : label;
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-        <label htmlFor={id} style={{ fontSize: 'var(--text-sm)', fontWeight: 500, color: 'var(--text-body)' }}>{label}</label>
+        <label htmlFor={id} style={{ fontSize: 'var(--text-sm)', fontWeight: 500, color: 'var(--text-body)' }}>{labelNode}</label>
         {tooltip && <Tooltip text={tooltip} />}
       </div>
       <select id={id} value={value} onChange={onChange} onBlur={onBlur} style={{ padding: 'var(--space-2) var(--space-3)', background: 'var(--surface-2)', border: (error ? '1px solid var(--danger)' : '1px solid var(--border)'), borderRadius: 'var(--radius-md)', color: value ? 'var(--text-primary)' : 'var(--text-muted)', fontSize: 'var(--text-base)', fontFamily: 'inherit' }}>
@@ -2450,13 +2560,16 @@ function ClassicPreview({ form, calc, invoiceNumber, user, template }) {
 
         {/* UPI QR */}
         {form.includeUpi && (form.upiId || form.upiScannerUrl) && (
-          <div style={{ marginTop: 12, padding: '10px 12px', background: '#f0fff4', border: '1px solid #86efac', borderRadius: 6, fontSize: 10, display: 'flex', alignItems: 'center', gap: 12 }}>
-            {form.upiScannerUrl && (
-              <img src={form.upiScannerUrl} alt="UPI QR" style={{ width: 64, height: 64, objectFit: 'contain', border: '1px solid #ccc', borderRadius: 4, background: '#fff', flexShrink: 0 }} />
-            )}
-            <div>
-              <div style={{ fontWeight: 700, color: '#333', marginBottom: 2 }}>Pay via UPI</div>
-              {form.upiId && <div style={{ color: '#555', fontFamily: 'monospace' }}>{form.upiId}</div>}
+          <div style={{ marginTop: 12, padding: '10px 12px', background: '#f0fff4', border: '1px solid #86efac', borderRadius: 6, fontSize: 10 }}>
+            <div style={{ fontWeight: 700, fontSize: 9, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#22863a', marginBottom: 6 }}>💳 Pay via UPI</div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+              <div>
+                {form.upiId && <div style={{ color: '#333', fontFamily: 'monospace', fontSize: 11, fontWeight: 600 }}>{form.upiId}</div>}
+                <div style={{ color: '#666', fontSize: 9, marginTop: 2 }}>Scan QR or use UPI ID above to pay instantly</div>
+              </div>
+              {form.upiScannerUrl && (
+                <img src={form.upiScannerUrl} alt="UPI QR" style={{ width: 64, height: 64, objectFit: 'contain', border: '1px solid #ccc', borderRadius: 4, background: '#fff', flexShrink: 0 }} />
+              )}
             </div>
           </div>
         )}

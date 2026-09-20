@@ -1,6 +1,6 @@
 import { NavLink } from 'react-router-dom';
 import {
-  LayoutDashboard, FileText, DollarSign, Calculator,
+  LayoutDashboard, FileText, IndianRupee, Calculator,
   Briefcase, TrendingUp, Receipt, Settings,
   ChevronLeft, ChevronRight,
 } from 'lucide-react';
@@ -9,7 +9,7 @@ import { useAuth } from '../../hooks/useAuth.jsx';
 const NAV_ITEMS = [
   { to: '/dashboard',   icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/invoices',    icon: FileText,         label: 'Invoices' },
-  { to: '/tds',         icon: DollarSign,       label: 'TDS Tracker' },
+  { to: '/tds',         icon: IndianRupee,      label: 'TDS Tracker' },
   { to: '/tax-planner', icon: Calculator,       label: 'Tax Planner' },
   { to: '/deals',       icon: Briefcase,        label: 'Brand Deals' },
   { to: '/income',      icon: TrendingUp,       label: 'Income' },

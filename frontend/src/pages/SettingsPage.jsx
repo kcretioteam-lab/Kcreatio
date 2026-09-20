@@ -540,6 +540,77 @@ function InvoiceSettingsSection({ user }) {
           </div>
         )}
       </div>
+
+      {/* ── Saved Brand Profiles (read-only, from invoice history) ── */}
+      <div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-3)' }}>
+          <div>
+            <h3 style={{ fontSize: 'var(--text-base)', fontWeight: 700, color: 'var(--text-primary)' }}>Saved Brand Profiles</h3>
+            <p style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', marginTop: 2 }}>
+              Brands you've invoiced are saved automatically and available in the "Load Saved Brand" picker on the invoice form.
+            </p>
+          </div>
+        </div>
+        <BrandProfilesList />
+      </div>
+    </div>
+  );
+}
+
+// ── Brand Profiles List (read-only view of past invoice brands) ───────────────
+function BrandProfilesList() {
+  const [brands, setBrands] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [q, setQ] = useState('');
+
+  useEffect(() => {
+    api.get('/invoices/brands')
+      .then(r => setBrands(r.data.brands || []))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  const filtered = brands.filter(b =>
+    !q || b.brand_name?.toLowerCase().includes(q.toLowerCase()) ||
+    b.brand_gstin?.toLowerCase().includes(q.toLowerCase())
+  );
+
+  if (loading) return <div style={{ color: 'var(--text-muted)', fontSize: 'var(--text-sm)', padding: 'var(--space-3)' }}>Loading…</div>;
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+      <div style={{ padding: 'var(--space-3)', background: 'var(--accent-dim)', border: '1px solid rgba(232,146,26,0.25)', borderRadius: 'var(--radius-md)', fontSize: 'var(--text-xs)', color: 'var(--text-body)', lineHeight: 1.5 }}>
+        💡 <strong>How it works:</strong> Every time you save an invoice for a brand, their details (name, GSTIN, address, state) are stored automatically. Use <strong>Load Saved Brand</strong> on the new invoice form to quickly re-fill their details.
+      </div>
+      {brands.length > 0 && (
+        <input
+          type="text"
+          value={q}
+          onChange={e => setQ(e.target.value)}
+          placeholder="Search by brand name or GSTIN…"
+          style={{ padding: 'var(--space-2) var(--space-3)', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', color: 'var(--text-primary)', fontSize: 'var(--text-sm)', fontFamily: 'inherit', outline: 'none' }}
+        />
+      )}
+      {filtered.length === 0 ? (
+        <div style={{ padding: 'var(--space-5)', textAlign: 'center', border: '1px dashed var(--border)', borderRadius: 'var(--radius-md)', color: 'var(--text-muted)', fontSize: 'var(--text-sm)' }}>
+          {brands.length === 0
+            ? 'No brands yet — create your first invoice to populate this list.'
+            : 'No brands match your search.'}
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+          {filtered.map((b, i) => (
+            <div key={i} style={{ padding: 'var(--space-3)', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 'var(--space-3)' }}>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontWeight: 600, fontSize: 'var(--text-sm)', color: 'var(--text-primary)' }}>{b.brand_name}</div>
+                {b.brand_gstin && <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', marginTop: 1 }}>GSTIN: <span style={{ fontFamily: 'monospace' }}>{b.brand_gstin}</span></div>}
+                {b.brand_address && <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 320 }}>{b.brand_address}</div>}
+              </div>
+              <span style={{ fontSize: 10, padding: '2px 8px', background: 'var(--surface-3)', border: '1px solid var(--border)', borderRadius: 'var(--radius-full)', color: 'var(--text-muted)', flexShrink: 0, whiteSpace: 'nowrap' }}>Auto-saved</span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
