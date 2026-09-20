@@ -268,7 +268,10 @@ function getChromePath(): string {
   if (process.env.CHROME_PATH) return process.env.CHROME_PATH;
   if (process.platform === 'darwin') return '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
   if (process.platform === 'linux') {
-    return '/usr/bin/google-chrome-stable';
+    // Render/Ubuntu uses chromium-browser; fall back to google-chrome-stable for GCE-style envs
+    for (const p of ['/usr/bin/chromium-browser', '/usr/bin/chromium', '/usr/bin/google-chrome-stable', '/usr/bin/google-chrome']) {
+      try { require('fs').accessSync(p); return p; } catch { /* not found */ }
+    }
   }
   return 'google-chrome';
 }
