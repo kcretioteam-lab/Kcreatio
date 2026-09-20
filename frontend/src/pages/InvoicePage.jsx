@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { format, addDays } from 'date-fns';
-import { Plus, FileText, Check, AlertCircle, Eye, Download, X, HelpCircle, ChevronUp, ChevronDown, ChevronsUpDown, Lock } from 'lucide-react';
+import { Plus, FileText, Check, AlertCircle, Eye, Download, X, HelpCircle, ChevronUp, ChevronDown, ChevronsUpDown, Lock, Save } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth.jsx';
 import { useToast } from '../hooks/useToast.jsx';
 import UsageBar from '../components/ui/UsageBar.jsx';
@@ -13,6 +13,7 @@ import Input from '../components/ui/Input.jsx';
 import Badge from '../components/ui/Badge.jsx';
 import Modal from '../components/ui/Modal.jsx';
 import InvoiceList from '../components/features/invoice/InvoiceList.jsx';
+import SignatureCanvas from 'react-signature-canvas';
 
 // ── Indian states ─────────────────────────────────────────────────────────────
 const INDIAN_STATES = [
@@ -45,22 +46,45 @@ function calcGSTMulti(form, userStateCode) {
   const lines = form.serviceLines || [{ amount: form.baseAmount, gstRate: form.gstRate }];
   const isIntra = form.brandStateCode && userStateCode && form.brandStateCode === userStateCode;
 
-  let totalBasePaise = 0;
+  let subtotalPaise = 0;
   let totalGstPaise = 0;
   const lineCalcs = lines.map(line => {
     const basePaise = Math.round((parseFloat(line.amount) || 0) * 100);
     const rate = parseInt(line.gstRate || form.gstRate || 18) / 100;
     const gstPaise = Math.round(basePaise * rate);
-    totalBasePaise += basePaise;
-    totalGstPaise += gstPaise;
+    subtotalPaise += basePaise;
     return { base: basePaise / 100, gstRate: parseInt(line.gstRate || form.gstRate || 18), gstAmount: gstPaise / 100 };
   });
+
+  // Apply discount to subtotal before GST
+  const discountVal = parseFloat(form.discountValue) || 0;
+  const discountPaise = form.discountValue && discountVal > 0
+    ? (form.discountType === 'percent'
+        ? Math.round(subtotalPaise * discountVal / 100)
+        : Math.round(discountVal * 100))
+    : 0;
+  const totalBasePaise = Math.max(0, subtotalPaise - discountPaise);
+
+  // Recompute GST on post-discount taxable value — use same rates proportionally
+  if (subtotalPaise > 0) {
+    const discountRatio = totalBasePaise / subtotalPaise;
+    lineCalcs.forEach(l => {
+      const adjustedBase = Math.round(l.base * 100 * discountRatio);
+      const rate = l.gstRate / 100;
+      const gstPaise = Math.round(adjustedBase * rate);
+      totalGstPaise += gstPaise;
+      l.base = adjustedBase / 100;
+      l.gstAmount = gstPaise / 100;
+    });
+  }
 
   return {
     base: totalBasePaise / 100,
     gstRate: parseInt(form.gstRate || 18),
     gstAmount: totalGstPaise / 100,
     total: (totalBasePaise + totalGstPaise) / 100,
+    subtotal: subtotalPaise / 100,
+    discountAmount: discountPaise / 100,
     supplyType: isIntra ? 'intrastate' : 'interstate',
     cgst: isIntra ? totalGstPaise / 2 / 100 : 0,
     sgst: isIntra ? totalGstPaise / 2 / 100 : 0,
@@ -141,6 +165,8 @@ const TEMPLATES = [
   },
 ];
 
+const ACCENT_PRESETS = ['#E8921A','#2563EB','#16A34A','#D97706','#0D9488','#6B7280','#8B5CF6','#EF4444'];
+
 const EMPTY_FORM = {
   brandName: '', brandGstin: '', brandAddress: '', brandStateCode: '', brandPan: '',
   brandEmail: '', brandPhone: '',
@@ -154,6 +180,8 @@ const EMPTY_FORM = {
   dueDate: format(addDays(new Date(), 30), 'yyyy-MM-dd'),
   placeOfSupply: '', reverseCharge: 'No', notes: '',
   paymentTerms: 'Net 30', templateId: 'classic',
+  purchaseOrderNumber: '',
+  discountValue: '', discountType: 'flat',
   // Bank details (optional)
   includeBankDetails: false,
   bankName: '', accountNumber: '', ifscCode: '', accountHolderName: '', upiId: '',
@@ -167,6 +195,7 @@ const EMPTY_FORM = {
   includeSignatory: false,
   signatoryName: '',
   signatoryImageUrl: null,  // base64 data URL for signature image
+  invoiceAccentColor: '',   // override accent color (empty = use template default)
 };
 
 // ── Validation (Rule 46 CGST Rules) ──────────────────────────────────────────
@@ -197,6 +226,7 @@ function isComplete(form) {
 
 // ── localStorage helpers — works without backend ──────────────────────────────
 const LS_KEY = 'creator_tax_invoices';
+const DRAFT_KEY = 'kcreatio:invoice_draft';
 function lsLoad() { try { return JSON.parse(localStorage.getItem(LS_KEY) || '[]'); } catch { return []; } }
 function lsSave(arr) { localStorage.setItem(LS_KEY, JSON.stringify(arr)); }
 function lsNextNumber(user) {
@@ -209,6 +239,29 @@ function lsNextNumber(user) {
 }
 
 // ── PDF download — browser print window ──────────────────────────────────────
+function AutosaveIndicator({ lastSaved }) {
+  const [label, setLabel] = useState('');
+  useEffect(() => {
+    if (!lastSaved) { setLabel(''); return; }
+    const tick = () => {
+      const ago = Math.floor((Date.now() - lastSaved) / 1000);
+      if (ago < 10) setLabel('Draft saved · just now');
+      else if (ago < 60) setLabel(`Draft saved · ${ago}s ago`);
+      else setLabel(`Draft saved · ${Math.floor(ago / 60)}m ago`);
+    };
+    tick();
+    const id = setInterval(tick, 15000);
+    return () => clearInterval(id);
+  }, [lastSaved]);
+  if (!label) return null;
+  return (
+    <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)', display: 'flex', alignItems: 'center', gap: 4 }}>
+      <Save size={11} aria-hidden="true" />
+      {label}
+    </span>
+  );
+}
+
 function buildClassicHTML(inv, user, t, plan) {
   const stateMap = Object.fromEntries(INDIAN_STATES.map(s => [s.code, s.name]));
   const fmt = (d) => {
@@ -267,6 +320,7 @@ function buildClassicHTML(inv, user, t, plan) {
     <div><strong>Invoice Date:</strong> ${fmt(inv.invoice_date)}</div>
     <div><strong>Due Date:</strong> ${fmt(inv.due_date)}</div>
     ${inv.payment_terms ? `<div><strong>Payment Terms:</strong> ${inv.payment_terms}</div>` : ''}
+    ${inv.purchase_order_number ? `<div><strong>PO Number:</strong> ${inv.purchase_order_number}</div>` : ''}
   </div>
 </div>
 <div class="body">
@@ -307,6 +361,7 @@ function buildClassicHTML(inv, user, t, plan) {
     </tbody>
   </table>
   <div class="totals">
+    ${inv.discount_value ? `<div class="trow"><span>Subtotal</span><span>${inr((inv.base_amount||0) + (inv.discount_value||0))}</span></div><div class="trow" style="color:#c0392b"><span>Discount${inv.discount_type==='percent'?` (${inv.discount_value}%)`:''}  </span><span>−${inr(inv.discount_value)}</span></div>` : ''}
     <div class="trow"><span>Taxable Value</span><span>${inr(inv.base_amount)}</span></div>
     ${inv.supply_type === 'intrastate' ? `
     <div class="trow"><span>Add: CGST @ ${(inv.gst_rate || 18) / 2}%</span><span>${inr(inv.cgst_amount)}</span></div>
@@ -442,6 +497,7 @@ function buildCorporateHTML(inv, user, t, plan) {
     <div class="detail-cell" style="margin-bottom:4px"><span class="dl">Due Date: </span><span class="dv">${fmt(inv.due_date)}</span></div>
     ${inv.place_of_supply ? `<div class="detail-cell" style="margin-bottom:4px"><span class="dl">Place of Supply: </span><span class="dv">${stateMap[inv.place_of_supply] || inv.place_of_supply}</span></div>` : ''}
     ${inv.payment_terms ? `<div class="detail-cell"><span class="dl">Payment Terms: </span><span class="dv">${inv.payment_terms}</span></div>` : ''}
+    ${inv.purchase_order_number ? `<div class="detail-cell"><span class="dl">PO Number: </span><span class="dv">${inv.purchase_order_number}</span></div>` : ''}
   </div>
 </div>
 <table>
@@ -465,6 +521,7 @@ function buildCorporateHTML(inv, user, t, plan) {
   </tbody>
 </table>
 <div class="totals">
+  ${inv.discount_value ? `<div class="trow"><span>Subtotal</span><span>${inr((inv.base_amount||0) + (inv.discount_value||0))}</span></div><div class="trow" style="color:#c0392b"><span>Discount${inv.discount_type==='percent'?` (${inv.discount_value}%)`:''}  </span><span>−${inr(inv.discount_value)}</span></div>` : ''}
   <div class="trow"><span>Taxable Amount</span><span>${inr(inv.base_amount)}</span></div>
   ${inv.supply_type === 'intrastate' ? `
   <div class="trow"><span>Add: CGST @ ${(inv.gst_rate||18)/2}%</span><span>${inr(inv.cgst_amount)}</span></div>
@@ -589,6 +646,7 @@ function buildMinimalHTML(inv, user, t, plan) {
   <div class="m"><div class="ml">Due Date</div><div class="mv">${fmt(inv.due_date)}</div></div>
   ${inv.place_of_supply ? `<div class="m"><div class="ml">Place of Supply</div><div class="mv">${stateMap[inv.place_of_supply] || inv.place_of_supply}</div></div>` : ''}
   ${inv.payment_terms ? `<div class="m"><div class="ml">Payment Terms</div><div class="mv">${inv.payment_terms}</div></div>` : ''}
+  ${inv.purchase_order_number ? `<div class="m"><div class="ml">PO Number</div><div class="mv">${inv.purchase_order_number}</div></div>` : ''}
 </div>
 <div class="parties">
   <div>
@@ -622,6 +680,7 @@ function buildMinimalHTML(inv, user, t, plan) {
   </tbody>
 </table>
 <div class="tax-blk">
+  ${inv.discount_value ? `<div class="trow"><span>Subtotal</span><span>${inr((inv.base_amount||0) + (inv.discount_value||0))}</span></div><div class="trow" style="color:#c0392b"><span>Discount${inv.discount_type==='percent'?` (${inv.discount_value}%)`:''}  </span><span>−${inr(inv.discount_value)}</span></div>` : ''}
   <div class="trow"><span>Taxable Value</span><span>${inr(inv.base_amount)}</span></div>
   ${inv.supply_type === 'intrastate' ? `
   <div class="trow"><span>Add: CGST @ ${(inv.gst_rate||18)/2}%</span><span>${inr(inv.cgst_amount)}</span></div>
@@ -675,10 +734,11 @@ ${plan === 'basic' ? `<div style="position:fixed;bottom:8px;left:0;right:0;text-
 
 function downloadInvoicePDF(inv, user, template, plan) {
   const t = template || TEMPLATES[0];
+  const effectiveT = { ...t, accentColor: inv.invoiceAccentColor || t.accentColor };
   let html;
-  if (t.layout === 'corporate') html = buildCorporateHTML(inv, user, t, plan);
-  else if (t.layout === 'minimal') html = buildMinimalHTML(inv, user, t, plan);
-  else html = buildClassicHTML(inv, user, t, plan);
+  if (effectiveT.layout === 'corporate') html = buildCorporateHTML(inv, user, effectiveT, plan);
+  else if (effectiveT.layout === 'minimal') html = buildMinimalHTML(inv, user, effectiveT, plan);
+  else html = buildClassicHTML(inv, user, effectiveT, plan);
 
   // Use Blob URL — avoids popup blocker issues with document.write
   const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
@@ -695,7 +755,64 @@ function downloadInvoicePDF(inv, user, template, plan) {
   setTimeout(() => URL.revokeObjectURL(url), 10000);
 }
 
+function BrandPicker({ onSelect, onClose }) {
+  const [brands, setBrands] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [q, setQ] = useState('');
+  useEffect(() => {
+    api.get('/invoices/brands')
+      .then(r => setBrands(r.data.brands || []))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+  const filtered = brands.filter(b =>
+    !q || b.brand_name?.toLowerCase().includes(q.toLowerCase()) ||
+    b.brand_gstin?.toLowerCase().includes(q.toLowerCase())
+  );
+  return (
+    <Modal isOpen title="Load Saved Brand" onClose={onClose}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', minHeight: 200 }}>
+        <input
+          autoFocus
+          type="text"
+          placeholder="Search brand name or GSTIN…"
+          value={q}
+          onChange={e => setQ(e.target.value)}
+          style={{ padding: 'var(--space-2) var(--space-3)', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', color: 'var(--text-primary)', fontSize: 'var(--text-sm)', fontFamily: 'inherit' }}
+        />
+        {loading ? (
+          <p style={{ color: 'var(--text-muted)', fontSize: 'var(--text-sm)', textAlign: 'center', padding: 'var(--space-4)' }}>Loading…</p>
+        ) : filtered.length === 0 ? (
+          <p style={{ color: 'var(--text-muted)', fontSize: 'var(--text-sm)', textAlign: 'center', padding: 'var(--space-4)' }}>
+            {brands.length === 0 ? 'No past brands found — save your first invoice to build a history.' : 'No brands match your search.'}
+          </p>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)', maxHeight: 320, overflowY: 'auto' }}>
+            {filtered.map((b, i) => (
+              <button key={i} type="button" onClick={() => onSelect(b)}
+                style={{ textAlign: 'left', padding: 'var(--space-2) var(--space-3)', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', cursor: 'pointer', fontFamily: 'inherit' }}
+                onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-3)'}
+                onMouseLeave={e => e.currentTarget.style.background = 'var(--surface-2)'}
+              >
+                <div style={{ fontWeight: 600, fontSize: 'var(--text-sm)', color: 'var(--text-primary)' }}>{b.brand_name}</div>
+                {b.brand_gstin && <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>GSTIN: {b.brand_gstin}</div>}
+                {b.brand_address && <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{b.brand_address}</div>}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    </Modal>
+  );
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
+const SIG_FONTS = [
+  { label: 'Georgia', preview: 'Georgia, serif', css: 'italic 40px Georgia, serif' },
+  { label: 'Palatino', preview: "'Palatino Linotype', Palatino, serif", css: "italic 38px 'Palatino Linotype', Palatino, serif" },
+  { label: 'Times', preview: "'Times New Roman', serif", css: "italic 40px 'Times New Roman', serif" },
+];
+
 export default function InvoicePage({ initialView }) {
   const { user } = useAuth();
   const toast = useToast();
@@ -732,14 +849,62 @@ export default function InvoicePage({ initialView }) {
   const PAGE_SIZE = 10;
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
+  const autosaveTimer = useRef(null);
+  const pdfAbortRef = useRef(null);
+  const sigCanvasRef = useRef(null);
+  const typePreviewRef = useRef(null);
+  const [lastDraftSaved, setLastDraftSaved] = useState(null);
+  const [showBrandPicker, setShowBrandPicker] = useState(false);
+  const [sigTab, setSigTab] = useState('draw');
+  const [sigInkColor, setSigInkColor] = useState('#000000');
+  const [typedSig, setTypedSig] = useState('');
+  const [typedSigFont, setTypedSigFont] = useState(0);
 
   const calc = calcGST(form, user?.state_code);
   const formErrors = getErrors(form);
   const complete = isComplete(form);
   const selectedTemplate = TEMPLATES.find(t => t.id === form.templateId) || TEMPLATES[0];
+  const effectiveTemplate = { ...selectedTemplate, accentColor: form.invoiceAccentColor || selectedTemplate.accentColor };
+  const customColorBg = (form.invoiceAccentColor && !ACCENT_PRESETS.includes(form.invoiceAccentColor)) ? form.invoiceAccentColor : 'var(--border-2)';
+  const colorInputValue = form.invoiceAccentColor || selectedTemplate.accentColor;
+  const showDiscount = calc.discountAmount > 0;
+  const colorSwatchButtons = ACCENT_PRESETS.map(c => {
+    const isActive = colorInputValue === c;
+    return (
+      <button key={c} type="button" onClick={() => update('invoiceAccentColor', c)}
+        style={{ width: 22, height: 22, borderRadius: '50%', background: c, border: isActive ? '2px solid white' : '2px solid transparent', outline: isActive ? ('2px solid ' + c) : 'none', outlineOffset: 1, cursor: 'pointer', padding: 0, flexShrink: 0 }} />
+    );
+  });
 
   // Load list whenever page/sort/search/filter changes
   useEffect(() => { loadInvoices(); }, [page, sortCol, sortDir, searchQuery, filterStatus]);
+
+  // Debounced autosave to localStorage (create view only)
+  useEffect(() => {
+    if (view !== 'create') return;
+    clearTimeout(autosaveTimer.current);
+    autosaveTimer.current = setTimeout(() => {
+      try {
+        localStorage.setItem(DRAFT_KEY, JSON.stringify({ form, savedAt: Date.now() }));
+        setLastDraftSaved(Date.now());
+      } catch {}
+    }, 600);
+    return () => clearTimeout(autosaveTimer.current);
+  }, [form, view]);
+
+  // Update typed-signature canvas preview whenever text or font changes
+  useEffect(() => {
+    if (!typePreviewRef.current) return;
+    const canvas = typePreviewRef.current;
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    if (typedSig) {
+      ctx.font = SIG_FONTS[typedSigFont].css;
+      ctx.fillStyle = '#1a1a1a';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(typedSig, 12, canvas.height / 2);
+    }
+  }, [typedSig, typedSigFont]);
 
   // When navigating to create, reset form + prefill from saved settings
   // Also supports duplicate (location.state.duplicate = source invoice)
@@ -782,8 +947,20 @@ export default function InvoicePage({ initialView }) {
       setCustomPaymentTerms(null);
       setSelectedBankAccountId(null);
       setSelectedUpiId(null);
+      // Try to restore autosaved draft (fresh create only, not duplication/deal-prefill)
+      const hasDealId = !!(location.state?.deal_id || new URLSearchParams(location.search).get('deal_id'));
+      if (!hasDealId) {
+        try {
+          const saved = JSON.parse(localStorage.getItem(DRAFT_KEY) || 'null');
+          if (saved?.form && Date.now() - saved.savedAt < 24 * 60 * 60 * 1000) {
+            setForm(saved.form);
+            setLastDraftSaved(saved.savedAt);
+          }
+        } catch {}
+      }
       setNextNumber(lsNextNumber(user));
       api.get('/invoices/next-number').then(r => setNextNumber(r.data.invoiceNumber)).catch(() => {});
+      api.get('/invoices/warm').catch(() => {});
 
       // Smart pre-fill from deal if deal_id is in location.state or query string
       const dealId = location.state?.deal_id || new URLSearchParams(location.search).get('deal_id');
@@ -865,7 +1042,8 @@ export default function InvoicePage({ initialView }) {
       gstRate: String(inv.gst_rate||'18'), invoiceDate: inv.invoice_date||format(new Date(),'yyyy-MM-dd'),
       dueDate: inv.due_date||format(addDays(new Date(),30),'yyyy-MM-dd'),
       placeOfSupply: inv.place_of_supply||'', reverseCharge: inv.reverse_charge||'No',
-      notes: inv.notes||'', paymentTerms: inv.payment_terms||'Net 30', templateId: inv.template_id||'classic',
+      notes: inv.notes||'', paymentTerms: inv.payment_terms||'Net 30', purchaseOrderNumber: inv.purchase_order_number||'', templateId: inv.template_id||'classic',
+      discountValue: inv.discount_value ? String(inv.discount_value) : '', discountType: inv.discount_type || 'flat',
       serviceLines: [{ description: inv.service_description||EMPTY_FORM.serviceDescription, sacCode: inv.sac_code||'998399', amount: String(inv.base_amount||''), gstRate: String(inv.gst_rate||'18') }],
       // Bank details
       includeBankDetails: inv.include_bank_details||false,
@@ -881,6 +1059,7 @@ export default function InvoicePage({ initialView }) {
       includeSignatory: inv.include_signatory||false,
       signatoryName: inv.signatory_name||'',
       signatoryImageUrl: inv.signatory_image_url||null,
+      invoiceAccentColor: inv.invoice_accent_color||'',
     });
     api.get(`/invoices/${editId}`)
       .then(res => setForm(buildForm(res.data)))
@@ -930,13 +1109,17 @@ export default function InvoicePage({ initialView }) {
       brand_state_code: form.brandStateCode, brand_pan: form.brandPan.trim()||null,
       brand_email: form.brandEmail.trim()||null, brand_phone: form.brandPhone.trim()||null,
       service_description: form.serviceDescription.trim(), sac_code: form.sacCode,
-      base_amount: parseFloat(form.baseAmount), gst_rate: parseInt(form.gstRate),
+      base_amount: c.base, gst_rate: parseInt(form.gstRate),
       gst_amount: c.gstAmount, total_amount: c.total, supply_type: c.supplyType,
       cgst_amount: c.cgst, sgst_amount: c.sgst, igst_amount: c.igst,
       invoice_date: form.invoiceDate, due_date: form.dueDate,
       place_of_supply: form.placeOfSupply, reverse_charge: form.reverseCharge,
       notes: form.notes.trim()||null, payment_terms: form.paymentTerms,
+      purchase_order_number: form.purchaseOrderNumber?.trim()||null,
+      discount_value: form.discountValue ? parseFloat(form.discountValue) : null,
+      discount_type: form.discountValue ? (form.discountType || 'flat') : null,
       template_id: form.templateId, status: 'draft',
+      invoice_accent_color: form.invoiceAccentColor||null,
       // Bank details
       include_bank_details: form.includeBankDetails,
       bank_name: form.bankName||null, account_number: form.accountNumber||null,
@@ -982,7 +1165,9 @@ export default function InvoicePage({ initialView }) {
         gstRate: payload.gst_rate, invoiceDate: payload.invoice_date, dueDate: payload.due_date,
         notes: payload.notes, sacCode: payload.sac_code, placeOfSupply: payload.place_of_supply,
         reverseCharge: payload.reverse_charge, templateId: payload.template_id,
-        paymentTerms: payload.payment_terms,
+        paymentTerms: payload.payment_terms, purchaseOrderNumber: payload.purchase_order_number,
+        discountValue: payload.discount_value != null ? payload.discount_value : undefined,
+        discountType: payload.discount_type || 'flat',
         // Bank details
         includeBankDetails: payload.include_bank_details,
         bankName: payload.bank_name, accountNumber: payload.account_number,
@@ -1014,6 +1199,8 @@ export default function InvoicePage({ initialView }) {
     e?.preventDefault();
     const inv = await doSave();
     if (!inv) return;
+    try { localStorage.removeItem(DRAFT_KEY); } catch {}
+    setLastDraftSaved(null);
     toast.success(editingId ? 'Invoice updated' : 'Invoice saved');
     resetAndGoList();
   }
@@ -1022,9 +1209,32 @@ export default function InvoicePage({ initialView }) {
     e?.preventDefault();
     const inv = await doSave();
     if (!inv) return;
-    toast.success('Invoice saved — opening PDF…');
+    try { localStorage.removeItem(DRAFT_KEY); } catch {}
+    setLastDraftSaved(null);
+    toast.success('Invoice saved — downloading PDF…');
     resetAndGoList();
-    setTimeout(() => downloadInvoicePDF(inv, user, TEMPLATES.find(t => t.id === inv.template_id)||TEMPLATES[0], user?.plan), 300);
+    setTimeout(async () => {
+      pdfAbortRef.current?.abort();
+      pdfAbortRef.current = new AbortController();
+      const signal = pdfAbortRef.current.signal;
+      if (inv.id && !String(inv.id).startsWith('local-')) {
+        try {
+          const res = await api.get(`/invoices/${inv.id}/pdf`, { responseType: 'blob', signal });
+          const url = URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }));
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `${(inv.invoice_number || 'invoice').replace(/\//g, '-')}.pdf`;
+          a.click();
+          setTimeout(() => URL.revokeObjectURL(url), 5000);
+        } catch (err) {
+          if (err?.name !== 'CanceledError' && err?.name !== 'AbortError') {
+            downloadInvoicePDF(inv, user, TEMPLATES.find(t => t.id === inv.template_id) || TEMPLATES[0], user?.plan);
+          }
+        }
+      } else {
+        downloadInvoicePDF(inv, user, TEMPLATES.find(t => t.id === inv.template_id) || TEMPLATES[0], user?.plan);
+      }
+    }, 300);
   }
 
   function resetAndGoList() {
@@ -1039,8 +1249,11 @@ export default function InvoicePage({ initialView }) {
   }
 
   async function handleDownloadFromList(inv) {
+    pdfAbortRef.current?.abort();
+    pdfAbortRef.current = new AbortController();
+    const signal = pdfAbortRef.current.signal;
     try {
-      const res = await api.get(`/invoices/${inv.id}/pdf`, { responseType: 'blob' });
+      const res = await api.get(`/invoices/${inv.id}/pdf`, { responseType: 'blob', signal });
       const url = URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }));
       const a = document.createElement('a');
       a.href = url; a.download = `${(inv.invoice_number||'invoice').replace(/\//g,'-')}.pdf`; a.click();
@@ -1048,6 +1261,16 @@ export default function InvoicePage({ initialView }) {
     } catch {
       downloadInvoicePDF(inv, user, TEMPLATES.find(t => t.id===inv.template_id)||TEMPLATES[0], user?.plan);
     }
+  }
+
+  async function handleExportJson(inv) {
+    try {
+      const res = await api.get(`/invoices/${inv.id}/export`, { responseType: 'blob' });
+      const url = URL.createObjectURL(new Blob([res.data], { type: 'application/json' }));
+      const a = document.createElement('a');
+      a.href = url; a.download = `${(inv.invoice_number||'invoice').replace(/\//g,'-')}.json`; a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 5000);
+    } catch { toast.error('Export failed'); }
   }
 
   async function handleDelete(inv) {
@@ -1151,6 +1374,12 @@ export default function InvoicePage({ initialView }) {
             </Sect>
 
             <Sect title="Bill To — Brand / Recipient">
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 'var(--space-2)' }}>
+                <button type="button" onClick={() => setShowBrandPicker(true)}
+                  style={{ fontSize: 'var(--text-xs)', color: 'var(--accent)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <FileText size={12} aria-hidden="true" /> Load Saved Brand
+                </button>
+              </div>
               <Input id="brandName" label="Brand / Company Name *" value={form.brandName} onChange={e => update('brandName', e.target.value)} onBlur={() => touch('brandName')} error={showErr('brandName')} placeholder="Mamaearth Pvt Ltd" tooltip="Legal name of the brand or company you are billing. Must match their GST registration exactly for B2B invoices." />
               <Input id="brandGstin" label="Brand GSTIN" value={form.brandGstin} onChange={e => update('brandGstin', e.target.value.toUpperCase().slice(0,15))} onBlur={() => touch('brandGstin')} error={showErr('brandGstin')} placeholder="27AAACM9517F1ZW" hint={form.brandGstin.length === 15 && GSTIN_REGEX.test(form.brandGstin) ? '✓ Valid GSTIN format' : 'Mandatory for B2B input tax credit'} maxLength={15} tooltip="15-digit GST Identification Number of the brand. Format: 2 digits state code + 10 digit PAN + 1 digit entity number + Z + 1 check digit. Required for B2B input tax credit." style={form.brandGstin.length === 15 && GSTIN_REGEX.test(form.brandGstin) ? { borderColor: 'var(--success)', boxShadow: '0 0 0 3px var(--success-dim)' } : {}} />
               <Input id="brandPan" label="Brand PAN" value={form.brandPan} onChange={e => update('brandPan', e.target.value.toUpperCase().slice(0,10))} placeholder="AAACM9517F" maxLength={10} tooltip="10-character Permanent Account Number of the brand. Optional but useful for TDS reconciliation and Form 26AS." />
@@ -1164,7 +1393,7 @@ export default function InvoicePage({ initialView }) {
                   <Tooltip text="Complete registered address of the brand. Must include city, state, and PIN code. Mandatory on GST invoices per Rule 46." />
                 </div>
                 <textarea id="brandAddress" value={form.brandAddress} onChange={e => update('brandAddress', e.target.value)} onBlur={() => touch('brandAddress')} rows={2} placeholder="123, Business Park, Mumbai, Maharashtra - 400001"
-                  style={{ padding: 'var(--space-2) var(--space-3)', background: 'var(--surface-2)', border: `1px solid ${showErr('brandAddress')?'var(--danger)':'var(--border)'}`, borderRadius: 'var(--radius-md)', color: 'var(--text-primary)', fontSize: 'var(--text-base)', resize: 'vertical', fontFamily: 'inherit' }} />
+                  style={{ padding: 'var(--space-2) var(--space-3)', background: 'var(--surface-2)', border: (showErr('brandAddress') ? '1px solid var(--danger)' : '1px solid var(--border)'), borderRadius: 'var(--radius-md)', color: 'var(--text-primary)', fontSize: 'var(--text-base)', resize: 'vertical', fontFamily: 'inherit' }} />
                 {showErr('brandAddress') && <span role="alert" style={{ fontSize: 'var(--text-xs)', color: 'var(--danger-text)' }}>{formErrors.brandAddress}</span>}
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
@@ -1195,7 +1424,7 @@ export default function InvoicePage({ initialView }) {
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
                         <label style={{ fontSize: 'var(--text-xs)', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                          Service {form.serviceLines.length > 1 ? `#${idx+1}` : ''}
+                          Service {form.serviceLines.length > 1 ? ('#' + (idx + 1)) : ''}
                         </label>
                         <Tooltip text="Describe the exact service provided. This appears on the invoice line item. Be specific: 'YouTube integration video for [Campaign Name]'." />
                       </div>
@@ -1221,7 +1450,7 @@ export default function InvoicePage({ initialView }) {
                           <input type="number" min="0" step="0.01" value={line.amount}
                             onChange={e => { const lines=[...form.serviceLines]; lines[idx]={...lines[idx],amount:e.target.value}; update('serviceLines',lines); if(idx===0) update('baseAmount',e.target.value); }}
                             placeholder="45000"
-                            style={{ padding: 'var(--space-2)', background: 'var(--surface)', border: `1px solid ${!line.amount?'var(--danger)':'var(--border)'}`, borderRadius: 'var(--radius-md)', color: 'var(--text-primary)', fontSize: 'var(--text-sm)', fontFamily: 'inherit', fontVariantNumeric: 'tabular-nums', outline: 'none' }}
+                            style={{ padding: 'var(--space-2)', background: 'var(--surface)', border: (!line.amount ? '1px solid var(--danger)' : '1px solid var(--border)'), borderRadius: 'var(--radius-md)', color: 'var(--text-primary)', fontSize: 'var(--text-sm)', fontFamily: 'inherit', fontVariantNumeric: 'tabular-nums', outline: 'none' }}
                           />
                         </div>
                         {/* GST% second */}
@@ -1254,13 +1483,29 @@ export default function InvoicePage({ initialView }) {
 
             {/* ── GST Summary ── */}
             <Sect title="Tax Calculation">
+              {/* Discount input */}
+              <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'flex-end', marginBottom: 'var(--space-3)' }}>
+                <div style={{ flex: 1 }}>
+                  <Input id="discountValue" label="Discount (optional)" type="number" min="0" value={form.discountValue || ''} onChange={e => update('discountValue', e.target.value)} placeholder={form.discountType === 'percent' ? 'e.g. 10' : 'e.g. 500'} tooltip="Apply a discount before GST calculation. Choose flat INR amount or percentage." />
+                </div>
+                <div style={{ display: 'flex', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', overflow: 'hidden', marginBottom: '1px' }}>
+                  {[['flat', '₹'], ['percent', '%']].map(([val, lbl]) => (
+                    <button key={val} type="button" onClick={() => update('discountType', val)}
+                      style={{ padding: '8px 14px', fontSize: 'var(--text-sm)', background: form.discountType === val ? 'var(--accent)' : 'var(--surface-2)', color: form.discountType === val ? '#fff' : 'var(--text-muted)', border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 600 }}>
+                      {lbl}
+                    </button>
+                  ))}
+                </div>
+              </div>
               {calc.base > 0 ? (
                 <div style={{ padding: 'var(--space-4)', background: 'var(--surface-2)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
                   <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 'var(--space-3)' }}>
-                    {calc.supplyType==='intrastate'?`Intrastate — CGST ${calc.gstRate/2}% + SGST ${calc.gstRate/2}%`:`Interstate — IGST ${calc.gstRate}%`}
+                    {calc.supplyType==='intrastate' ? ('Intrastate — CGST ' + (calc.gstRate/2) + '% + SGST ' + (calc.gstRate/2) + '%') : ('Interstate — IGST ' + calc.gstRate + '%')}
                   </div>
-                  {[['Taxable Value', formatINR(calc.base)],
-                    ...(calc.supplyType==='intrastate'?[[`CGST @ ${calc.gstRate/2}%`,formatINR(calc.cgst)],[`SGST @ ${calc.gstRate/2}%`,formatINR(calc.sgst)]]:[[`IGST @ ${calc.gstRate}%`,formatINR(calc.igst)]])
+                  {[
+                    ...(showDiscount ? [['Subtotal', formatINR(calc.subtotal)], ['Discount', ('−' + formatINR(calc.discountAmount))]] : []),
+                    ['Taxable Value', formatINR(calc.base)],
+                    ...(calc.supplyType==='intrastate'?[['CGST @ ' + (calc.gstRate/2) + '%',formatINR(calc.cgst)],['SGST @ ' + (calc.gstRate/2) + '%',formatINR(calc.sgst)]]:[['IGST @ ' + calc.gstRate + '%',formatINR(calc.igst)]]),
                   ].map(([l,v]) => (
                     <div key={l} style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0', fontSize: 'var(--text-sm)' }}>
                       <span style={{ color: 'var(--text-body)' }}>{l}</span>
@@ -1287,33 +1532,22 @@ export default function InvoicePage({ initialView }) {
               <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
                 <Input id="invoiceDate" label="Invoice Date *" type="date" value={form.invoiceDate} onChange={e => update('invoiceDate', e.target.value)} onBlur={() => touch('invoiceDate')} error={showErr('invoiceDate')} tooltip="Date the invoice is issued. Cannot be backdated by more than 30 days for GST filing." />
                 <Input id="dueDate" label="Due Date" type="date" value={form.dueDate} onChange={e => update('dueDate', e.target.value)} tooltip="Payment expected by this date. Standard is 30 days from invoice date (Net 30)." />
+                <Input id="purchaseOrderNumber" label="PO Number (optional)" value={form.purchaseOrderNumber || ''} onChange={e => update('purchaseOrderNumber', e.target.value)} placeholder="PO-2024-001" tooltip="Brand's Purchase Order number, if provided. Printed on the invoice for easy reference." />
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
                     <label htmlFor="paymentTerms" style={{ fontSize: 'var(--text-sm)', fontWeight: 500, color: 'var(--text-body)' }}>Payment Terms</label>
-                    <Tooltip text="How many days the brand has to pay. Net 30 is standard. Select 'Custom' to enter specific terms." />
+                    <Tooltip text="How quickly the brand must pay. Preset chips for common terms, or type your own." />
                   </div>
-                  <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
-                    <select id="paymentTerms"
-                      value={customPaymentTerms !== null ? 'custom' : form.paymentTerms}
-                      onChange={e => {
-                        if (e.target.value === 'custom') { setCustomPaymentTerms(''); }
-                        else { update('paymentTerms', e.target.value); setCustomPaymentTerms(null); }
-                      }}
-                      style={{ flex: 1, padding: 'var(--space-2) var(--space-3)', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', color: 'var(--text-primary)', fontSize: 'var(--text-base)', fontFamily: 'inherit' }}>
-                      {['Immediate','Net 7','Net 15','Net 30','Net 45','Net 60'].map(t => <option key={t} value={t}>{t}{t==='Net 30'?' (Default)':''}</option>)}
-                      <option value="custom">Custom Terms</option>
-                    </select>
-                    {customPaymentTerms !== null && (
-                      <input
-                        autoFocus
-                        type="text"
-                        value={customPaymentTerms}
-                        onChange={e => { setCustomPaymentTerms(e.target.value); update('paymentTerms', e.target.value); }}
-                        placeholder="e.g. Net 45 days"
-                        style={{ flex: 1, padding: 'var(--space-2) var(--space-3)', background: 'var(--surface-2)', border: '1px solid var(--accent)', borderRadius: 'var(--radius-md)', color: 'var(--text-primary)', fontSize: 'var(--text-base)', fontFamily: 'inherit', outline: 'none' }}
-                      />
-                    )}
+                  <div style={{ display: 'flex', gap: 'var(--space-1)', flexWrap: 'wrap', marginBottom: 'var(--space-1)' }}>
+                    {['Due on Receipt', 'Net 15', 'Net 30', 'Net 60'].map(t => (
+                      <button key={t} type="button" onClick={() => { update('paymentTerms', t); setCustomPaymentTerms(null); }}
+                        style={{ padding: '3px 10px', fontSize: 'var(--text-xs)', background: form.paymentTerms === t ? 'var(--accent)' : 'var(--surface-2)', color: form.paymentTerms === t ? '#fff' : 'var(--text-muted)', border: (form.paymentTerms === t ? '1px solid var(--accent)' : '1px solid var(--border)'), borderRadius: 'var(--radius-full)', cursor: 'pointer', fontFamily: 'inherit', transition: 'all var(--duration-fast)' }}>{t}</button>
+                    ))}
                   </div>
+                  <input id="paymentTerms" type="text" value={form.paymentTerms} onChange={e => update('paymentTerms', e.target.value)}
+                    placeholder="e.g. Net 45 days"
+                    style={{ padding: 'var(--space-2) var(--space-3)', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', color: 'var(--text-primary)', fontSize: 'var(--text-base)', fontFamily: 'inherit' }}
+                  />
                 </div>
               </div>
             </Sect>
@@ -1343,7 +1577,7 @@ export default function InvoicePage({ initialView }) {
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
                       <div style={{ fontSize: 'var(--text-xs)', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Select saved account</div>
                       {savedBankAccounts.map(acc => (
-                        <label key={acc.id} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', cursor: 'pointer', padding: 'var(--space-2) var(--space-3)', background: selectedBankAccountId === acc.id ? 'var(--accent-dim)' : 'var(--surface-2)', border: `1px solid ${selectedBankAccountId === acc.id ? 'var(--accent)' : 'var(--border)'}`, borderRadius: 'var(--radius-md)', transition: 'all var(--duration-fast)' }}>
+                        <label key={acc.id} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', cursor: 'pointer', padding: 'var(--space-2) var(--space-3)', background: selectedBankAccountId === acc.id ? 'var(--accent-dim)' : 'var(--surface-2)', border: (selectedBankAccountId === acc.id ? '1px solid var(--accent)' : '1px solid var(--border)'), borderRadius: 'var(--radius-md)', transition: 'all var(--duration-fast)' }}>
                           <input type="radio" name="savedBank" checked={selectedBankAccountId === acc.id} onChange={() => {
                             setSelectedBankAccountId(acc.id);
                             setForm(prev => ({ ...prev, bankName: acc.bank_name||'', accountNumber: acc.account_number||'', ifscCode: acc.ifsc_code||'', accountHolderName: acc.account_holder_name||'', upiId: acc.upi_id||'' }));
@@ -1355,7 +1589,7 @@ export default function InvoicePage({ initialView }) {
                           {acc.is_default && <span style={{ fontSize: 9, padding: '1px 6px', background: 'var(--accent-dim)', color: 'var(--accent)', borderRadius: 4, fontWeight: 700, flexShrink: 0 }}>Default</span>}
                         </label>
                       ))}
-                      <label style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', cursor: 'pointer', padding: 'var(--space-2) var(--space-3)', background: selectedBankAccountId === 'manual' ? 'var(--accent-dim)' : 'var(--surface-2)', border: `1px solid ${selectedBankAccountId === 'manual' ? 'var(--accent)' : 'var(--border)'}`, borderRadius: 'var(--radius-md)' }}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', cursor: 'pointer', padding: 'var(--space-2) var(--space-3)', background: selectedBankAccountId === 'manual' ? 'var(--accent-dim)' : 'var(--surface-2)', border: (selectedBankAccountId === 'manual' ? '1px solid var(--accent)' : '1px solid var(--border)'), borderRadius: 'var(--radius-md)' }}>
                         <input type="radio" name="savedBank" checked={selectedBankAccountId === 'manual'} onChange={() => { setSelectedBankAccountId('manual'); setForm(prev => ({ ...prev, bankName: '', accountNumber: '', ifscCode: '', accountHolderName: '', upiId: '' })); }} style={{ accentColor: 'var(--accent)', cursor: 'pointer' }} />
                         <span style={{ fontSize: 'var(--text-sm)', color: 'var(--text-body)' }}>Enter manually</span>
                       </label>
@@ -1411,7 +1645,7 @@ export default function InvoicePage({ initialView }) {
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
                       <div style={{ fontSize: 'var(--text-xs)', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Select saved UPI</div>
                       {savedUpiIds.map(u => (
-                        <label key={u.id} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', cursor: 'pointer', padding: 'var(--space-2) var(--space-3)', background: selectedUpiId === u.id ? 'var(--accent-dim)' : 'var(--surface-2)', border: `1px solid ${selectedUpiId === u.id ? 'var(--accent)' : 'var(--border)'}`, borderRadius: 'var(--radius-md)' }}>
+                        <label key={u.id} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', cursor: 'pointer', padding: 'var(--space-2) var(--space-3)', background: selectedUpiId === u.id ? 'var(--accent-dim)' : 'var(--surface-2)', border: (selectedUpiId === u.id ? '1px solid var(--accent)' : '1px solid var(--border)'), borderRadius: 'var(--radius-md)' }}>
                           <input type="radio" name="savedUpi" checked={selectedUpiId === u.id} onChange={() => {
                             setSelectedUpiId(u.id);
                             setForm(prev => ({ ...prev, upiId: u.upi_id||'', upiScannerUrl: u.scanner_image_url||null }));
@@ -1424,7 +1658,7 @@ export default function InvoicePage({ initialView }) {
                           {u.is_default && <span style={{ fontSize: 9, padding: '1px 6px', background: 'var(--accent-dim)', color: 'var(--accent)', borderRadius: 4, fontWeight: 700, flexShrink: 0 }}>Default</span>}
                         </label>
                       ))}
-                      <label style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', cursor: 'pointer', padding: 'var(--space-2) var(--space-3)', background: selectedUpiId === 'manual' ? 'var(--accent-dim)' : 'var(--surface-2)', border: `1px solid ${selectedUpiId === 'manual' ? 'var(--accent)' : 'var(--border)'}`, borderRadius: 'var(--radius-md)' }}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', cursor: 'pointer', padding: 'var(--space-2) var(--space-3)', background: selectedUpiId === 'manual' ? 'var(--accent-dim)' : 'var(--surface-2)', border: (selectedUpiId === 'manual' ? '1px solid var(--accent)' : '1px solid var(--border)'), borderRadius: 'var(--radius-md)' }}>
                         <input type="radio" name="savedUpi" checked={selectedUpiId === 'manual'} onChange={() => { setSelectedUpiId('manual'); setForm(prev => ({ ...prev, upiId: '', upiScannerUrl: null })); }} style={{ accentColor: 'var(--accent)', cursor: 'pointer' }} />
                         <span style={{ fontSize: 'var(--text-sm)', color: 'var(--text-body)' }}>Enter manually</span>
                       </label>
@@ -1503,11 +1737,11 @@ export default function InvoicePage({ initialView }) {
               {form.includeSignatory && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
                   <Input id="signatoryName" label="Signatory Name" value={form.signatoryName} onChange={e => update('signatoryName', e.target.value)} placeholder={user?.name || 'Your Name'} hint="Name printed under the signature line" tooltip="The person authorized to sign invoices on behalf of your business" />
-                  {/* Signature image upload */}
+                  {/* Signature Draw / Type / Upload */}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
                       <label style={{ fontSize: 'var(--text-sm)', fontWeight: 500, color: 'var(--text-body)' }}>Signature Image (optional)</label>
-                      <Tooltip text="Upload a PNG/JPG of your handwritten signature. It will appear above the signature line on the invoice. Use a white or transparent background." />
+                      <Tooltip text="Draw, type, or upload your signature. It appears above the signature line on the invoice." />
                     </div>
                     {form.signatoryImageUrl ? (
                       <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
@@ -1517,19 +1751,89 @@ export default function InvoicePage({ initialView }) {
                         </button>
                       </div>
                     ) : (
-                      <label style={{ cursor: 'pointer' }}>
-                        <div style={{ padding: 'var(--space-4)', border: '1px dashed var(--border)', borderRadius: 'var(--radius-md)', textAlign: 'center', color: 'var(--text-muted)', fontSize: 'var(--text-sm)', background: 'var(--surface-2)', transition: 'background var(--duration-fast)' }}>
-                          📷 Click to upload signature image (PNG/JPG)
+                      <div>
+                        {/* Tab bar */}
+                        <div style={{ display: 'flex', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', overflow: 'hidden', marginBottom: 'var(--space-2)', width: 'fit-content' }}>
+                          {[['draw', 'Draw'], ['type', 'Type'], ['upload', 'Upload']].map(([val, lbl], idx, arr) => (
+                            <button key={val} type="button" onClick={() => setSigTab(val)}
+                              style={{ padding: '6px 14px', fontSize: 'var(--text-xs)', background: sigTab === val ? 'var(--accent)' : 'var(--surface-2)', color: sigTab === val ? '#fff' : 'var(--text-muted)', border: 'none', borderRight: idx !== 2 ? '1px solid var(--border)' : 'none', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 600 }}>
+                              {lbl}
+                            </button>
+                          ))}
                         </div>
-                        <input type="file" accept="image/png,image/jpeg,image/webp" style={{ display: 'none' }} onChange={e => {
-                          const file = e.target.files?.[0];
-                          if (!file) return;
-                          if (file.size > 500000) { alert('Image must be under 500KB'); return; }
-                          const reader = new FileReader();
-                          reader.onload = ev => update('signatoryImageUrl', ev.target.result);
-                          reader.readAsDataURL(file);
-                        }} />
-                      </label>
+
+                        {/* Draw tab */}
+                        {sigTab === 'draw' && (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                              <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>Ink colour:</span>
+                              {['#000000', '#1a3c8f', '#8b0000'].map(c => (
+                                <button key={c} type="button" onClick={() => setSigInkColor(c)}
+                                  style={{ width: 18, height: 18, borderRadius: '50%', background: c, border: sigInkColor === c ? '2px solid var(--accent)' : '2px solid transparent', outline: sigInkColor === c ? '2px solid var(--accent)' : 'none', outlineOffset: 1, cursor: 'pointer', padding: 0, flexShrink: 0 }} />
+                              ))}
+                            </div>
+                            <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', overflow: 'hidden', background: '#fff', maxWidth: 320, touchAction: 'none' }}>
+                              <SignatureCanvas ref={sigCanvasRef} penColor={sigInkColor}
+                                canvasProps={{ width: 320, height: 84, style: { display: 'block' } }} />
+                            </div>
+                            <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+                              <button type="button" onClick={() => sigCanvasRef.current?.clear()}
+                                style={{ padding: '4px 12px', fontSize: 'var(--text-xs)', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', color: 'var(--text-muted)', cursor: 'pointer', fontFamily: 'inherit' }}>
+                                Clear
+                              </button>
+                              <button type="button" onClick={() => {
+                                if (sigCanvasRef.current && !sigCanvasRef.current.isEmpty())
+                                  update('signatoryImageUrl', sigCanvasRef.current.toDataURL('image/png'));
+                              }}
+                                style={{ padding: '4px 12px', fontSize: 'var(--text-xs)', background: 'var(--accent)', border: 'none', borderRadius: 'var(--radius-md)', color: '#fff', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 600 }}>
+                                Use Signature
+                              </button>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Type tab */}
+                        {sigTab === 'type' && (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+                            <input value={typedSig} onChange={e => setTypedSig(e.target.value)} placeholder="Type your name…"
+                              style={{ padding: 'var(--space-2) var(--space-3)', fontSize: 'var(--text-sm)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', background: 'var(--surface-2)', color: 'var(--text-body)', fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box', maxWidth: 320 }} />
+                            <div style={{ display: 'flex', gap: 'var(--space-1)', flexWrap: 'wrap' }}>
+                              {SIG_FONTS.map((f, i) => (
+                                <button key={i} type="button" onClick={() => setTypedSigFont(i)}
+                                  style={{ padding: '3px 10px', fontSize: 13, fontFamily: f.preview, fontStyle: 'italic', background: typedSigFont === i ? 'var(--accent)' : 'var(--surface-2)', border: (typedSigFont === i ? '1px solid var(--accent)' : '1px solid var(--border)'), borderRadius: 'var(--radius-md)', color: typedSigFont === i ? '#fff' : 'var(--text-body)', cursor: 'pointer' }}>
+                                  {f.label}
+                                </button>
+                              ))}
+                            </div>
+                            <canvas ref={typePreviewRef} width={320} height={72}
+                              style={{ display: 'block', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', background: '#fff' }} />
+                            <button type="button" onClick={() => {
+                              if (typedSig.trim() && typePreviewRef.current)
+                                update('signatoryImageUrl', typePreviewRef.current.toDataURL('image/png'));
+                            }}
+                              style={{ padding: '4px 12px', fontSize: 'var(--text-xs)', background: 'var(--accent)', border: 'none', borderRadius: 'var(--radius-md)', color: '#fff', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 600, alignSelf: 'flex-start' }}>
+                              Use Signature
+                            </button>
+                          </div>
+                        )}
+
+                        {/* Upload tab */}
+                        {sigTab === 'upload' && (
+                          <label style={{ cursor: 'pointer' }}>
+                            <div style={{ padding: 'var(--space-4)', border: '1px dashed var(--border)', borderRadius: 'var(--radius-md)', textAlign: 'center', color: 'var(--text-muted)', fontSize: 'var(--text-sm)', background: 'var(--surface-2)' }}>
+                              Click to upload signature image (PNG/JPG)
+                            </div>
+                            <input type="file" accept="image/png,image/jpeg,image/webp" style={{ display: 'none' }} onChange={e => {
+                              const file = e.target.files?.[0];
+                              if (!file) return;
+                              if (file.size > 500000) { alert('Image must be under 500KB'); return; }
+                              const reader = new FileReader();
+                              reader.onload = ev => update('signatoryImageUrl', ev.target.result);
+                              reader.readAsDataURL(file);
+                            }} />
+                          </label>
+                        )}
+                      </div>
                     )}
                   </div>
                 </div>
@@ -1539,7 +1843,7 @@ export default function InvoicePage({ initialView }) {
             {/* Mobile: collapsible invoice preview above action buttons */}
             {isMobile && (
               <MobilePreviewCollapsible>
-                <InvoicePreview form={form} calc={calc} invoiceNumber={nextNumber} user={user} template={selectedTemplate} />
+                <InvoicePreview form={form} calc={calc} invoiceNumber={nextNumber} user={user} template={effectiveTemplate} />
               </MobilePreviewCollapsible>
             )}
           </form>
@@ -1547,10 +1851,10 @@ export default function InvoicePage({ initialView }) {
           {/* Desktop: sticky right-side preview */}
           {!isMobile && (
           <div style={{ position: 'sticky', top: 'calc(52px + var(--space-4))', alignSelf: 'flex-start', maxHeight: 'calc(100dvh - 120px)', overflowY: 'auto' }}>
-            <InvoicePreview form={form} calc={calc} invoiceNumber={nextNumber} user={user} template={selectedTemplate} />
+            <InvoicePreview form={form} calc={calc} invoiceNumber={nextNumber} user={user} template={effectiveTemplate} />
           </div>
           )}
-        </div>
+        </div>{/* end grid */}
         </div>{/* end maxWidth wrapper */}
 
         {/* ── Action bar — always pinned at bottom, 3 buttons in one row ── */}
@@ -1568,9 +1872,14 @@ export default function InvoicePage({ initialView }) {
               Fill all required (*) fields to enable invoice creation
             </p>
           )}
+          {lastDraftSaved && (
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 'var(--space-2)' }}>
+              <AutosaveIndicator lastSaved={lastDraftSaved} />
+            </div>
+          )}
           <div style={{ display: 'flex', gap: 'var(--space-2)', maxWidth: 1200, margin: '0 auto', width: '100%' }}>
             <button type="button" onClick={handleSave} disabled={!complete||submitting}
-              style={{ flex: 1, padding: 'var(--space-3)', background: complete&&!submitting?'var(--surface-2)':'var(--border-2)', color: complete&&!submitting?'var(--text-primary)':'var(--text-disabled)', border: `1px solid ${complete?'var(--border)':'transparent'}`, borderRadius: 'var(--radius-md)', fontWeight: 600, fontSize: 'var(--text-sm)', cursor: complete&&!submitting?'pointer':'not-allowed', fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 'var(--space-2)' }}>
+              style={{ flex: 1, padding: 'var(--space-3)', background: complete&&!submitting?'var(--surface-2)':'var(--border-2)', color: complete&&!submitting?'var(--text-primary)':'var(--text-disabled)', border: (complete ? '1px solid var(--border)' : '1px solid transparent'), borderRadius: 'var(--radius-md)', fontWeight: 600, fontSize: 'var(--text-sm)', cursor: complete&&!submitting?'pointer':'not-allowed', fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 'var(--space-2)' }}>
               <Check size={14} aria-hidden="true" />
               {submitting ? 'Saving…' : 'Save Invoice'}
             </button>
@@ -1589,6 +1898,26 @@ export default function InvoicePage({ initialView }) {
           </div>
         </div>
 
+        {/* Brand picker modal */}
+        {showBrandPicker && (
+          <BrandPicker
+            onClose={() => setShowBrandPicker(false)}
+            onSelect={b => {
+              setForm(prev => ({
+                ...prev,
+                brandName: b.brand_name || prev.brandName,
+                brandGstin: b.brand_gstin || prev.brandGstin,
+                brandAddress: b.brand_address || prev.brandAddress,
+                brandStateCode: b.brand_state_code || prev.brandStateCode,
+                brandPan: b.brand_pan || prev.brandPan,
+                brandEmail: b.brand_email || prev.brandEmail,
+                brandPhone: b.brand_phone || prev.brandPhone,
+              }));
+              setShowBrandPicker(false);
+            }}
+          />
+        )}
+
         {/* Template picker — scrollable gallery like Swipe */}
         <Modal isOpen={templateOpen} onClose={() => setTemplateOpen(false)} title="Choose Invoice Template" width="680px">
           <div>
@@ -1606,7 +1935,7 @@ export default function InvoicePage({ initialView }) {
                   style={{
                     flexShrink: 0, scrollSnapAlign: 'start',
                     width: 160, cursor: locked ? 'not-allowed' : 'pointer', fontFamily: 'inherit',
-                    border: `2px solid ${form.templateId===t.id?'var(--accent)':'var(--border)'}`,
+                    border: (form.templateId===t.id ? '2px solid var(--accent)' : '2px solid var(--border)'),
                     borderRadius: 'var(--radius-lg)', overflow: 'hidden',
                     background: 'transparent', padding: 0,
                     transition: 'border-color var(--duration-fast)',
@@ -1719,6 +2048,23 @@ export default function InvoicePage({ initialView }) {
               );
             })}
             </div>
+            {/* Accent colour override */}
+            <div style={{ marginTop: 'var(--space-4)' }}>
+              <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', marginBottom: 'var(--space-2)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.06em' }}>Accent Colour</div>
+              <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center', flexWrap: 'wrap' }}>
+                {colorSwatchButtons}
+                <label title="Custom colour" style={{ position: 'relative', cursor: 'pointer' }}>
+                  <div style={{ width: 22, height: 22, borderRadius: '50%', background: customColorBg, border: '2px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, color: 'var(--text-muted)', lineHeight: 1 }}>+</div>
+                  <input type="color" value={colorInputValue} onChange={e => update('invoiceAccentColor', e.target.value)} style={{ position: 'absolute', opacity: 0, width: 0, height: 0, pointerEvents: 'none' }} tabIndex={-1} />
+                </label>
+                {form.invoiceAccentColor && (
+                  <button type="button" onClick={() => update('invoiceAccentColor', '')}
+                    style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 6px' }}>
+                    Reset to template default
+                  </button>
+                )}
+              </div>
+            </div>
             {/* Selected template info */}
             <div style={{ marginTop: 'var(--space-4)', padding: 'var(--space-3)', background: 'var(--surface-2)', borderRadius: 'var(--radius-md)', display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
               <div style={{ width: 32, height: 32, background: selectedTemplate.headerColor, borderRadius: 6, flexShrink: 0 }} aria-hidden="true" />
@@ -1732,7 +2078,7 @@ export default function InvoicePage({ initialView }) {
         </Modal>
 
         <Modal isOpen={previewOpen} onClose={() => setPreviewOpen(false)} title="Invoice Preview" width="640px">
-          <InvoicePreview form={form} calc={calc} invoiceNumber={nextNumber} user={user} template={selectedTemplate} />
+          <InvoicePreview form={form} calc={calc} invoiceNumber={nextNumber} user={user} template={effectiveTemplate} />
         </Modal>
       </div>
     );
@@ -1744,7 +2090,7 @@ export default function InvoicePage({ initialView }) {
   return (
     <div style={{ padding: isMobile ? 'var(--space-3)' : 'var(--space-5)', width: '100%', maxWidth: 1200 }}>
       <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-4)', flexWrap: 'wrap', gap: 'var(--space-3)' }}>
-        <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)' }}>GST-compliant · Rule 46 CGST Rules{totalCount > 0 ? ` · ${totalCount} total` : ''}</p>
+        <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)' }}>GST-compliant · Rule 46 CGST Rules{totalCount > 0 ? (' · ' + totalCount + ' total') : ''}</p>
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
           {usage.invoices_limit !== null && (
             <span style={{
@@ -1822,7 +2168,7 @@ export default function InvoicePage({ initialView }) {
 
       <InvoiceList
         invoices={invoices} loading={listLoading}
-        onDownload={handleDownloadFromList} onDelete={handleDelete} onMarkPaid={handleMarkPaid} onRefresh={loadInvoices}
+        onDownload={handleDownloadFromList} onExportJson={handleExportJson} onDelete={handleDelete} onMarkPaid={handleMarkPaid} onRefresh={loadInvoices}
         sortCol={sortCol} sortDir={sortDir}
         onSort={(col) => {
           if (col === sortCol) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
@@ -1962,7 +2308,7 @@ function SField({ id, label, children, error, value, onChange, onBlur, tooltip }
         <label htmlFor={id} style={{ fontSize: 'var(--text-sm)', fontWeight: 500, color: 'var(--text-body)' }}>{label}</label>
         {tooltip && <Tooltip text={tooltip} />}
       </div>
-      <select id={id} value={value} onChange={onChange} onBlur={onBlur} style={{ padding: 'var(--space-2) var(--space-3)', background: 'var(--surface-2)', border: `1px solid ${error ? 'var(--danger)' : 'var(--border)'}`, borderRadius: 'var(--radius-md)', color: value ? 'var(--text-primary)' : 'var(--text-muted)', fontSize: 'var(--text-base)', fontFamily: 'inherit' }}>
+      <select id={id} value={value} onChange={onChange} onBlur={onBlur} style={{ padding: 'var(--space-2) var(--space-3)', background: 'var(--surface-2)', border: (error ? '1px solid var(--danger)' : '1px solid var(--border)'), borderRadius: 'var(--radius-md)', color: value ? 'var(--text-primary)' : 'var(--text-muted)', fontSize: 'var(--text-base)', fontFamily: 'inherit' }}>
         {children}
       </select>
       {error && <span role="alert" style={{ fontSize: 'var(--text-xs)', color: 'var(--danger-text)' }}>{error}</span>}

@@ -11,7 +11,7 @@ import Input from '../components/ui/Input.jsx';
 import StatCard from '../components/ui/StatCard.jsx';
 import { SkeletonStatCard, SkeletonTableRow } from '../components/ui/Skeleton.jsx';
 import EmptyState from '../components/ui/EmptyState.jsx';
-import { DollarSign, CheckCircle, Clock, AlertCircle, Receipt } from 'lucide-react';
+import { IndianRupee, CheckCircle, Clock, AlertCircle, Receipt } from 'lucide-react';
 import UsageBar from '../components/ui/UsageBar.jsx';
 import { useUsage } from '../hooks/useUsage.jsx';
 
@@ -145,7 +145,7 @@ export default function TDSPage() {
         </div>
       ) : summary && (
         <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(auto-fit, minmax(200px, 1fr))', gap: 'var(--space-4)', marginBottom: 'var(--space-6)' }}>
-          <StatCard label="Total TDS Deducted" value={formatINR(summary.totalDeducted)} icon={DollarSign} accentColor="var(--warning)" />
+          <StatCard label="Total TDS Deducted" value={formatINR(summary.totalDeducted)} icon={IndianRupee} accentColor="var(--warning)" />
           <StatCard label="Form 16A Received" value={formatINR(summary.form16aReceived)} icon={CheckCircle} accentColor="var(--success)" />
           <StatCard label="Pending Form 16A" value={formatINR(summary.pending)} icon={Clock} accentColor="var(--danger)" />
           <StatCard label="Net TDS Credit" value={formatINR(summary.netTdsCredit)} icon={AlertCircle} accentColor="var(--info)" />

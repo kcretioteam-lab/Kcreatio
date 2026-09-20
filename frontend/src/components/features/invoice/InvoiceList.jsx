@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
-import { Eye, Pencil, Download, Trash2, ChevronUp, ChevronDown, ChevronsUpDown, CheckCircle, Send, Copy } from 'lucide-react';
+import { Eye, Pencil, Download, FileJson, Trash2, ChevronUp, ChevronDown, ChevronsUpDown, CheckCircle, Send, Copy } from 'lucide-react';
 import Badge from '../../ui/Badge.jsx';
 import { formatINR } from '../../../utils/formatINR.js';
 import api from '../../../utils/api.js';
@@ -20,7 +20,7 @@ const COLS = [
   { key: 'actions',        label: 'Actions',   sortable: false },
 ];
 
-export default function InvoiceList({ invoices, loading, onDownload, onDelete, onRefresh, onMarkPaid, sortCol, sortDir, onSort }) {
+export default function InvoiceList({ invoices, loading, onDownload, onExportJson, onDelete, onRefresh, onMarkPaid, sortCol, sortDir, onSort }) {
   const navigate = useNavigate();
   const toast = useToast();
   const [viewModalId, setViewModalId] = useState(null);
@@ -166,6 +166,11 @@ export default function InvoiceList({ invoices, loading, onDownload, onDelete, o
                       {/* DOWNLOAD */}
                       <ActionBtn icon={<Download size={13}/>} label="Download PDF" title="PDF"
                         onClick={e => { e.stopPropagation(); onDownload(inv); }} accent />
+                      {/* JSON EXPORT */}
+                      {onExportJson && (
+                        <ActionBtn icon={<FileJson size={13}/>} label="Export as JSON (for accountant)" title="JSON"
+                          onClick={e => { e.stopPropagation(); onExportJson(inv); }} />
+                      )}
                       {/* DELETE — only draft */}
                       {inv.status === 'draft' && (
                         <ActionBtn icon={<Trash2 size={13}/>} label="Delete invoice" title="Delete"

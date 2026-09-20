@@ -1,5 +1,6 @@
 import { Router, Response } from 'express';
 import { z } from 'zod';
+import rateLimit from 'express-rate-limit';
 import { supabase } from '../lib/supabase.js';
 import { authenticate, AuthRequest } from '../middleware/auth.js';
 import { validateBody } from '../middleware/validateBody.js';
@@ -12,11 +13,31 @@ import {
   CREATOR_GST_CONFIG,
 } from '../services/invoiceService.js';
 import { generateInvoicePdf } from '../services/pdfService.js';
+import { generateInvoicePdfWithPuppeteer, warmBrowser } from '../services/puppeteerPdfService.js';
 import { PLAN_LIMITS, Plan } from '../config/plans.js';
 
 const router = Router();
 
 const GSTIN_REGEX = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
+const DATA_URL_REGEX = /^data:image\/(png|jpeg|gif|webp|svg\+xml);base64,[A-Za-z0-9+/]+=*$/;
+
+function isValidImageField(val: string | undefined | null): boolean {
+  if (!val) return true;
+  if (DATA_URL_REGEX.test(val)) return true;
+  const supabaseUrl = process.env.SUPABASE_URL || '';
+  return supabaseUrl.length > 0 &&
+    val.startsWith(supabaseUrl) &&
+    val.includes('/storage/v1/object/public/invoice-signatures/');
+}
+
+const pdfRateLimit = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 20,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  keyGenerator: (req) => (req as AuthRequest).userId || 'anonymous',
+  message: { error: 'RATE_LIMITED', message: 'PDF generation limit reached — please try again in an hour' },
+});
 
 // ── Public route: payment confirmation by brand ──────────────────────────────
 // Must be defined BEFORE router.use(authenticate) to skip auth middleware
@@ -83,6 +104,9 @@ const CreateInvoiceSchema = z.object({
   reverseCharge: z.enum(['Yes', 'No']).default('No'),
   templateId: z.string().max(20).default('classic'),
   paymentTerms: z.string().max(100).default('Net 30'),
+  purchaseOrderNumber: z.string().max(100).optional(),
+  discountValue: z.number().min(0).optional(),
+  discountType: z.enum(['flat', 'percent']).optional(),
   // Bank details
   includeBankDetails: z.boolean().default(false),
   bankName: z.string().max(100).optional(),
@@ -96,14 +120,22 @@ const CreateInvoiceSchema = z.object({
   // Signatory
   includeSignatory: z.boolean().default(false),
   signatoryName: z.string().max(200).optional(),
-  signatoryImageUrl: z.string().optional(),
+  signatoryImageUrl: z.string().optional().refine(isValidImageField, { message: 'signatoryImageUrl must be a base64 data URL or Supabase storage URL' }),
   sellerBusinessName: z.string().max(200).optional(),
   // Contact fields
   brandEmail: z.string().email().optional().or(z.literal('')),
   brandPhone: z.string().max(20).optional(),
   // UPI QR
   includeUpi: z.boolean().default(false),
-  upiScannerUrl: z.string().optional(),
+  upiScannerUrl: z.string().optional().refine(isValidImageField, { message: 'upiScannerUrl must be a base64 data URL or Supabase storage URL' }),
+  // Accent color override
+  invoiceAccentColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional().nullable(),
+});
+
+// GET /invoices/warm — pre-warms Puppeteer browser (called on page load from frontend)
+router.get('/warm', async (_req: AuthRequest, res: Response): Promise<void> => {
+  warmBrowser().catch(() => {});
+  res.json({ ok: true });
 });
 
 // GET /invoices/next-number — must come before /:id routes
@@ -123,6 +155,30 @@ router.get('/next-number', async (req: AuthRequest, res: Response): Promise<void
 
   const nextSeq = String((count || 0) + 1).padStart(4, '0');
   res.json({ invoiceNumber: `${prefix}/${fyCode}/${nextSeq}` });
+});
+
+// GET /invoices/brands — distinct past brands for party picker
+router.get('/brands', async (req: AuthRequest, res: Response): Promise<void> => {
+  const { data } = await supabase
+    .from('invoices')
+    .select('brand_name, brand_gstin, brand_address, brand_state_code, brand_pan, brand_email, brand_phone')
+    .eq('user_id', req.userId!)
+    .not('brand_name', 'is', null)
+    .order('created_at', { ascending: false })
+    .limit(200);
+
+  if (!data) { res.json({ brands: [] }); return; }
+
+  // Deduplicate by brand_name (keep most recent)
+  const seen = new Set<string>();
+  const brands = data.filter(b => {
+    const key = (b.brand_name || '').toLowerCase().trim();
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  }).slice(0, 50);
+
+  res.json({ brands });
 });
 
 // GET /invoices
@@ -257,6 +313,9 @@ router.post('/', validateBody(CreateInvoiceSchema), async (req: AuthRequest, res
       reverse_charge: body.reverseCharge || 'No',
       template_id: body.templateId || 'classic',
       payment_terms: body.paymentTerms || 'Net 30',
+      purchase_order_number: body.purchaseOrderNumber || null,
+      discount_value: body.discountValue ?? null,
+      discount_type: body.discountType || null,
       // Bank details
       include_bank_details: body.includeBankDetails || false,
       bank_name: body.bankName || null,
@@ -278,6 +337,7 @@ router.post('/', validateBody(CreateInvoiceSchema), async (req: AuthRequest, res
       // UPI QR
       include_upi: body.includeUpi || false,
       upi_scanner_url: body.upiScannerUrl || null,
+      invoice_accent_color: body.invoiceAccentColor || null,
     })
     .select()
     .single();
@@ -310,7 +370,7 @@ router.get('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
 });
 
 // GET /invoices/:id/pdf
-router.get('/:id/pdf', async (req: AuthRequest, res: Response): Promise<void> => {
+router.get('/:id/pdf', pdfRateLimit, async (req: AuthRequest, res: Response): Promise<void> => {
   const { data: invoice } = await supabase
     .from('invoices')
     .select('*')
@@ -324,43 +384,69 @@ router.get('/:id/pdf', async (req: AuthRequest, res: Response): Promise<void> =>
   if (!user) { res.status(404).json({ error: 'NOT_FOUND', message: 'User not found' }); return; }
 
   try {
-    const pdfBuffer = await generateInvoicePdf({
-      invoiceNumber: invoice.invoice_number,
-      invoiceDate: invoice.invoice_date,
-      dueDate: invoice.due_date,
-      seller: {
-        name: user.business_name || user.name,
-        gstin: user.gstin,
-        address: user.business_address,
-        stateCode: user.state_code,
-      },
-      buyer: {
-        name: invoice.brand_name,
-        gstin: invoice.brand_gstin,
-        address: invoice.brand_address,
-        stateCode: invoice.brand_state_code,
-      },
-      serviceDescription: invoice.service_description,
-      gst: {
-        baseAmount: invoice.base_amount,
-        gstRate: invoice.gst_rate,
-        gstAmount: invoice.gst_amount,
-        totalAmount: invoice.total_amount,
-        supplyType: invoice.supply_type,
-        cgstAmount: invoice.cgst_amount,
-        sgstAmount: invoice.sgst_amount,
-        igstAmount: invoice.igst_amount,
-      },
-      notes: invoice.notes,
-    });
+    const cacheKey = `${invoice.id}:${invoice.updated_at || invoice.created_at}`;
+    const pdfBuffer = await generateInvoicePdfWithPuppeteer(invoice, user, cacheKey);
 
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="${invoice.invoice_number.replace(/\//g, '-')}.pdf"`);
     res.send(pdfBuffer);
-  } catch (err) {
-    console.error('PDF generation error:', err);
-    res.status(500).json({ error: 'INTERNAL_ERROR', message: 'Failed to generate PDF' });
+  } catch (puppeteerErr) {
+    console.warn('Puppeteer PDF failed, falling back to pdfmake:', puppeteerErr);
+    try {
+      const pdfBuffer = await generateInvoicePdf({
+        invoiceNumber: invoice.invoice_number,
+        invoiceDate: invoice.invoice_date,
+        dueDate: invoice.due_date,
+        seller: {
+          name: user.business_name || user.name,
+          gstin: user.gstin,
+          address: user.business_address,
+          stateCode: user.state_code,
+        },
+        buyer: {
+          name: invoice.brand_name,
+          gstin: invoice.brand_gstin,
+          address: invoice.brand_address,
+          stateCode: invoice.brand_state_code,
+        },
+        serviceDescription: invoice.service_description,
+        gst: {
+          baseAmount: invoice.base_amount,
+          gstRate: invoice.gst_rate,
+          gstAmount: invoice.gst_amount,
+          totalAmount: invoice.total_amount,
+          supplyType: invoice.supply_type,
+          cgstAmount: invoice.cgst_amount,
+          sgstAmount: invoice.sgst_amount,
+          igstAmount: invoice.igst_amount,
+        },
+        notes: invoice.notes,
+      });
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="${invoice.invoice_number.replace(/\//g, '-')}.pdf"`);
+      res.send(pdfBuffer);
+    } catch (err) {
+      console.error('PDF generation error:', err);
+      res.status(500).json({ error: 'INTERNAL_ERROR', message: 'Failed to generate PDF' });
+    }
   }
+});
+
+// GET /invoices/:id/export
+router.get('/:id/export', async (req: AuthRequest, res: Response): Promise<void> => {
+  const { data: invoice } = await supabase
+    .from('invoices')
+    .select('*')
+    .eq('id', req.params.id)
+    .eq('user_id', req.userId!)
+    .maybeSingle();
+
+  if (!invoice) { res.status(404).json({ error: 'NOT_FOUND', message: 'Invoice not found' }); return; }
+
+  const filename = `${(invoice.invoice_number || 'invoice').replace(/\//g, '-')}.json`;
+  res.setHeader('Content-Type', 'application/json');
+  res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+  res.json(invoice);
 });
 
 // PUT /invoices/:id
@@ -403,7 +489,8 @@ router.put('/:id', validateBody(CreateInvoiceSchema.partial()), async (req: Auth
     cgstAmount: 'cgst_amount', sgstAmount: 'sgst_amount', igstAmount: 'igst_amount',
     invoiceDate: 'invoice_date', dueDate: 'due_date', notes: 'notes',
     placeOfSupply: 'place_of_supply', reverseCharge: 'reverse_charge',
-    templateId: 'template_id', paymentTerms: 'payment_terms',
+    templateId: 'template_id', paymentTerms: 'payment_terms', purchaseOrderNumber: 'purchase_order_number',
+    discountValue: 'discount_value', discountType: 'discount_type',
     includeBankDetails: 'include_bank_details', bankName: 'bank_name',
     accountNumber: 'account_number', ifscCode: 'ifsc_code',
     accountHolderName: 'account_holder_name', upiId: 'upi_id',
@@ -411,6 +498,7 @@ router.put('/:id', validateBody(CreateInvoiceSchema.partial()), async (req: Auth
     includeTerms: 'include_terms', termsText: 'terms_text',
     includeSignatory: 'include_signatory', signatoryName: 'signatory_name',
     signatoryImageUrl: 'signatory_image_url', sellerBusinessName: 'seller_business_name',
+    invoiceAccentColor: 'invoice_accent_color',
   };
   for (const [camel, snake] of Object.entries(fieldMap)) {
     if (body[camel] !== undefined) updates[snake] = body[camel];
