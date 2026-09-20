@@ -4,7 +4,7 @@ services:
     runtime: node
     region: oregon
     rootDir: backend
-    buildCommand: apt-get install -y chromium-browser --no-install-recommends 2>/dev/null || true && npm ci && npm run build
+    buildCommand: apt-get install -y chromium-browser --no-install-recommends 2>/dev/null || true && npm ci --omit=dev && npm run build
     startCommand: node dist/server.js
     healthCheckPath: /api/health
     envVars:
