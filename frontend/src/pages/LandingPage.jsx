@@ -11,6 +11,7 @@ import {
   Zap, Shield, Check, Sun, Moon, Menu, X,
 } from 'lucide-react';
 import { useTheme } from '../App.jsx';
+import LogoMark from '../components/ui/LogoMark.jsx';
 import {
   reduced, useInView, Reveal,
   FlowPipeline, Act5Impact, DashboardReveal,

@@ -10,6 +10,7 @@ import {
   Download, IndianRupee, BarChart2,
   Zap, Shield, RefreshCw, Check, ChevronRight,
 } from 'lucide-react';
+import LogoMark from '../components/ui/LogoMark.jsx';
 
 // ─── Shared utils (exported so LandingPageV6.jsx can import) ─────────────────
 
@@ -844,7 +845,7 @@ export function Footer() {
         <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 32, marginBottom: 40 }}>
           <div style={{ maxWidth: 260 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-              <div style={{ width: 28, height: 28, background: 'linear-gradient(135deg, #E8921A, #c8711a)', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: 13, color: '#fff' }}>K</div>
+              <LogoMark size={28} />
               <span style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: 15 }}>Kcretio</span>
             </div>
             <p style={{ fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.7 }}>

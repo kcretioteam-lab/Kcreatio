@@ -6,6 +6,7 @@ import { useIsMobile } from '../hooks/useIsMobile.js';
 import Input from '../components/ui/Input.jsx';
 import api from '../utils/api.js';
 import { useTheme } from '../App.jsx';
+import LogoMark from '../components/ui/LogoMark.jsx';
 
 const BRAND_BULLETS = [
   { icon: FileText,   text: 'GST-compliant invoices in 30 seconds' },
@@ -196,7 +197,7 @@ export default function AuthPage({ defaultMode = 'register' }) {
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-            <div aria-hidden="true" style={{ width: 24, height: 24, background: 'var(--accent)', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 11, color: '#fff' }}>C</div>
+            <LogoMark size={24} />
             <span style={{ fontWeight: 700, fontSize: 'var(--text-sm)', color: 'var(--text-primary)' }}>Kcretio</span>
           </div>
         </div>
@@ -234,7 +235,7 @@ export default function AuthPage({ defaultMode = 'register' }) {
           <div style={{ background: 'var(--surface-2)', borderRight: '1px solid var(--border)', padding: 'var(--space-10)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', marginBottom: 'var(--space-10)' }}>
-                <div aria-hidden="true" style={{ width: 32, height: 32, background: 'var(--accent)', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 15, color: '#fff', flexShrink: 0 }}>C</div>
+                <LogoMark size={32} />
                 <span style={{ fontWeight: 700, fontSize: 'var(--text-md)', color: 'var(--text-primary)' }}>Kcretio</span>
               </div>
               <h2 style={{ fontFamily: "'Instrument Serif', Georgia, serif", fontSize: 'clamp(22px, 2vw, 30px)', fontWeight: 400, lineHeight: 1.2, color: 'var(--text-primary)', marginBottom: 'var(--space-6)', letterSpacing: '-0.01em' }}>
