@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { format, addDays } from 'date-fns';
-import { Plus, FileText, Check, AlertCircle, Eye, Download, X, HelpCircle, ChevronUp, ChevronDown, ChevronsUpDown, Lock, Save } from 'lucide-react';
+import { Plus, FileText, Check, AlertCircle, Eye, Download, X, HelpCircle, ChevronUp, ChevronDown, ChevronsUpDown, Lock, Save, Mail } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth.jsx';
 import { useToast } from '../hooks/useToast.jsx';
 import UsageBar from '../components/ui/UsageBar.jsx';
@@ -238,6 +238,9 @@ function lsNextNumber(user) {
   return `${prefix}/${fyCode}/${String(count+1).padStart(4,'0')}`;
 }
 
+// base64-embedded logo for PDF watermark — avoids external URL resolution in Blob docs
+const _WMARK_B64 = 'PD94bWwgdmVyc2lvbj0iMS4wIiBzdGFuZGFsb25lPSJ5ZXMiPz4KPHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjMxMy45MTUwMDAwMDAwMDAxIDIxOC41ODEgNDI5LjM0OCA0MjkuMzQ4Ij4KPHBhdGggc3R5bGU9ImZpbGw6IzU0NWM2Nzsgc3Ryb2tlOm5vbmU7IiBkPSJNNjI5IDI5NkM2MzUuNjc4IDI5OC44MDIgNjQ1Ljc4NCAyOTcgNjUzIDI5N0w3MDYgMjk3QzY5OS4zMjIgMjk0LjE5OCA2ODkuMjE2IDI5NiA2ODIgMjk2TDYyOSAyOTZ6Ii8+CjxwYXRoIHN0eWxlPSJmaWxsOiMyOTQxZGI7IHN0cm9rZTpub25lOyIgZD0iTTQ3OSAyOTdDNDgwLjc2OSAyOTcuNzc5IDQ4Mi4wMzYgMjk3LjkxMiA0ODQgMjk4TDQ3MSAzMDNMNDczIDMwNkw0NjUgMzA3QzQ2MC4wODIgMzE4LjA3NSA0NjEgMzI5LjA5OSA0NjEgMzQxQzQ2MSAzNTYuMzA4IDQ2MC40OTggMzcxLjcwNCA0NjAuODU5IDM4N0M0NjEuMDA4IDM5My4zMzEgNDY0LjI0NiAzOTcuMjY3IDQ2MyA0MDRDNDY1Ljk2NyA0MDQgNDY1LjY3NCA0MDYuMzY0IDQ2Ni4zMzMgNDA5QzQ2Ny43NzggNDE0Ljc3NyA0NzAuOTgzIDQxOS41MjUgNDczIDQyNUM0NzguOTE1IDQyMi40MzQgNDc5LjQ3OCA0MTcuNjYzIDQ4My41MjkgNDEzLjI3NEM0ODcuNjI2IDQwOC44MzQgNDkyLjkzMyA0MDUuMjkgNDk3LjIxNSA0MDAuOTZDNTAyLjY4MyAzOTUuNDMxIDUwNy41NzkgMzg5LjE1NyA1MTQuMDE1IDM4NC41NDJDNTIwLjE3NCAzODAuMTI0IDUzMS4xMjggMzgxLjA1IDUzNC44NTYgMzc0LjE2NEM1MzYuNzI3IDM3MC43MSA1MzYgMzY1Ljc3OSA1MzYgMzYyQzUzNi4wMDEgMzUzLjM1NiA1MzUuNjYxIDM0NC42MzUgNTM2LjAzOSAzMzZDNTM2LjM3NyAzMjguMjk2IDUzNy4wMzcgMzIwLjc1NCA1MzYuOTk5IDMxM0M1MzYuOTc2IDMwOC4xNzEgNTM2LjY5OCAzMDIuODY4IDUzMi43NzUgMjk5LjQzNEM1MjguNjkgMjk1Ljg1NiA1MjIuMDE5IDI5NyA1MTcgMjk3TDQ3OSAyOTd6Ii8+CjxwYXRoIHN0eWxlPSJmaWxsOiM0OGFlZmQ7IHN0cm9rZTpub25lOyIgZD0iTTQ5MyA0MThDNDk2Ljg3OCA0MTYuNjQzIDUwMC45MDMgNDE2LjE3NCA1MDUgNDE2QzUwMi4yMzcgNDIxLjQ0NSA1MTAuNTE4IDQyNC45MTYgNTEzLjAwMiA0MjkuMjg1QzUxNS44MjggNDM0LjI1OCA1MTMuMTE2IDQ0MC4wMSA1MTUuMDYzIDQ0NC42NTVDNTE2LjkyIDQ0OS4wODQgNTMwLjI5MSA0NDcuMDMxIDUzNCA0NDUuNjMzQzU0NC4yMDEgNDQxLjc5IDU1NC4yNDQgNDM2LjEyNSA1NjQgNDMxLjI0N0M1NzUuMzE4IDQyNS41ODggNTg2Ljg4NyA0MjAuMjE4IDU5NyA0MTIuNDk3QzYyMi40NzcgMzkzLjA0NyA2NDQuMjc5IDM2OC42MzMgNjY4IDM0Ny4xN0M2NzguMTE1IDMzOC4wMTcgNjg3Ljc3NCAzMjguMzA1IDY5OCAzMTkuMjg2QzcwMi4yMyAzMTUuNTU1IDcwOS4zMyAzMTAuOTI0IDcxMC41MTIgMzA1LjAwMUM3MTIuNTI0IDI5NC45MDcgNjk3Ljc3NCAyOTcgNjkyIDI5N0w2NDggMjk3QzY0MC4yNTYgMjk3IDYzMS41MzcgMjk1Ljg5OCA2MjQgMjk3LjkyN0M2MDkuOTQgMzAxLjcxNCA2MDAuMzkgMzEzLjQzMyA1OTAgMzIyLjgzQzU2OC4zMTUgMzQyLjQ0MyA1NDcuNjc3IDM2My4yMTYgNTI2IDM4Mi44M0M1MTguNzg0IDM4OS4zNTkgNTExLjg4MyAzOTYuMTE0IDUwNSA0MDNDNTAwLjQxNyA0MDcuNTg0IDQ5NS41NjEgNDExLjk1MSA0OTMgNDE4eiIvPgo8cGF0aCBzdHlsZT0iZmlsbDojNTQ1YzY3OyBzdHJva2U6bm9uZTsiIGQ9Ik00NjYgMzA4TDQ3MyAzMDZDNDcyLjMzOSAzMDQuNjAzIDQ3Mi4wMzYgMzA0LjE4NiA0NzEgMzAzQzQ3NS4zNjkgMzAxLjU0NCA0NzkuNDA4IDI5OS42NzkgNDg0IDI5OUM0NzcuMDcxIDI5Ni4xNzUgNDY4LjkyNSAzMDEuODYxIDQ2NiAzMDgiLz4KPHBhdGggc3R5bGU9ImZpbGw6IzI5NDFkYjsgc3Ryb2tlOm5vbmU7IiBkPSJNMzkyIDM4NUMzOTcuNzA3IDM4Ny4zOTUgNDA1Ljg0NiAzODYgNDEyIDM4Nkw0NTMgMzg2QzQ0Ny4yOTMgMzgzLjYwNSA0MzkuMTU0IDM4NSA0MzMgMzg1TDM5MiAzODV6Ii8+CjxwYXRoIHN0eWxlPSJmaWxsOiM0OGFlZmQ7IHN0cm9rZTpub25lOyIgZD0iTTQwNCA0MTFDNDAxLjQ2NyA0MDIuMTYgNDExLjE3NyAzOTEuNDY2IDQxOCAzODdDNDE1LjEwOSAzODUuNzg3IDQxMi4xMzEgMzg2LjAwMSA0MDkgMzg2QzQwMi4wMjQgMzg1Ljk5OCAzOTIuMDA1IDM4NC4xNTMgMzg2LjEwNSAzODguNjUzQzM3OC4zNzkgMzk0LjU0NSAzNzkuOTkgNDA4LjI3NiAzOTAuMDA0IDQxMC42MDZDMzk0LjQyIDQxMS42MzMgMzk5LjQ4OSA0MTEgNDA0IDQxMXoiLz4KPHBhdGggc3R5bGU9ImZpbGw6IzIxYThmYzsgc3Ryb2tlOm5vbmU7IiBkPSJNNDA0IDQxMEMzOTkuNzM5IDQxMS4yNTkgMzk1LjQyMyA0MTEgMzkxIDQxMUMzOTYuMjE3IDQxMy4xODkgNDAzLjM4MSA0MTIgNDA5IDQxMkw0MzkgNDEyQzQ0NC4xNDIgNDEyIDQ1MC4wMzMgNDEyLjc2MSA0NTQuOTk5IDQxMS4xOTZDNDY0LjYwMiA0MDguMTY5IDQ2Ny4xOTUgMzk0LjY4NiA0NTguOTU2IDM4OC42NTNDNDUxLjAzOSAzODIuODU1IDQzNC4zOTkgMzg1Ljk0IDQyNSAzODYuMDAxQzQyMS4wOCAzODYuMDI2IDQxNy40NDUgMzg2LjM1OSA0MTQuMjYzIDM4OC45MkM0MTAuMzIxIDM5Mi4wOTMgMzk5LjYgNDA1LjAxNyA0MDQgNDEweiIvPgo8cGF0aCBzdHlsZT0iZmlsbDojNzg0OGY5OyBzdHJva2U6bm9uZTsiIGQ9Ik00ODAgNDQyQzQ4Ni44MDEgNDQxLjk5IDQ5My45MzIgNDQ0LjIzMSA1MDAgNDQ3QzQ5OC43MDQgNDQ4LjU5NCA0OTguNDY1IDQ0OS4wMTggNDk4IDQ1MUM1MDAuNzE1IDQ1Mi41IDUwMi45MjggNDUzLjU2IDUwNiA0NTRMNTA1IDQ1N0w1MDggNDU5TDUwMiA0NjJDNTA1LjczMSA0NjIuOTkxIDUwOC44MjUgNDYwLjQ5OSA1MTIgNDU4LjZDNTE4LjIxOCA0NTQuODgyIDUyNC4zMDMgNDUwLjgwMyA1MzEgNDQ4QzUyNi4zNzggNDQ0LjYzMyA1MjAuNTkxIDQ0OS4yMjYgNTE2Ljc3OCA0NDYuMDE2QzUxNC4xMTggNDQzLjc3NyA1MTUuNjUyIDQzOS4wNiA1MTUuMDk3IDQzNkM1MTMuOTQgNDI5LjYxNSA1MTEuNjA5IDQyNi4zMzEgNTA2Ljk2OCA0MjEuODY1QzUwNS4zMTggNDIwLjI3NyA1MDMuNzM4IDQxOS4wNDkgNTA1IDQxN0M0OTEuMzc4IDQxMS40MzEgNDgxLjg0NSA0MzEuMzE4IDQ4MCA0NDJ6Ii8+CjxwYXRoIHN0eWxlPSJmaWxsOiMyOTQxZGI7IHN0cm9rZTpub25lOyIgZD0iTTYwMSA0MTlDNjAxLjE5NSA0MjYuMjYzIDU5Ni40MDkgNDI3LjgzNSA1OTIuMTc0IDQzMi43MDRDNTg3Ljk0MSA0MzcuNTcxIDU4NC41NDcgNDQyLjgzMiA1NzkuNTYxIDQ0Ny4wNzZDNTc2LjM3NSA0NDkuNzg5IDU3Mi40NDcgNDUxLjMyNCA1NjkuMTc0IDQ1My45MTNDNTY2LjQxMiA0NTYuMDk3IDU2NC40NTYgNDU5LjI1NiA1NjEuNjI1IDQ2MS4yOThDNTU5LjgyNSA0NjIuNTk2IDU1Ny40MTQgNDYyLjY1OCA1NTUuNjk5IDQ2NC4wMTJDNTUxLjQ4MyA0NjcuMzQ0IDU1MC44MTYgNDczLjQ5OSA1NDYgNDc3TDU0NiA0NzlDNTUxLjgxNyA0ODMuMTA1IDU1Ni41MDQgNDg4LjcxNCA1NjEuNDI0IDQ5My44MzFDNTcwLjIwMiA1MDIuOTU5IDU3OS4wMzUgNTEyLjAzNSA1ODggNTIxQzU5MS4yMzcgNTE5LjgyOCA1OTIuMzg1IDUxOS43MzcgNTk1IDUyMkw2MDIgNTE3QzYwMS41OTQgNTE0LjkwNyA2MDEuNzgzIDUxNC45OCA2MDAgNTE0TDYwOSA1MDhDNjA0LjY1IDUwMC4yMjMgNjA2LjkxOSA0OTMuNjA1IDYxNSA0OTBDNjE1LjkyMSA0ODYuNjU3IDYxOC40MjUgNDg0LjQ2OCA2MTkgNDgxTDYyMyA0ODBMNjIyIDQ3NkM2MjIuNjEgNDc2IDYyNS42MSA0NzYuMzkgNjI2IDQ3NkM2MjcuNjE2IDQ3NC4zODQgNjI2LjA3IDQ3My41NDkgNjI3IDQ3MkM2MjcuNjgyIDQ3MC44NjMgNjI4Ljk4OSA0NzAuMDExIDYzMCA0NjlMNjMxIDQ3MEM2MzEuNDI5IDQ2Ni43MjMgNjM0LjEwOCA0NTguMjA4IDYzOC42MTQgNDU4Ljc2NUM2NDAuNzgxIDQ1OS4wMzQgNjQzLjI2NSA0NjEuNzg5IDY0NSA0NjNDNjM3LjE3NyA0NTEuODk0IDYyNS41OTkgNDQyLjYwMyA2MTYgNDMzQzYxMS4zMTIgNDI4LjMxIDYwNy4wMjEgNDIxLjg2NyA2MDEgNDE5eiIvPgo8cGF0aCBzdHlsZT0iZmlsbDojMjFhOGZjOyBzdHJva2U6bm9uZTsiIGQ9Ik0zNDMgNDI4QzM0NC4yNDggNDI4LjY4NSAzNDQuNTQ4IDQyOC43NDkgMzQ2IDQyOUMzNDIuODQ3IDQzMC41NzcgMzM5LjM0NCA0MzEuNDg0IDMzNyA0MzVDMzM2LjA0IDQzNi40NDEgMzM1Ljk0MyA0MzguNDI5IDMzNSA0NDBMMzM0IDQzOUMzMzQuMDEgNDQyLjczNSAzMzMuOTE1IDQ0Ni41NDQgMzM1LjU3MyA0NDkuOTk5QzMzNi42MTcgNDUyLjE3NiAzMzguMTU5IDQ1NC4wNzQgMzQwLjA0NCA0NTUuNTgxQzM1OC4wMDggNDY5Ljk0NyAzNzYuMzUzIDQzNi4yNjYgMzU0Ljk4NSA0MjguODU0QzM1MS4yMjUgNDI3LjU1IDM0Ni45MTcgNDI4IDM0MyA0Mjh6Ii8+CjxwYXRoIHN0eWxlPSJmaWxsOiM0OGFlZmQ7IHN0cm9rZTpub25lOyIgZD0iTTMzNSA0NDBDMzM4LjE2NyA0MzUuNTE1IDM0MC41ODggNDMxLjg0MSAzNDYgNDMwQzMzOS42ODYgNDI3Ljg0MSAzMzUuNjEgNDM0LjUyIDMzNSA0NDB6Ii8+CjxwYXRoIHN0eWxlPSJmaWxsOiMyMWE4ZmM7IHN0cm9rZTpub25lOyIgZD0iTTM4NiA0MzJDMzg2LjU5OCA0MzMuMTk1IDM4Ni40NjYgNDMyLjk3NyAzODggNDM0TDM4MCA0MzdDMzc3LjE0OCA0NDQuODI2IDM3Ny44ODkgNDU0Ljc1OCAzODcuMDAxIDQ1OC4yNThDMzkxLjE0OSA0NTkuODUxIDM5Ni42MzMgNDU5IDQwMSA0NTlMNDI4IDQ1OUM0MjcuMDIgNDU3LjIxNyA0MjcuMDkyIDQ1Ny40MDYgNDI1IDQ1N0M0MjYuNjMyIDQ1NS4wNzQgNDI2Ljk2NiA0NTQuNDg5IDQyNyA0NTJDNDI5LjIwNyA0NTAuNDI4IDQyOS4zMDMgNDQ5LjY4MiA0MjkgNDQ3QzQzNC4yMTMgNDQ1LjA0NyA0MzYuNzkgNDQwLjY4NCA0NDEuNDMxIDQzOC4wNjVDNDQ0LjM5NSA0MzYuMzkyIDQ0Ny41NiA0MzYuNjQ4IDQ0OCA0MzNMNDUyIDQzM0M0NDUuODA2IDQzMC40MDEgNDM2LjY4NiA0MzIgNDMwIDQzMkM0MTUuNDggNDMyIDQwMC4zNTcgNDI5LjMzNSAzODYgNDMyeiIvPgo8cGF0aCBzdHlsZT0iZmlsbDojMjk0MWRiOyBzdHJva2U6bm9uZTsiIGQ9Ik00MTAgNDMxQzQxNC4yMTUgNDMyLjc2OSA0MTkuNDY0IDQzMiA0MjQgNDMyTDQ1MiA0MzJDNDQ3Ljc4NSA0MzAuMjMxIDQ0Mi41MzYgNDMxIDQzOCA0MzFMNDEwIDQzMSIvPgo8cGF0aCBzdHlsZT0iZmlsbDojMjk0MWRiOyBzdHJva2U6bm9uZTsiIGQ9Ik00NDggNDMzQzQ0Ny41MzkgNDM2LjU1MSA0NDQuMjQ2IDQzNi4xNTUgNDQxLjM4OSA0MzcuNTgzQzQzNi44MDggNDM5Ljg3NCA0MzMuNjQgNDQ0LjQ2MiA0MjkgNDQ3QzQyOC44MTcgNDQ5LjQyOCA0MjguNTc3IDQ1MC4xNyA0MjcgNDUyQzQyNi44MDEgNDU0LjEwNiA0MjYuNTQ0IDQ1NC41NDMgNDI1IDQ1Nkw0MjggNDU5TDM4OSA0NTlDMzkzLjk2OSA0NjEuMDg1IDQwMC42NSA0NjAgNDA2IDQ2MEw0NDAgNDYwQzQ0Ni41NzkgNDYwIDQ1My4zMzYgNDYwLjU4MSA0NTguODkyIDQ1Ni4zMTJDNDY2LjE5MiA0NTAuNzAyIDQ2NS41MjUgNDM3LjM4MSA0NTYuOTg1IDQzMy4xOTRDNDU0LjEzNiA0MzEuNzk3IDQ1MC45ODcgNDMyLjYzMSA0NDggNDMzIi8+CjxwYXRoIHN0eWxlPSJmaWxsOiM0OGFlZmQ7IHN0cm9rZTpub25lOyIgZD0iTTM4MSA0MzhMMzg4IDQzNEMzODQuNDUyIDQzMy4wNjYgMzgyLjYwMiA0MzQuOTQ1IDM4MSA0Mzh6Ii8+CjxwYXRoIHN0eWxlPSJmaWxsOiMyOTQxZGI7IHN0cm9rZTpub25lOyIgZD0iTTQ3OSA0NDFDNDc0LjczMiA0NTQuNDM3IDQ3MS4xNCA0NjguMjYyIDQ2OCA0ODJDNDY5LjMgNDgxLjM1IDQ2OSA0ODEuODUzIDQ2OSA0ODBDNDcwLjc1MyA0ODIuNTc4IDQ3Mi4xMTYgNDgzLjgxNSA0NzUgNDg1QzQ3MS40MDIgNDg5LjIzMSA0NjguMTMzIDQ5My44NiA0NjYgNDk5QzQ2NS4wMTQgNDk3LjUyMiA0NjUgNDk3Ljc5NyA0NjUgNDk2QzQ1My44MzUgNTIxLjg4MiA0ODYuNjQyIDU0Mi40MzUgNTAzIDU1NS43MzlDNTEwLjM1MyA1NjEuNzIgNTIwLjQ1NiA1NzIuMzEyIDUzMC45ODEgNTY2LjgyMUM1MzkuMjk4IDU2Mi40ODIgNTM3IDU0OS43MiA1MzcgNTQyTDUzNyA0NzBDNTIxLjY3MSA0NzEuMzc1IDUwNi4yMjkgNDc0LjIwOCA0OTEgNDc0QzQ5NC40OTQgNDY5LjcwOCA0OTkuMTg2IDQ2Ni42ODMgNTA0IDQ2NEM1MDMuNDAyIDQ2Mi44MDUgNTAzLjUzNCA0NjMuMDIzIDUwMiA0NjJDNTA0LjIyMiA0NjEuMTkgNTA1Ljk5IDQ2MC4yNjEgNTA4IDQ1OUM1MDYuODYxIDQ1Ny45ODUgNTA2LjM4OCA0NTcuNjkxIDUwNSA0NTdDNTA1Ljk4NiA0NTUuNTIxIDUwNiA0NTUuNzk3IDUwNiA0NTRDNTAzLjE4OSA0NTMuMjk5IDUwMC42OTYgNDUyLjA1OSA0OTggNDUxTDUwMCA0NDdDNDkzLjg4IDQ0My4wMDMgNDg2LjE5NiA0NDIuMzI1IDQ3OSA0NDEiLz4KPHBhdGggc3R5bGU9ImZpbGw6Izc4NDhmOTsgc3Ryb2tlOm5vbmU7IiBkPSJNNjMxIDQ3MEM2MjcuMTI5IDQ3MC40NzggNjI1Ljk2OCA0NzQuODEyIDYyMiA0NzZMNjIzIDQ4MEw2MTkgNDgxQzYxOC4wNzkgNDg0LjM0NCA2MTUuNTc1IDQ4Ni41MzIgNjE1IDQ5MEM2MDcuOTcxIDQ5MS45MTYgNjAyLjIyNiA1MDEuMTY1IDYwOSA1MDdDNjA2LjEyNSA1MDkuMzk5IDYwMy40NTYgNTExLjUzNCA2MDAgNTEzTDYwMiA1MTdDNTk5LjA5MyA1MTcuOTU5IDU5Ny40MjUgNTIwLjE3IDU5NSA1MjJDNTkzLjE0MiA1MTkuNDI4IDU5Mi4wNjUgNTE5LjI3MiA1ODkgNTIwQzU5MS42MTQgNTI1LjYwNSA1OTYuNjY4IDUyOS42NjggNjAxIDUzNEM2MDcuNDU4IDU0MC40NTggNjEzLjU2OSA1NDcuNzU1IDYyMiA1NTEuNjc2QzYzMC4zMzQgNTU1LjU1MiA2MzkuMDUxIDU1NSA2NDggNTU1TDY4MyA1NTVDNjkzLjUyIDU1NSA3MDUuNjUxIDU1Ni42ODMgNzE1Ljk5NiA1NTQuNzcyQzcyMC4yODIgNTUzLjk3OSA3MjMuMjYzIDU1MC40NjYgNzIyLjcyOCA1NDZDNzIxLjg0NiA1MzguNjQ5IDcxMC45NjUgNTMwLjEwNSA3MDUuOTg1IDUyNUM2OTAuMzYxIDUwOC45ODMgNjc0LjgwOCA0OTIuODA4IDY1OSA0NzdMNjQ2IDQ2NC4wMDFDNjQ0LjA4MiA0NjIuMDk5IDY0MS44MDQgNDU5LjEyMSA2MzkuMDQgNDU4LjQ2MUM2MzMuNzU3IDQ1Ny4yMDEgNjMxLjI0OSA0NjYuMjkyIDYzMSA0NzB6Ii8+CjxwYXRoIHN0eWxlPSJmaWxsOiM3ODQ4Zjk7IHN0cm9rZTpub25lOyIgZD0iTTQ2OSA0ODBDNDY3LjAxNiA0ODYuMjA2IDQ2NS4yODIgNDkyLjQ2MSA0NjUgNDk5QzQ2OS4wMzEgNDk1LjAwNCA0NzIuMDI3IDQ4OS44MjMgNDc1IDQ4NUM0NzIuNjM2IDQ4My41NjMgNDcwLjg4MiA0ODIuMDIgNDY5IDQ4MHoiLz4KPC9zdmc+Cg==';
+
 // ── PDF download — browser print window ──────────────────────────────────────
 function AutosaveIndicator({ lastSaved }) {
   const [label, setLabel] = useState('');
@@ -308,6 +311,7 @@ function buildClassicHTML(inv, user, t, plan) {
   @page { margin: 0; size: A4 portrait; }
   * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; }
   @media print { body { padding: 16px 24px; } .hdr { border-radius: 0; } .body { border-radius: 0; } }
+  ${plan === 'basic' ? `body::before{content:'';position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-45deg);width:65%;height:65%;background:url('data:image/svg+xml;base64,${_WMARK_B64}') no-repeat center/contain;opacity:.07;pointer-events:none;z-index:9999;}body::after{content:'Kcretio.in — upgrade for watermark-free invoices';position:fixed;bottom:10px;left:0;right:0;text-align:center;font-size:8px;color:#a0aec0;font-family:Arial,sans-serif;letter-spacing:.04em;pointer-events:none;z-index:9999;}` : ''}
 </style>
 </head><body>
 <div class="hdr">
@@ -406,10 +410,9 @@ function buildClassicHTML(inv, user, t, plan) {
       </div>
     </div>
   </div>` : ''}
-  <div class="footer">Computer-generated invoice &nbsp;·&nbsp; Kcretio &nbsp;·&nbsp; Subject to GST as applicable</div>
+  <div class="footer">GST-compliant invoice &nbsp;·&nbsp; Kcretio.in &nbsp;·&nbsp; Subject to GST as applicable</div>
 </div>
 <script>window.onload = function() { window.print(); };</script>
-${plan === 'basic' ? `<div style="position:fixed;bottom:8px;left:0;right:0;text-align:center;font-size:9px;color:#94a3b8;font-family:Inter,sans-serif;letter-spacing:0.04em;pointer-events:none;">Created with Kcretio — Basic Plan · kcreatio.com</div>` : ''}
 </body></html>`;
 }
 
@@ -463,6 +466,7 @@ function buildCorporateHTML(inv, user, t, plan) {
   @page { margin: 0; size: A4 portrait; }
   * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; }
   @media print { body { padding: 16px 24px; } }
+  ${plan === 'basic' ? `body::before{content:'';position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-45deg);width:65%;height:65%;background:url('data:image/svg+xml;base64,${_WMARK_B64}') no-repeat center/contain;opacity:.07;pointer-events:none;z-index:9999;}body::after{content:'Kcretio.in — upgrade for watermark-free invoices';position:fixed;bottom:10px;left:0;right:0;text-align:center;font-size:8px;color:#a0aec0;font-family:Arial,sans-serif;letter-spacing:.04em;pointer-events:none;z-index:9999;}` : ''}
 </style>
 </head><body>
 <div class="hdr">
@@ -568,9 +572,8 @@ ${inv.include_terms && inv.terms_text ? `
   <strong>Terms &amp; Conditions:</strong>
   <div style="margin-top:4px;white-space:pre-line;color:#666;font-size:9px">${inv.terms_text}</div>
 </div>` : ''}
-<div style="margin-top:16px;text-align:center;font-size:8px;color:#ccc">Computer-generated invoice · Kcretio · Subject to GST as applicable</div>
+<div style="margin-top:16px;text-align:center;font-size:8px;color:#ccc">GST-compliant invoice · Kcretio.in · Subject to GST as applicable</div>
 <script>window.onload = function() { window.print(); };</script>
-${plan === 'basic' ? `<div style="position:fixed;bottom:8px;left:0;right:0;text-align:center;font-size:9px;color:#94a3b8;font-family:Inter,sans-serif;letter-spacing:0.04em;pointer-events:none;">Created with Kcretio — Basic Plan · kcreatio.com</div>` : ''}
 </body></html>`;
 }
 
@@ -620,6 +623,7 @@ function buildMinimalHTML(inv, user, t, plan) {
   @page { margin: 0; size: A4 portrait; }
   * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; }
   @media print { body { padding: 16px 24px; } }
+  ${plan === 'basic' ? `body::before{content:'';position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-45deg);width:65%;height:65%;background:url('data:image/svg+xml;base64,${_WMARK_B64}') no-repeat center/contain;opacity:.07;pointer-events:none;z-index:9999;}body::after{content:'Kcretio.in — upgrade for watermark-free invoices';position:fixed;bottom:10px;left:0;right:0;text-align:center;font-size:8px;color:#a0aec0;font-family:Arial,sans-serif;letter-spacing:.04em;pointer-events:none;z-index:9999;}` : ''}
 </style>
 </head><body>
 <div class="top">
@@ -726,9 +730,8 @@ ${inv.include_terms && inv.terms_text ? `
   <strong>Terms &amp; Conditions:</strong>
   <div style="margin-top:4px;white-space:pre-line;color:#666;font-size:9px">${inv.terms_text}</div>
 </div>` : ''}
-<div style="margin-top:16px;text-align:center;font-size:8px;color:#ccc">Computer-generated invoice · Kcretio · Subject to GST as applicable</div>
+<div style="margin-top:16px;text-align:center;font-size:8px;color:#ccc">GST-compliant invoice · Kcretio.in · Subject to GST as applicable</div>
 <script>window.onload = function() { window.print(); };</script>
-${plan === 'basic' ? `<div style="position:fixed;bottom:8px;left:0;right:0;text-align:center;font-size:9px;color:#94a3b8;font-family:Inter,sans-serif;letter-spacing:0.04em;pointer-events:none;">Created with Kcretio — Basic Plan · kcreatio.com</div>` : ''}
 </body></html>`;
 }
 
@@ -772,6 +775,11 @@ function BrandPicker({ onSelect, onClose }) {
   return (
     <Modal isOpen title="Load Saved Brand" onClose={onClose}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', minHeight: 200 }}>
+        {/* Info banner — where this data comes from */}
+        <div style={{ padding: 'var(--space-2) var(--space-3)', background: 'var(--accent-dim)', border: '1px solid rgba(232,146,26,0.3)', borderRadius: 'var(--radius-md)', fontSize: 'var(--text-xs)', color: 'var(--text-body)', lineHeight: 1.5 }}>
+          <span style={{ fontWeight: 600 }}>📋 From your invoice history.</span> Brands you've invoiced before appear here for quick re-use. Manage bank accounts, UPI & signatory in{' '}
+          <a href="/settings#invoice" style={{ color: 'var(--accent)', fontWeight: 600, textDecoration: 'underline' }}>Settings → Invoice Settings</a>.
+        </div>
         <input
           autoFocus
           type="text"
@@ -783,9 +791,16 @@ function BrandPicker({ onSelect, onClose }) {
         {loading ? (
           <p style={{ color: 'var(--text-muted)', fontSize: 'var(--text-sm)', textAlign: 'center', padding: 'var(--space-4)' }}>Loading…</p>
         ) : filtered.length === 0 ? (
-          <p style={{ color: 'var(--text-muted)', fontSize: 'var(--text-sm)', textAlign: 'center', padding: 'var(--space-4)' }}>
-            {brands.length === 0 ? 'No past brands found — save your first invoice to build a history.' : 'No brands match your search.'}
-          </p>
+          <div style={{ textAlign: 'center', padding: 'var(--space-4)' }}>
+            <p style={{ color: 'var(--text-muted)', fontSize: 'var(--text-sm)', marginBottom: 'var(--space-2)' }}>
+              {brands.length === 0 ? 'No past brands found yet.' : 'No brands match your search.'}
+            </p>
+            {brands.length === 0 && (
+              <p style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>
+                Save your first invoice to a brand and it will appear here for future quick-fill.
+              </p>
+            )}
+          </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)', maxHeight: 320, overflowY: 'auto' }}>
             {filtered.map((b, i) => (
@@ -812,6 +827,102 @@ const SIG_FONTS = [
   { label: 'Palatino', preview: "'Palatino Linotype', Palatino, serif", css: "italic 38px 'Palatino Linotype', Palatino, serif" },
   { label: 'Times', preview: "'Times New Roman', serif", css: "italic 40px 'Times New Roman', serif" },
 ];
+
+function CompliancePanel({ form }) {
+  const errors = getErrors(form);
+  const hasAnyInput = form.brandName.trim() || form.baseAmount || form.serviceDescription.trim();
+  if (!hasAnyInput) return null;
+
+  const checks = [
+    { key: 'sacCode',            label: 'SAC code present' },
+    { key: 'brandGstin',         label: 'GSTIN valid + state match' },
+    { key: 'placeOfSupply',      label: 'Place of supply declared' },
+    { key: 'serviceDescription', label: 'Service description present' },
+    { key: 'brandAddress',       label: 'Brand address present' },
+    { key: 'brandStateCode',     label: 'Brand state declared' },
+    { key: 'baseAmount',         label: 'Taxable value > ₹0' },
+  ];
+  const passed = checks.filter(c => !errors[c.key]).length;
+  const allPass = passed === checks.length;
+
+  return (
+    <div style={{
+      marginBottom: 'var(--space-2)',
+      padding: 'var(--space-2) var(--space-3)',
+      background: allPass ? 'rgba(72,187,120,.08)' : 'rgba(237,137,54,.06)',
+      border: `1px solid ${allPass ? 'rgba(72,187,120,.25)' : 'rgba(237,137,54,.2)'}`,
+      borderRadius: 'var(--radius)',
+      maxWidth: 1200,
+      margin: '0 auto var(--space-2)',
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
+        <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.06em', color: allPass ? '#48bb78' : 'var(--warning-text)', textTransform: 'uppercase', flexShrink: 0 }}>
+          Rule 46 {allPass ? '✓ Compliant' : `${passed}/${checks.length}`}
+        </span>
+        {checks.map(c => {
+          const ok = !errors[c.key];
+          return (
+            <span key={c.key} style={{
+              fontSize: 10,
+              padding: '2px 7px',
+              borderRadius: 999,
+              background: ok ? 'rgba(72,187,120,.15)' : 'rgba(229,62,62,.12)',
+              color: ok ? '#48bb78' : '#e53e3e',
+              fontWeight: 600,
+              whiteSpace: 'nowrap',
+            }}>
+              {ok ? '✓' : '✗'} {c.label}
+            </span>
+          );
+        })}
+        {allPass && (
+          <span style={{ fontSize: 10, color: '#48bb78', marginLeft: 'auto', fontWeight: 600, flexShrink: 0 }}>
+            Brand finance teams will accept this invoice
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function NetInHandPanel({ calc }) {
+  if (!calc || !calc.total || calc.total <= 0) return null;
+  const tdsDeducted = Math.round(calc.total * 0.10);
+  const netReceived = calc.total - tdsDeducted;
+
+  return (
+    <div style={{
+      marginTop: 'var(--space-3)',
+      padding: 'var(--space-3)',
+      background: 'var(--surface-2)',
+      border: '1px solid var(--border)',
+      borderRadius: 'var(--radius)',
+      fontSize: 'var(--text-sm)',
+    }}>
+      <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 'var(--space-2)' }}>
+        Net-in-Hand Estimate (194J TDS @ 10%)
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+          <span style={{ color: 'var(--text-secondary)' }}>Brand pays</span>
+          <span style={{ fontWeight: 600 }}>{formatINR(calc.total)}</span>
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+          <span style={{ color: 'var(--text-secondary)' }}>TDS deducted (10%)</span>
+          <span style={{ color: '#e53e3e', fontWeight: 600 }}>−{formatINR(tdsDeducted)}</span>
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid var(--border)', paddingTop: 'var(--space-1)', marginTop: 'var(--space-1)' }}>
+          <span style={{ fontWeight: 700 }}>You receive</span>
+          <span style={{ fontWeight: 700, color: 'var(--accent)' }}>{formatINR(netReceived)}</span>
+        </div>
+        <div style={{ fontSize: 11, color: '#48bb78', marginTop: 2 }}>
+          TDS credit at ITR: +{formatINR(tdsDeducted)} — not lost, claimable when you file
+        </div>
+      </div>
+    </div>
+  );
+}
+
 
 export default function InvoicePage({ initialView }) {
   const { user } = useAuth();
@@ -1389,7 +1500,7 @@ export default function InvoicePage({ initialView }) {
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-                  <label htmlFor="brandAddress" style={{ fontSize: 'var(--text-sm)', fontWeight: 500, color: 'var(--text-body)' }}>Brand Address *</label>
+                  <label htmlFor="brandAddress" style={{ fontSize: 'var(--text-sm)', fontWeight: 500, color: 'var(--text-body)' }}>Brand Address <span style={{ color: 'var(--danger-text)', fontWeight: 700 }} aria-hidden="true">*</span></label>
                   <Tooltip text="Complete registered address of the brand. Must include city, state, and PIN code. Mandatory on GST invoices per Rule 46." />
                 </div>
                 <textarea id="brandAddress" value={form.brandAddress} onChange={e => update('brandAddress', e.target.value)} onBlur={() => touch('brandAddress')} rows={2} placeholder="123, Business Park, Mumbai, Maharashtra - 400001"
@@ -1444,7 +1555,7 @@ export default function InvoicePage({ initialView }) {
                         {/* Amount first */}
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                            <label style={{ fontSize: 'var(--text-sm)', fontWeight: 500, color: 'var(--text-body)' }}>Amount ₹ *</label>
+                            <label style={{ fontSize: 'var(--text-sm)', fontWeight: 500, color: 'var(--text-body)' }}>Amount ₹ <span style={{ color: 'var(--danger-text)', fontWeight: 700 }} aria-hidden="true">*</span></label>
                             <Tooltip text="Taxable value before GST for this service line." />
                           </div>
                           <input type="number" min="0" step="0.01" value={line.amount}
@@ -1516,6 +1627,7 @@ export default function InvoicePage({ initialView }) {
                     <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>Total Invoice Value</span>
                     <span style={{ fontWeight: 700, fontSize: 'var(--text-md)', color: 'var(--accent)', fontVariantNumeric: 'tabular-nums' }}>{formatINR(calc.total)}</span>
                   </div>
+                  <NetInHandPanel calc={calc} />
                 </div>
               ) : (
                 <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)', textAlign: 'center', padding: 'var(--space-4) 0' }}>
@@ -1857,7 +1969,7 @@ export default function InvoicePage({ initialView }) {
         </div>{/* end grid */}
         </div>{/* end maxWidth wrapper */}
 
-        {/* ── Action bar — always pinned at bottom, 3 buttons in one row ── */}
+        {/* ── Action bar — always pinned at bottom ── */}
         <div style={{
           position: isMobile ? 'fixed' : 'sticky',
           bottom: isMobile ? 64 : 0,
@@ -1867,9 +1979,12 @@ export default function InvoicePage({ initialView }) {
           padding: 'var(--space-3) var(--space-5)',
           flexShrink: 0,
         }}>
+          {/* Validation hint — only shown after user has touched fields */}
+          <CompliancePanel form={form} />
           {!complete && Object.keys(touched).length > 0 && (
-            <p style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', marginBottom: 'var(--space-2)', textAlign: 'center' }}>
-              Fill all required (*) fields to enable invoice creation
+            <p style={{ fontSize: 'var(--text-xs)', color: 'var(--warning-text)', marginBottom: 'var(--space-2)', textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+              <AlertCircle size={12} aria-hidden="true" />
+              Fill all required (<span style={{ color: 'var(--danger-text)', fontWeight: 700 }}>*</span>) fields above to enable invoice creation
             </p>
           )}
           {lastDraftSaved && (
@@ -1877,23 +1992,116 @@ export default function InvoicePage({ initialView }) {
               <AutosaveIndicator lastSaved={lastDraftSaved} />
             </div>
           )}
-          <div style={{ display: 'flex', gap: 'var(--space-2)', maxWidth: 1200, margin: '0 auto', width: '100%' }}>
-            <button type="button" onClick={handleSave} disabled={!complete||submitting}
-              style={{ flex: 1, padding: 'var(--space-3)', background: complete&&!submitting?'var(--surface-2)':'var(--border-2)', color: complete&&!submitting?'var(--text-primary)':'var(--text-disabled)', border: (complete ? '1px solid var(--border)' : '1px solid transparent'), borderRadius: 'var(--radius-md)', fontWeight: 600, fontSize: 'var(--text-sm)', cursor: complete&&!submitting?'pointer':'not-allowed', fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 'var(--space-2)' }}>
-              <Check size={14} aria-hidden="true" />
-              {submitting ? 'Saving…' : 'Save Invoice'}
-            </button>
-            <button type="button" onClick={handleSaveAndDownload} disabled={!complete||submitting}
-              style={{ flex: 1, padding: 'var(--space-3)', background: complete&&!submitting?'var(--accent)':'var(--border-2)', color: complete&&!submitting?'#fff':'var(--text-disabled)', border: 'none', borderRadius: 'var(--radius-md)', fontWeight: 700, fontSize: 'var(--text-sm)', cursor: complete&&!submitting?'pointer':'not-allowed', fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 'var(--space-2)', transition: 'background var(--duration-standard)' }}>
+          <div style={{ display: 'flex', gap: 'var(--space-2)', maxWidth: 1200, margin: '0 auto', width: '100%', flexWrap: isMobile ? 'wrap' : 'nowrap' }}>
+            {/* Primary CTA — Save & Download */}
+            <button
+              type="button"
+              onClick={handleSaveAndDownload}
+              disabled={!complete || submitting}
+              title={!complete ? 'Fill all required (*) fields to enable this button' : 'Save invoice and download as PDF'}
+              style={{
+                flex: isMobile ? '1 1 100%' : 2,
+                padding: 'var(--space-3) var(--space-4)',
+                background: complete && !submitting ? 'var(--accent)' : 'var(--border-2)',
+                color: complete && !submitting ? '#fff' : 'var(--text-disabled)',
+                border: 'none',
+                borderRadius: 'var(--radius-md)',
+                fontWeight: 700,
+                fontSize: 'var(--text-sm)',
+                cursor: complete && !submitting ? 'pointer' : 'not-allowed',
+                fontFamily: 'inherit',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 'var(--space-2)',
+                transition: 'background var(--duration-standard)',
+                boxShadow: complete && !submitting ? '0 2px 8px rgba(232,146,26,0.25)' : 'none',
+              }}
+              onMouseEnter={e => { if (complete && !submitting) e.currentTarget.style.background = 'var(--accent-hover, #d97e10)'; }}
+              onMouseLeave={e => { if (complete && !submitting) e.currentTarget.style.background = 'var(--accent)'; }}
+            >
               <Download size={14} aria-hidden="true" />
               {submitting ? 'Saving…' : 'Save & Download PDF'}
             </button>
-            <button type="button" onClick={() => navigate('/invoices')}
-              style={{ flex: 1, padding: 'var(--space-3)', background: 'var(--danger-dim)', border: '1px solid var(--danger)', borderRadius: 'var(--radius-md)', color: 'var(--danger-text)', fontSize: 'var(--text-sm)', fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 'var(--space-2)', transition: 'background var(--duration-fast)' }}
-              onMouseEnter={e => e.currentTarget.style.background = 'rgba(239,68,68,0.18)'}
-              onMouseLeave={e => e.currentTarget.style.background = 'var(--danger-dim)'}
+
+            {/* Secondary — Save only */}
+            <button
+              type="button"
+              onClick={handleSave}
+              disabled={!complete || submitting}
+              title={!complete ? 'Fill all required (*) fields to enable this button' : 'Save invoice without downloading'}
+              style={{
+                flex: 1,
+                padding: 'var(--space-3) var(--space-4)',
+                background: 'var(--surface-2)',
+                color: complete && !submitting ? 'var(--text-primary)' : 'var(--text-disabled)',
+                border: complete ? '1px solid var(--border)' : '1px solid var(--border)',
+                borderRadius: 'var(--radius-md)',
+                fontWeight: 600,
+                fontSize: 'var(--text-sm)',
+                cursor: complete && !submitting ? 'pointer' : 'not-allowed',
+                fontFamily: 'inherit',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 'var(--space-2)',
+                opacity: complete && !submitting ? 1 : 0.55,
+              }}
             >
-              <X size={13} aria-hidden="true" /> Discard &amp; Close
+              <Check size={14} aria-hidden="true" />
+              {submitting ? 'Saving…' : 'Save Only'}
+            </button>
+
+            {/* Email share */}
+            <button
+              type="button"
+              disabled={!complete || submitting}
+              title={!complete ? 'Fill all required (*) fields to enable sharing' : `Share invoice via email${form.brandEmail ? ` to ${form.brandEmail}` : ''}`}
+              onClick={() => {
+                if (!complete) return;
+                const subject = encodeURIComponent(`Invoice ${nextNumber || ''} — ${form.brandName}`);
+                const body = encodeURIComponent(
+                  `Hi,\n\nPlease find attached / download your GST invoice.\n\nInvoice #: ${nextNumber || '—'}\nBrand: ${form.brandName}\nAmount: ₹${calc.total.toLocaleString('en-IN', { minimumFractionDigits: 2 })}\nDue Date: ${form.dueDate || '—'}\n\nPlease make payment at your earliest convenience.\n\nThank you.`
+                );
+                const to = form.brandEmail ? encodeURIComponent(form.brandEmail) : '';
+                window.open(`mailto:${to}?subject=${subject}&body=${body}`, '_blank');
+              }}
+              style={{
+                flex: 1,
+                padding: 'var(--space-3) var(--space-4)',
+                background: 'var(--surface-2)',
+                color: complete && !submitting ? 'var(--text-primary)' : 'var(--text-disabled)',
+                border: '1px solid var(--border)',
+                borderRadius: 'var(--radius-md)',
+                fontWeight: 600,
+                fontSize: 'var(--text-sm)',
+                cursor: complete && !submitting ? 'pointer' : 'not-allowed',
+                fontFamily: 'inherit',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 'var(--space-2)',
+                opacity: complete && !submitting ? 1 : 0.55,
+              }}
+            >
+              <Mail size={14} aria-hidden="true" />
+              {isMobile ? 'Email' : 'Share via Email'}
+            </button>
+
+            {/* Discard & Close — tertiary, visually de-emphasised */}
+            <button
+              type="button"
+              onClick={() => navigate('/invoices')}
+              title="Discard changes and go back to invoice list"
+              style={{
+                flex: isMobile ? '1 1 auto' : '0 0 auto',
+                padding: 'var(--space-3) var(--space-4)',
+                background: 'transparent',
+                border: '1px solid var(--border)',
+                borderRadius: 'var(--radius-md)',
+                color: 'var(--text-muted)',
+                fontSize: 'var(--text-sm)',
+                fontWeight: 500,
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 'var(--space-2)',
+                transition: 'color var(--duration-fast), border-color var(--duration-fast)',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.color = 'var(--danger-text)'; e.currentTarget.style.borderColor = 'var(--danger)'; }}
+              onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-muted)'; e.currentTarget.style.borderColor = 'var(--border)'; }}
+            >
+              <X size={13} aria-hidden="true" /> {isMobile ? 'Close' : 'Discard & Close'}
             </button>
           </div>
         </div>
@@ -2302,10 +2510,13 @@ function Sect({ title, children, collapsible = false, defaultOpen = true }) {
 }
 
 function SField({ id, label, children, error, value, onChange, onBlur, tooltip }) {
+  const labelNode = typeof label === 'string' && label.includes(' *')
+    ? <>{label.replace(' *', '')} <span style={{ color: 'var(--danger-text)', fontWeight: 700 }} aria-hidden="true">*</span></>
+    : label;
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-        <label htmlFor={id} style={{ fontSize: 'var(--text-sm)', fontWeight: 500, color: 'var(--text-body)' }}>{label}</label>
+        <label htmlFor={id} style={{ fontSize: 'var(--text-sm)', fontWeight: 500, color: 'var(--text-body)' }}>{labelNode}</label>
         {tooltip && <Tooltip text={tooltip} />}
       </div>
       <select id={id} value={value} onChange={onChange} onBlur={onBlur} style={{ padding: 'var(--space-2) var(--space-3)', background: 'var(--surface-2)', border: (error ? '1px solid var(--danger)' : '1px solid var(--border)'), borderRadius: 'var(--radius-md)', color: value ? 'var(--text-primary)' : 'var(--text-muted)', fontSize: 'var(--text-base)', fontFamily: 'inherit' }}>
@@ -2450,13 +2661,16 @@ function ClassicPreview({ form, calc, invoiceNumber, user, template }) {
 
         {/* UPI QR */}
         {form.includeUpi && (form.upiId || form.upiScannerUrl) && (
-          <div style={{ marginTop: 12, padding: '10px 12px', background: '#f0fff4', border: '1px solid #86efac', borderRadius: 6, fontSize: 10, display: 'flex', alignItems: 'center', gap: 12 }}>
-            {form.upiScannerUrl && (
-              <img src={form.upiScannerUrl} alt="UPI QR" style={{ width: 64, height: 64, objectFit: 'contain', border: '1px solid #ccc', borderRadius: 4, background: '#fff', flexShrink: 0 }} />
-            )}
-            <div>
-              <div style={{ fontWeight: 700, color: '#333', marginBottom: 2 }}>Pay via UPI</div>
-              {form.upiId && <div style={{ color: '#555', fontFamily: 'monospace' }}>{form.upiId}</div>}
+          <div style={{ marginTop: 12, padding: '10px 12px', background: '#f0fff4', border: '1px solid #86efac', borderRadius: 6, fontSize: 10 }}>
+            <div style={{ fontWeight: 700, fontSize: 9, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#22863a', marginBottom: 6 }}>💳 Pay via UPI</div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+              <div>
+                {form.upiId && <div style={{ color: '#333', fontFamily: 'monospace', fontSize: 11, fontWeight: 600 }}>{form.upiId}</div>}
+                <div style={{ color: '#666', fontSize: 9, marginTop: 2 }}>Scan QR or use UPI ID above to pay instantly</div>
+              </div>
+              {form.upiScannerUrl && (
+                <img src={form.upiScannerUrl} alt="UPI QR" style={{ width: 64, height: 64, objectFit: 'contain', border: '1px solid #ccc', borderRadius: 4, background: '#fff', flexShrink: 0 }} />
+              )}
             </div>
           </div>
         )}

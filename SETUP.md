@@ -1,4 +1,4 @@
-# Kcreatio — Setup Guide
+# Kcretio — Setup Guide
 
 ## Prerequisites
 - Node.js 20+ 
@@ -21,10 +21,16 @@ npm run install:all
 1. Create a new project at https://supabase.com
 2. Go to SQL Editor — run these migrations **in order**:
    - `backend/migrations/001_initial_schema.sql` — users, invoices, core tables
-   - `backend/migrations/002_seed_test_user.sql` — dev user (admin@kcreatio.in / admin123)
+   - `backend/migrations/002_seed_test_user.sql` — dev user (admin@kcretio.in / admin123)
    - `backend/migrations/003_invoice_settings_and_invoice_extras.sql` — bank accounts, T&C, signatory, extended invoice columns
    - `backend/migrations/004_upi_settings_contact_fields.sql` — UPI setting type, UPI QR scanner, brand email/phone on invoices
    - `backend/migrations/005_user_phone_invoice_contact.sql` — phone, invoice_phone, invoice_email, show_phone_on_invoice, avatar_url on users
+   - `backend/migrations/006_rename_free_to_basic.sql` — rename plan value free → basic
+   - `backend/migrations/007_auth_upgrade.sql` — Google OAuth, Gmail OAuth, social_links, failed_login_attempts, account lock
+   - `backend/migrations/008_otp_log.sql` — otp_logs table for email verification
+   - `backend/migrations/009_password_reset_tokens.sql` — password_reset_tokens table
+   - `backend/migrations/010_email_detections.sql` — email_detections table (Smart Inbox)
+   - `backend/migrations/011_notification_prefs_auto_apply.sql` — gmail_auto_apply, threshold, deal_followup_alerts columns
 
 3. Create a Storage bucket named **`invoice-signatures`** (public read):
    - Go to Storage → New bucket → Name: `invoice-signatures` → Public: ON
@@ -50,8 +56,11 @@ SUPABASE_SERVICE_ROLE_KEY=<from supabase dashboard>
 RAZORPAY_KEY_ID=rzp_test_xxxxx
 RAZORPAY_KEY_SECRET=<from razorpay dashboard>
 RAZORPAY_WEBHOOK_SECRET=<from razorpay webhook settings>
+GOOGLE_CLIENT_ID=<from google cloud console>
+GOOGLE_CLIENT_SECRET=<from google cloud console>
+GOOGLE_REDIRECT_URI=http://localhost:4000/api/v1/auth/google/callback
+GMAIL_REDIRECT_URI=http://localhost:4000/api/v1/auth/gmail/callback
 RESEND_API_KEY=re_xxxx       # optional for dev
-GROQ_API_KEY=gsk_xxxx        # optional for dev
 FRONTEND_URL=http://localhost:5173
 NODE_ENV=development
 PORT=4000
@@ -132,15 +141,15 @@ Set env var: `VITE_API_URL=https://your-backend.onrender.com/api/v1`
 ## Architecture Overview
 
 ```
-kcreatio/
+kcretio/
 ├── frontend/          # React 18 + Vite — see frontend/README.md
 ├── backend/           # Express 4 + TypeScript + Supabase
 │   ├── src/
-│   │   ├── routes/    # auth, invoices, invoice-settings, upload, tds, deals, income, expenses
-│   │   ├── services/  # invoiceService (GST calc), pdfService
+│   │   ├── routes/    # auth, invoices, invoice-settings, upload, tds, deals, income, expenses, taxPlanner
+│   │   ├── services/  # invoiceService (GST calc), puppeteerPdfService (PDF + watermark)
 │   │   ├── middleware/ # authenticate, validateBody
 │   │   └── lib/       # supabase client
-│   └── migrations/    # 001–005 SQL files, run in Supabase SQL Editor
+│   └── migrations/    # 001–011 SQL files, run in Supabase SQL Editor
 └── SETUP.md           # This file
 ```
 

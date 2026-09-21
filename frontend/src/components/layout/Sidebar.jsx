@@ -1,15 +1,16 @@
 import { NavLink } from 'react-router-dom';
 import {
-  LayoutDashboard, FileText, DollarSign, Calculator,
+  LayoutDashboard, FileText, IndianRupee, Calculator,
   Briefcase, TrendingUp, Receipt, Settings,
   ChevronLeft, ChevronRight,
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth.jsx';
+import LogoMark from '../ui/LogoMark.jsx';
 
 const NAV_ITEMS = [
   { to: '/dashboard',   icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/invoices',    icon: FileText,         label: 'Invoices' },
-  { to: '/tds',         icon: DollarSign,       label: 'TDS Tracker' },
+  { to: '/tds',         icon: IndianRupee,      label: 'TDS Tracker' },
   { to: '/tax-planner', icon: Calculator,       label: 'Tax Planner' },
   { to: '/deals',       icon: Briefcase,        label: 'Brand Deals' },
   { to: '/income',      icon: TrendingUp,       label: 'Income' },
@@ -60,11 +61,7 @@ export default function Sidebar({ collapsed, onToggle }) {
         padding: '0 var(--space-4)', borderBottom: '1px solid var(--border)',
         gap: 'var(--space-3)', flexShrink: 0,
       }}>
-        <div aria-hidden="true" style={{
-          width: 28, height: 28, background: 'var(--accent)', borderRadius: 8,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontWeight: 800, fontSize: 14, color: '#fff', flexShrink: 0,
-        }}>C</div>
+        <LogoMark size={28} />
         {!collapsed && (
           <span style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: 'var(--text-base)', whiteSpace: 'nowrap', letterSpacing: '-0.01em' }}>
             Kcretio
