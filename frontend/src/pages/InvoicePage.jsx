@@ -828,6 +828,102 @@ const SIG_FONTS = [
   { label: 'Times', preview: "'Times New Roman', serif", css: "italic 40px 'Times New Roman', serif" },
 ];
 
+function CompliancePanel({ form }) {
+  const errors = getErrors(form);
+  const hasAnyInput = form.brandName.trim() || form.baseAmount || form.serviceDescription.trim();
+  if (!hasAnyInput) return null;
+
+  const checks = [
+    { key: 'sacCode',            label: 'SAC code present' },
+    { key: 'brandGstin',         label: 'GSTIN valid + state match' },
+    { key: 'placeOfSupply',      label: 'Place of supply declared' },
+    { key: 'serviceDescription', label: 'Service description present' },
+    { key: 'brandAddress',       label: 'Brand address present' },
+    { key: 'brandStateCode',     label: 'Brand state declared' },
+    { key: 'baseAmount',         label: 'Taxable value > ₹0' },
+  ];
+  const passed = checks.filter(c => !errors[c.key]).length;
+  const allPass = passed === checks.length;
+
+  return (
+    <div style={{
+      marginBottom: 'var(--space-2)',
+      padding: 'var(--space-2) var(--space-3)',
+      background: allPass ? 'rgba(72,187,120,.08)' : 'rgba(237,137,54,.06)',
+      border: `1px solid ${allPass ? 'rgba(72,187,120,.25)' : 'rgba(237,137,54,.2)'}`,
+      borderRadius: 'var(--radius)',
+      maxWidth: 1200,
+      margin: '0 auto var(--space-2)',
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
+        <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.06em', color: allPass ? '#48bb78' : 'var(--warning-text)', textTransform: 'uppercase', flexShrink: 0 }}>
+          Rule 46 {allPass ? '✓ Compliant' : `${passed}/${checks.length}`}
+        </span>
+        {checks.map(c => {
+          const ok = !errors[c.key];
+          return (
+            <span key={c.key} style={{
+              fontSize: 10,
+              padding: '2px 7px',
+              borderRadius: 999,
+              background: ok ? 'rgba(72,187,120,.15)' : 'rgba(229,62,62,.12)',
+              color: ok ? '#48bb78' : '#e53e3e',
+              fontWeight: 600,
+              whiteSpace: 'nowrap',
+            }}>
+              {ok ? '✓' : '✗'} {c.label}
+            </span>
+          );
+        })}
+        {allPass && (
+          <span style={{ fontSize: 10, color: '#48bb78', marginLeft: 'auto', fontWeight: 600, flexShrink: 0 }}>
+            Brand finance teams will accept this invoice
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function NetInHandPanel({ calc }) {
+  if (!calc || !calc.total || calc.total <= 0) return null;
+  const tdsDeducted = Math.round(calc.total * 0.10);
+  const netReceived = calc.total - tdsDeducted;
+
+  return (
+    <div style={{
+      marginTop: 'var(--space-3)',
+      padding: 'var(--space-3)',
+      background: 'var(--surface-2)',
+      border: '1px solid var(--border)',
+      borderRadius: 'var(--radius)',
+      fontSize: 'var(--text-sm)',
+    }}>
+      <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 'var(--space-2)' }}>
+        Net-in-Hand Estimate (194J TDS @ 10%)
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+          <span style={{ color: 'var(--text-secondary)' }}>Brand pays</span>
+          <span style={{ fontWeight: 600 }}>{formatINR(calc.total)}</span>
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+          <span style={{ color: 'var(--text-secondary)' }}>TDS deducted (10%)</span>
+          <span style={{ color: '#e53e3e', fontWeight: 600 }}>−{formatINR(tdsDeducted)}</span>
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid var(--border)', paddingTop: 'var(--space-1)', marginTop: 'var(--space-1)' }}>
+          <span style={{ fontWeight: 700 }}>You receive</span>
+          <span style={{ fontWeight: 700, color: 'var(--accent)' }}>{formatINR(netReceived)}</span>
+        </div>
+        <div style={{ fontSize: 11, color: '#48bb78', marginTop: 2 }}>
+          TDS credit at ITR: +{formatINR(tdsDeducted)} — not lost, claimable when you file
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
 export default function InvoicePage({ initialView }) {
   const { user } = useAuth();
   const toast = useToast();
@@ -1531,6 +1627,7 @@ export default function InvoicePage({ initialView }) {
                     <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>Total Invoice Value</span>
                     <span style={{ fontWeight: 700, fontSize: 'var(--text-md)', color: 'var(--accent)', fontVariantNumeric: 'tabular-nums' }}>{formatINR(calc.total)}</span>
                   </div>
+                  <NetInHandPanel calc={calc} />
                 </div>
               ) : (
                 <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)', textAlign: 'center', padding: 'var(--space-4) 0' }}>
@@ -1883,6 +1980,7 @@ export default function InvoicePage({ initialView }) {
           flexShrink: 0,
         }}>
           {/* Validation hint — only shown after user has touched fields */}
+          <CompliancePanel form={form} />
           {!complete && Object.keys(touched).length > 0 && (
             <p style={{ fontSize: 'var(--text-xs)', color: 'var(--warning-text)', marginBottom: 'var(--space-2)', textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
               <AlertCircle size={12} aria-hidden="true" />

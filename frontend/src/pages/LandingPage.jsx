@@ -16,7 +16,7 @@ import {
   reduced, useInView, Reveal,
   FlowPipeline, Act5Impact, DashboardReveal,
   Act6Ecosystem, ComparisonTable, Pricing,
-  FAQ, Act7Return, Footer,
+  FAQ, Act7Return, Footer, TaxRiskCalculator,
 } from './LandingPageActs.jsx';
 
 // ─── CursorGlow ───────────────────────────────────────────────────────────────
@@ -914,6 +914,7 @@ export default function LandingPage() {
         <Act6Ecosystem />
         <ComparisonTable />
         <Pricing />
+        <TaxRiskCalculator />
         <FAQ />
         <Act7Return />
       </main>

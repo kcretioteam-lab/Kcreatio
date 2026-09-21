@@ -385,7 +385,7 @@ router.get('/:id/pdf', pdfRateLimit, async (req: AuthRequest, res: Response): Pr
 
   try {
     const cacheKey = `${invoice.id}:${invoice.updated_at || invoice.created_at}`;
-    const pdfBuffer = await generateInvoicePdfWithPuppeteer(invoice, user, cacheKey);
+    const pdfBuffer = await generateInvoicePdfWithPuppeteer(invoice, user, cacheKey, req.userPlan);
 
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="${invoice.invoice_number.replace(/\//g, '-')}.pdf"`);

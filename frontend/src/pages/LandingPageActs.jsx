@@ -882,3 +882,234 @@ export function Footer() {
     </footer>
   );
 }
+
+// ─── Tax Risk Calculator (public, no login) ────────────────────────────────
+
+function inrFmt(n) {
+  return '₹' + Math.round(n).toLocaleString('en-IN');
+}
+
+export function TaxRiskCalculator() {
+  const [monthly, setMonthly] = useState('');
+  const [brands, setBrands] = useState('');
+  const [result, setResult] = useState(null);
+  const [loading, setLoading] = useState(false);
+
+  async function handleEstimate(e) {
+    e.preventDefault();
+    const m = parseFloat(monthly) || 0;
+    const b = parseInt(brands, 10) || 1;
+    if (m <= 0) return;
+    setLoading(true);
+    try {
+      const r = await fetch(`/api/v1/tax/quick-estimate?monthly_income=${m}&brand_count=${b}`);
+      const data = await r.json();
+      setResult(data);
+    } catch {
+      /* ignore */
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <Reveal>
+      <section style={{
+        maxWidth: 760,
+        margin: '0 auto',
+        padding: 'var(--space-12) var(--space-5)',
+        textAlign: 'center',
+      }}>
+        <div style={{
+          display: 'inline-block',
+          background: 'rgba(232,146,26,.12)',
+          border: '1px solid rgba(232,146,26,.3)',
+          borderRadius: 999,
+          padding: '4px 16px',
+          fontSize: 11,
+          fontWeight: 700,
+          letterSpacing: '.08em',
+          color: 'var(--accent)',
+          textTransform: 'uppercase',
+          marginBottom: 'var(--space-4)',
+        }}>Tax Risk Calculator</div>
+
+        <h2 style={{
+          fontSize: 'clamp(22px, 4vw, 32px)',
+          fontWeight: 800,
+          marginBottom: 'var(--space-3)',
+          lineHeight: 1.25,
+        }}>What actually happens to your income?</h2>
+        <p style={{ color: 'var(--text-secondary)', marginBottom: 'var(--space-6)', fontSize: 15 }}>
+          Enter your monthly earnings — see exactly what brands deduct, what you receive, and what you get back at ITR. No account needed.
+        </p>
+
+        <form onSubmit={handleEstimate} style={{
+          display: 'flex',
+          gap: 'var(--space-3)',
+          justifyContent: 'center',
+          flexWrap: 'wrap',
+          marginBottom: 'var(--space-6)',
+        }}>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 4 }}>
+            <label style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.06em', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>
+              Monthly Income
+            </label>
+            <div style={{ position: 'relative' }}>
+              <span style={{
+                position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)',
+                color: 'var(--text-secondary)', fontSize: 14, pointerEvents: 'none',
+              }}>₹</span>
+              <input
+                type="number"
+                min="0"
+                value={monthly}
+                onChange={e => setMonthly(e.target.value)}
+                placeholder="50000"
+                required
+                style={{
+                  paddingLeft: 28, paddingRight: 12, paddingTop: 10, paddingBottom: 10,
+                  border: '1px solid var(--border)',
+                  borderRadius: 'var(--radius)',
+                  background: 'var(--bg-card)',
+                  color: 'var(--text-primary)',
+                  fontSize: 15,
+                  width: 160,
+                  outline: 'none',
+                }}
+              />
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 4 }}>
+            <label style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.06em', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>
+              No. of Brands
+            </label>
+            <input
+              type="number"
+              min="1"
+              max="50"
+              value={brands}
+              onChange={e => setBrands(e.target.value)}
+              placeholder="3"
+              style={{
+                padding: '10px 12px',
+                border: '1px solid var(--border)',
+                borderRadius: 'var(--radius)',
+                background: 'var(--bg-card)',
+                color: 'var(--text-primary)',
+                fontSize: 15,
+                width: 100,
+                outline: 'none',
+              }}
+            />
+          </div>
+
+          <button type="submit" disabled={loading} style={{
+            alignSelf: 'flex-end',
+            padding: '10px 24px',
+            background: 'var(--accent)',
+            color: '#fff',
+            border: 'none',
+            borderRadius: 'var(--radius)',
+            fontWeight: 700,
+            fontSize: 14,
+            cursor: loading ? 'not-allowed' : 'pointer',
+            opacity: loading ? 0.7 : 1,
+            transition: 'opacity .2s',
+          }}>
+            {loading ? 'Calculating…' : 'Show me the numbers'}
+          </button>
+        </form>
+
+        {result && (
+          <div style={{ textAlign: 'left' }}>
+            {/* Part 1: Money flow */}
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
+              gap: 'var(--space-3)',
+              marginBottom: 'var(--space-4)',
+            }}>
+              {[
+                { label: 'Annual income', value: inrFmt(result.annual), color: 'var(--text-primary)', note: 'before any deductions' },
+                { label: 'TDS brands deduct', value: inrFmt(result.estimatedTds), color: '#e53e3e', note: '10% at source under 194J' },
+                { label: 'You actually receive', value: inrFmt(result.annual - result.estimatedTds), color: '#48bb78', note: 'paid into your account' },
+              ].map(({ label, value, color, note }) => (
+                <div key={label} style={{
+                  background: 'var(--bg-card)',
+                  border: '1px solid var(--border)',
+                  borderRadius: 'var(--radius-lg)',
+                  padding: 'var(--space-4)',
+                }}>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 6, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.06em' }}>{label}</div>
+                  <div style={{ fontSize: 22, fontWeight: 800, color, marginBottom: 4 }}>{value}</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{note}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* Part 2: ITR outcome — refund vs advance tax */}
+            {result.itrRefund > 0 ? (
+              <div style={{
+                background: 'linear-gradient(135deg, rgba(72,187,120,.12), rgba(72,187,120,.06))',
+                border: '1px solid rgba(72,187,120,.3)',
+                borderRadius: 'var(--radius-lg)',
+                padding: 'var(--space-4) var(--space-5)',
+                marginBottom: 'var(--space-3)',
+              }}>
+                <div style={{ fontWeight: 800, fontSize: 16, color: '#48bb78', marginBottom: 4 }}>
+                  {inrFmt(result.itrRefund)} refund when you file ITR
+                </div>
+                <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+                  Your income tax ({inrFmt(result.incomeTax)}) is less than TDS deducted — the government owes <em>you</em> money.
+                  Track every deduction to claim it back.
+                </div>
+              </div>
+            ) : (
+              <div style={{
+                background: 'rgba(237,137,54,.08)',
+                border: '1px solid rgba(237,137,54,.3)',
+                borderRadius: 'var(--radius-lg)',
+                padding: 'var(--space-4) var(--space-5)',
+                marginBottom: 'var(--space-3)',
+              }}>
+                <div style={{ fontWeight: 800, fontSize: 16, color: '#ed8936', marginBottom: 4 }}>
+                  {inrFmt(result.q2Due)} advance tax due by Sep 15 (Q2)
+                </div>
+                <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+                  Income tax ({inrFmt(result.incomeTax)}) exceeds TDS ({inrFmt(result.estimatedTds)}) — {inrFmt(result.advanceTaxOwed)} still owed this FY.
+                  Missing Q2 triggers 234C interest.
+                </div>
+              </div>
+            )}
+
+            {/* Part 3: Form 16A */}
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              gap: 'var(--space-2)',
+              background: 'var(--bg-card)',
+              border: '1px solid var(--border)',
+              borderRadius: 'var(--radius-lg)',
+              padding: 'var(--space-3) var(--space-4)',
+            }}>
+              <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+                <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>Form 16A: </span>
+                {result.form16aRisk} beyond Jun 30 — collect before filing to claim your refund
+              </div>
+            </div>
+          </div>
+        )}
+
+        {result && (
+          <p style={{ marginTop: 'var(--space-4)', fontSize: 12, color: 'var(--text-muted)' }}>
+            New regime slabs + Section 87A rebate (FY 2025-26). Estimates only.{' '}
+            <Link to="/register" style={{ color: 'var(--accent)', fontWeight: 600 }}>Sign up free</Link> to track your actual TDS.
+          </p>
+        )}
+      </section>
+    </Reveal>
+  );
+}

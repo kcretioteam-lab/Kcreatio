@@ -1,4 +1,4 @@
-# Kcreatio — Backend
+# Kcretio — Backend
 
 Express 4 + TypeScript API for the Kcreatio frontend.
 
@@ -39,11 +39,11 @@ Backend reads env from `backend/.env`. See root `SETUP.md` for required variable
 | Prefix | File | Description |
 |--------|------|-------------|
 | `/api/v1/auth` | `routes/auth.ts` | Register, login, logout, refresh, Google OAuth, Gmail connect/disconnect |
-| `/api/v1/invoices` | `routes/invoices.ts` | CRUD + PDF generation + payment confirm token |
+| `/api/v1/invoices` | `routes/invoices.ts` | CRUD + PDF generation (server-side Puppeteer with watermark for non-Pro) + payment confirm token + email share |
 | `/api/v1/invoice-settings` | `routes/invoiceSettings.ts` | Bank accounts, UPI IDs, T&C profiles, signatory |
 | `/api/v1/upload` | `routes/upload.ts` | Signature + UPI QR image upload to Supabase Storage |
 | `/api/v1/tds` | `routes/tds.ts` | TDS records + Form 16A tracking |
-| `/api/v1/tax` | `routes/taxPlanner.ts` | Advance tax estimate, schedule, deadlines, payments |
+| `/api/v1/tax` | `routes/taxPlanner.ts` | **Public** `GET /quick-estimate` (no auth, used by landing page), advance tax estimate, schedule, deadlines, payments |
 | `/api/v1/deals` | `routes/deals.ts` | Brand deal CRM + mark-paid (auto-creates income) |
 | `/api/v1/income` | `routes/income.ts` | Income entries + summary |
 | `/api/v1/expenses` | `routes/expenses.ts` | Expense entries + summary |
@@ -64,6 +64,35 @@ All jobs run when `NODE_ENV=production` or `ENABLE_JOBS=true`.
 | `startAdvanceTaxReminderJob` | Daily 9:00 AM | Emails advance tax reminders. Basic: Q4 (March) only. Starter+: all 4 quarters at configured `alert_days_before` |
 | `startInvoiceOverdueJob` | Daily 9:05 AM | Flips `sent` invoices to `overdue` when `due_date < today` |
 | `startGmailScanJob` | Every 6 hours | Scans connected Gmail inboxes → classifies emails → creates `email_detections` rows. Auto-applies if user has Pro + auto-apply enabled |
+
+---
+
+## Tax Quick Estimate (Public, no auth)
+
+`GET /api/v1/tax/quick-estimate?monthly_income=50000&brand_count=2`
+
+Used by the landing page Tax Risk Calculator. No authentication required — registered **before** `router.use(authenticate)` in `taxPlanner.ts`.
+
+**Calculation logic:**
+1. Annual income = `monthlyIncome × 12`
+2. Taxable income = `max(0, annual − ₹50,000 standard deduction)`
+3. Apply new regime slabs FY 2025-26 (0% / 5% / 10% / 15% / 20% / 25% / 30%)
+4. Section 87A rebate: if taxable income ≤ ₹12L, subtract up to ₹60,000 — most creators pay ₹0 income tax
+5. Add 4% health & education cess
+6. `itrRefund = max(0, estimatedTds − incomeTax)` — the common case for creators
+7. `advanceTaxOwed = max(0, incomeTax − estimatedTds)` — only triggers for income >~₹13L
+
+**Response fields:** `annual`, `estimatedTds`, `incomeTax`, `advanceTaxOwed`, `itrRefund`, `q2Due`, `form16aRisk`
+
+---
+
+## PDF Generation (Puppeteer)
+
+Server-side PDF rendering via `services/puppeteerPdfService.ts`.
+
+- `POST /api/v1/invoices/:id/pdf` — generates and streams a PDF
+- **Plan gating:** Basic and Starter users get a diagonal "DRAFT — Upgrade to Pro to remove watermark" overlay injected into the HTML before rendering. Pro users get clean PDFs.
+- The watermark is injected as an absolutely-positioned `<div>` in the HTML template, not post-processed — so it prints correctly at any scale.
 
 ---
 
