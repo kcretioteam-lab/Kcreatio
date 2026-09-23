@@ -12,7 +12,9 @@ export default function PageTransition({ children }) {
     <div
       style={{
         opacity: visible ? 1 : 0,
-        transform: visible ? 'translateY(0)' : 'translateY(6px)',
+        // 'none' (not translateY(0)) once visible — any transform turns this into the containing
+        // block for position:fixed children, which breaks pinned bars like the invoice action bar
+        transform: visible ? 'none' : 'translateY(6px)',
         transition: 'opacity 180ms var(--ease-decelerate), transform 180ms var(--ease-decelerate)',
         height: '100%',
       }}
