@@ -58,7 +58,10 @@ export default function Input({
       {label && (
         <div style={{ display: 'flex', alignItems: 'center' }}>
           <label htmlFor={id} style={{ fontSize: 'var(--text-sm)', fontWeight: 500, color: 'var(--text-body)' }}>
-            {label}
+            {typeof label === 'string' && label.includes(' *')
+              ? <>{label.replace(' *', '')} <span style={{ color: 'var(--danger-text)', fontWeight: 700 }} aria-hidden="true">*</span></>
+              : label
+            }
           </label>
           {tooltip && <InlineTooltip text={tooltip} />}
         </div>

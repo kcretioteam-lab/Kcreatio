@@ -18,11 +18,13 @@ import PlanGate from '../components/ui/PlanGate.jsx';
 import { canAccess } from '../utils/planConfig.js';
 import SmartInboxWidget from '../components/SmartInboxWidget.jsx';
 import ManualPasteModal from '../components/ManualPasteModal.jsx';
+import { usePremiumRequest } from '../hooks/usePremiumRequest.jsx';
 
 const CURRENT_FY = (() => { const n = new Date(), y = n.getFullYear(), m = n.getMonth()+1; return m>=4?`${y}-${String(y+1).slice(-2)}`:`${y-1}-${String(y).slice(-2)}`; })();
 
 export default function DashboardPage() {
   const { user, trialDaysLeft } = useAuth();
+  const { openRequest } = usePremiumRequest();
   const isMobile = useIsMobile();
   const hasIncomeDashboard = canAccess('income_dashboard', user?.plan);
   const hasFullCalendar = canAccess('full_calendar', user?.plan);
@@ -156,11 +158,10 @@ export default function DashboardPage() {
       {user?.plan === 'trial' && trialDaysLeft() <= 7 && trialDaysLeft() > 0 && (
         <div style={{ background:'rgba(232,146,26,0.1)', border:'1px solid rgba(232,146,26,0.3)', borderRadius:'var(--radius-md)', padding:'var(--space-3) var(--space-4)', display:'flex', alignItems:'center', justifyContent:'space-between', gap:'var(--space-3)', flexWrap:'wrap', marginBottom:'var(--space-4)' }}>
           <span style={{ fontSize:'var(--text-sm)', color:'var(--accent)', fontWeight:600 }}>
-            ⚠ Your trial ends in {trialDaysLeft()} day{trialDaysLeft() !== 1 ? 's' : ''} — upgrade to keep access
+            ⚠ Your Pro access ends in {trialDaysLeft()} day{trialDaysLeft() !== 1 ? 's' : ''}
           </span>
-          <Link to="/settings#billing" style={{ fontSize:'var(--text-sm)', color:'var(--accent)', fontWeight:700, textDecoration:'none', whiteSpace:'nowrap' }}>
-            Upgrade now →
-          </Link>
+          {/* Paid upgrade disabled — premium is granted on request
+          <Link to="/settings#billing" ...>Upgrade now →</Link> */}
         </div>
       )}
 
@@ -206,7 +207,8 @@ export default function DashboardPage() {
               <Lock size={12} /> Net Income
             </span>
             <span style={{ fontSize:'var(--text-xl)', fontWeight:700, color:'var(--text-disabled)' }}>—</span>
-            <Link to="/settings#billing" style={{ fontSize:'var(--text-xs)', color:'var(--accent)', fontWeight:600, textDecoration:'none' }}>Unlock on Pro →</Link>
+            {/* <Link to="/settings#billing" ...>Unlock on Pro →</Link> — paid upgrade disabled */}
+            <button type="button" onClick={openRequest} style={{ fontSize:'var(--text-xs)', color:'var(--accent)', fontWeight:600, background:'none', border:'none', padding:0, cursor:'pointer', fontFamily:'inherit', textAlign:'left' }}>Request Pro access →</button>
           </div>
           )}
 
@@ -274,9 +276,10 @@ export default function DashboardPage() {
               ))}
               <Link to="/tax-planner" style={{ fontSize: 'var(--text-xs)', color: 'var(--accent)', textDecoration: 'underline' }}>View all →</Link>
               {!hasFullCalendar && (
-                <Link to="/settings#billing" style={{ fontSize:'var(--text-xs)', color:'var(--accent)', textDecoration:'none', fontWeight:600 }}>
-                  See all deadlines on Starter →
-                </Link>
+                /* <Link to="/settings#billing" ...>See all deadlines on Starter →</Link> — paid upgrade disabled */
+                <button type="button" onClick={openRequest} style={{ fontSize:'var(--text-xs)', color:'var(--accent)', fontWeight:600, background:'none', border:'none', padding:0, cursor:'pointer', fontFamily:'inherit', textAlign:'left' }}>
+                  Request premium to see all deadlines →
+                </button>
               )}
             </div>
           )}

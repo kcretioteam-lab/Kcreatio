@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import LogoMark from '../components/ui/LogoMark.jsx';
 
 const SECTIONS = [
   {
@@ -23,11 +24,11 @@ const SECTIONS = [
   },
   {
     title: '6. Payments & Subscriptions',
-    body: 'Paid plans are billed through Razorpay. Subscriptions renew automatically at the end of each billing period until cancelled. Cancelling stops future renewals; it does not refund the current billing period unless required by law.',
+    body: 'Kcretio does not currently charge for any plan. When paid plans launch, they will be billed through Razorpay, renew automatically at the end of each billing period until cancelled, and cancelling will stop future renewals without refunding the current billing period unless required by law.',
   },
   {
-    title: '7. Free Trial',
-    body: 'New accounts receive a 28-day free trial with full access. At the end of the trial, your account moves to the free plan unless you subscribe to a paid plan.',
+    title: '7. Premium Access',
+    body: 'New accounts start on the free Basic plan. You may request 28 days of free premium (Pro) access; requests are reviewed and approval is at our discretion. At the end of the 28 days, your account returns to the Basic plan.',
   },
   {
     title: '8. Acceptable Use',
@@ -68,7 +69,7 @@ export default function TermsPage() {
     <div style={{ minHeight: '100dvh', background: 'var(--bg)' }}>
       <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: 'var(--space-5) var(--space-6)', borderBottom: '1px solid var(--border)' }}>
         <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', color: 'var(--text-primary)', fontWeight: 600, textDecoration: 'none' }}>
-          <span aria-hidden="true" style={{ width: 28, height: 28, background: 'var(--accent)', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 14, color: '#fff' }}>K</span>
+          <LogoMark size={28} />
           Kcretio
         </Link>
         <Link to="/register" style={{ fontSize: 'var(--text-sm)', color: 'var(--accent)', fontWeight: 600, textDecoration: 'none' }}>← Back to sign up</Link>

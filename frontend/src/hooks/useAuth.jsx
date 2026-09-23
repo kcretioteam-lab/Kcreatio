@@ -9,14 +9,14 @@ const AuthContext = createContext(null);
 const MOCK_USER = {
   id: 'dev-bypass-user',
   name: 'Admin User',
-  email: 'admin@kcreatio.in',
+  email: 'admin@kcretio.in',
   business_name: 'Test Creator Channel',
   gstin: '29ABCDE1234F1Z5',
   pan: 'ABCDE1234F',
   business_address: '123 Creator Street, Bengaluru, Karnataka - 560001',
   state_code: '29',
   invoice_prefix: 'ADM',
-  plan: 'pro',   // Use 'basic' to test feature gates
+  plan: 'basic',   // Use 'pro' to test without watermark / feature gates
   trial_ends_at: null,
   phone: '+91 98765 43210',
   show_phone_on_invoice: true,

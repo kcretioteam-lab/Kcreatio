@@ -6,6 +6,43 @@ import { validateBody } from '../middleware/validateBody.js';
 import { getFinancialYear } from '../services/invoiceService.js';
 
 const router = Router();
+
+// PUBLIC — no auth required (used by landing page TDS calculator)
+router.get('/quick-estimate', (req, res): void => {
+  const monthlyIncome = parseFloat(req.query.monthly_income as string) || 0;
+  const brandCount = parseInt(req.query.brand_count as string, 10) || 1;
+  const annual = monthlyIncome * 12;
+  // No standard deduction — it applies to salary income only; creator income is professional/business income
+  const taxableIncome = Math.max(0, annual);
+
+  // New regime slabs FY 2025-26 (matches NEW_REGIME_SLABS in this file)
+  const slabs: [number, number, number][] = [
+    [0, 400000, 0], [400000, 800000, 0.05], [800000, 1200000, 0.10],
+    [1200000, 1600000, 0.15], [1600000, 2000000, 0.20],
+    [2000000, 2400000, 0.25], [2400000, Infinity, 0.30],
+  ];
+  let preCessTax = 0;
+  for (const [min, max, rate] of slabs) {
+    if (taxableIncome <= min) break;
+    preCessTax += (Math.min(taxableIncome, max === Infinity ? taxableIncome : max) - min) * rate;
+  }
+  // Section 87A rebate: taxable income ≤ ₹12L → rebate up to ₹60,000 (most creators pay ₹0 tax)
+  if (taxableIncome <= 1200000) preCessTax = Math.max(0, preCessTax - 60000);
+  const incomeTax = Math.round(preCessTax * 1.04); // 4% cess
+
+  const estimatedTds = Math.round(annual * 0.10);
+  const advanceTaxOwed = Math.max(0, incomeTax - estimatedTds);
+  const itrRefund = Math.max(0, estimatedTds - incomeTax);
+  const q2Due = Math.round(advanceTaxOwed * 0.45); // 45% cumulative by Sep 15
+
+  const lateCount = Math.round(brandCount * 0.4);
+  const form16aRisk = brandCount < 3
+    ? `${Math.round(brandCount * 40)}% chance of delay`
+    : `~${lateCount} of ${brandCount} brand${lateCount !== 1 ? 's' : ''} likely late`;
+
+  res.json({ annual, estimatedTds, incomeTax, advanceTaxOwed, itrRefund, q2Due, form16aRisk });
+});
+
 router.use(authenticate);
 
 // Tax slabs FY 2025-26 (New Regime)
@@ -35,14 +72,18 @@ const INSTALMENT_SCHEDULE = [
 
 function calcTax(annualIncomePaise: number, regime: string): number {
   const slabs = regime === 'old' ? OLD_REGIME_SLABS : NEW_REGIME_SLABS;
-  const standardDeduction = regime === 'new' ? 5000000 : 0; // ₹50,000 in paise
-  const taxableIncomePaise = Math.max(0, annualIncomePaise - standardDeduction);
+  // No standard deduction — it applies to salary income only; creator income is professional/business income
+  const taxableIncomePaise = Math.max(0, annualIncomePaise);
   let taxPaise = 0;
   for (const slab of slabs) {
     if (taxableIncomePaise <= slab.min * 100) break;
     const inSlab = Math.min(taxableIncomePaise, slab.max === Infinity ? Infinity : slab.max * 100) - slab.min * 100;
     taxPaise += Math.round(inSlab * slab.rate);
   }
+  // Section 87A rebate — new regime: taxable ≤ ₹12L, up to ₹60,000; old regime: taxable ≤ ₹5L, up to ₹12,500
+  const rebateLimitPaise = regime === 'old' ? 500000 * 100 : 1200000 * 100;
+  const maxRebatePaise = regime === 'old' ? 12500 * 100 : 60000 * 100;
+  if (taxableIncomePaise <= rebateLimitPaise) taxPaise = Math.max(0, taxPaise - maxRebatePaise);
   const cessPaise = Math.round(taxPaise * 0.04);
   return taxPaise + cessPaise;
 }

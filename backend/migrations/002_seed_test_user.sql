@@ -1,4 +1,4 @@
--- Test user seed: admin@kcreatio.in / admin123
+-- Test user seed: admin@kcretio.in / admin123
 -- Run AFTER 001_initial_schema.sql
 -- Password hash = bcrypt("admin", 12 rounds) — for dev/testing only
 
@@ -17,7 +17,7 @@ INSERT INTO users (
   trial_ends_at
 ) VALUES (
   gen_random_uuid(),
-  'admin@kcreatio.in',
+  'admin@kcretio.in',
   '$2b$12$YgUEinjHqeRvAUWrDaHLTOI/0snAV1k1IyucF5sq8vZ4RMS8cVI3S',  -- "admin123"
   'Admin User',
   'Test Creator Channel',

@@ -1,8 +1,9 @@
 import { Router, Request, Response } from 'express';
-import bcrypt from 'bcrypt';
+import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 import { z } from 'zod';
+import rateLimit from 'express-rate-limit';
 import { supabase } from '../lib/supabase.js';
 import { validateBody } from '../middleware/validateBody.js';
 import { authenticate, AuthRequest } from '../middleware/auth.js';
@@ -11,10 +12,18 @@ import { getFrontendUrl } from '../lib/env.js';
 
 const router = Router();
 
+const authRateLimit = rateLimit({
+  windowMs: 60 * 1000,
+  max: 10,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message: { error: 'RATE_LIMITED', message: 'Too many attempts — please try again in a minute' },
+});
+
 const BCRYPT_ROUNDS = 12;
 const ACCESS_EXPIRY = '15m';
 const REFRESH_EXPIRY = '30d';
-const TRIAL_DAYS = 28;
+const TRIAL_DAYS = 28; // unused while auto-trial is disabled — premium grants use PREMIUM_DAYS in premiumRequests.ts
 const MAX_FAILED_ATTEMPTS = 5;
 const OTP_EXPIRY_MINUTES = 10;
 const RESET_TOKEN_EXPIRY_MINUTES = 60;
@@ -183,7 +192,7 @@ const RegisterSchema = z.object({
   marketingEmails: z.boolean().default(true),
 });
 
-router.post('/register', validateBody(RegisterSchema), async (req: Request, res: Response): Promise<void> => {
+router.post('/register', authRateLimit, validateBody(RegisterSchema), async (req: Request, res: Response): Promise<void> => {
   const { name, email, phone, password, verificationToken, marketingEmails } = req.body;
 
   // Validate the email verification token
@@ -206,8 +215,9 @@ router.post('/register', validateBody(RegisterSchema), async (req: Request, res:
     return;
   }
 
-  const trialEndsAt = new Date();
-  trialEndsAt.setDate(trialEndsAt.getDate() + TRIAL_DAYS);
+  // Auto 28-day trial on signup disabled — new users start on Basic and request premium (routes/premiumRequests.ts)
+  // const trialEndsAt = new Date();
+  // trialEndsAt.setDate(trialEndsAt.getDate() + TRIAL_DAYS);
 
   const { data: user, error } = await supabase
     .from('users')
@@ -216,8 +226,8 @@ router.post('/register', validateBody(RegisterSchema), async (req: Request, res:
       email,
       phone: phone || null,
       password_hash: hash,
-      plan: 'trial',
-      trial_ends_at: trialEndsAt.toISOString(),
+      plan: 'basic', // was: 'trial'
+      trial_ends_at: null, // was: trialEndsAt.toISOString()
       invoice_prefix: 'INV',
       is_email_verified: true,
       terms_accepted_at: new Date().toISOString(),
@@ -244,7 +254,7 @@ const LoginSchema = z.object({
   password: z.string().min(1),
 });
 
-router.post('/login', validateBody(LoginSchema), async (req: Request, res: Response): Promise<void> => {
+router.post('/login', authRateLimit, validateBody(LoginSchema), async (req: Request, res: Response): Promise<void> => {
   const { identifier, password } = req.body;
 
   // Try email lookup first, then phone
@@ -718,8 +728,9 @@ router.get('/google/callback', async (req: Request, res: Response): Promise<void
         user = byEmail;
       } else {
         // Create new user via Google
-        const trialEndsAt = new Date();
-        trialEndsAt.setDate(trialEndsAt.getDate() + TRIAL_DAYS);
+        // Auto 28-day trial on signup disabled — new users start on Basic and request premium
+        // const trialEndsAt = new Date();
+        // trialEndsAt.setDate(trialEndsAt.getDate() + TRIAL_DAYS);
         const { data: newUser } = await supabase
           .from('users')
           .insert({
@@ -728,8 +739,8 @@ router.get('/google/callback', async (req: Request, res: Response): Promise<void
             password_hash: await bcrypt.hash(crypto.randomBytes(32).toString('hex'), 10), // random unusable password
             google_id: googleId,
             avatar_url: picture || null,
-            plan: 'trial',
-            trial_ends_at: trialEndsAt.toISOString(),
+            plan: 'basic', // was: 'trial'
+            trial_ends_at: null, // was: trialEndsAt.toISOString()
             invoice_prefix: 'INV',
             is_email_verified: true,
             terms_accepted_at: new Date().toISOString(),

@@ -1,10 +1,10 @@
 services:
   - type: web
-    name: kcreatio-backend
+    name: kcretio-backend
     runtime: node
     region: oregon
     rootDir: backend
-    buildCommand: npm install && npm run build
+    buildCommand: apt-get install -y chromium-browser --no-install-recommends 2>/dev/null || true && npm ci --omit=dev && npm run build
     startCommand: node dist/server.js
     healthCheckPath: /api/health
     envVars:
@@ -20,6 +20,8 @@ services:
         value: "false"
       - key: ENABLE_JOBS
         value: "true"
+      - key: CHROME_PATH
+        value: /usr/bin/chromium-browser
       - key: JWT_ACCESS_SECRET
         sync: false
       - key: JWT_REFRESH_SECRET

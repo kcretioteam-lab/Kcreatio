@@ -11,7 +11,7 @@ import Input from '../components/ui/Input.jsx';
 import StatCard from '../components/ui/StatCard.jsx';
 import { SkeletonStatCard, SkeletonTableRow } from '../components/ui/Skeleton.jsx';
 import EmptyState from '../components/ui/EmptyState.jsx';
-import { DollarSign, CheckCircle, Clock, AlertCircle, Receipt } from 'lucide-react';
+import { IndianRupee, CheckCircle, Clock, AlertCircle, Receipt } from 'lucide-react';
 import UsageBar from '../components/ui/UsageBar.jsx';
 import { useUsage } from '../hooks/useUsage.jsx';
 
@@ -138,6 +138,34 @@ export default function TDSPage() {
         </div>
       </header>
 
+      {/* ITR claimable callout */}
+      {!loading && summary && summary.totalDeducted > 0 && (
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: 'var(--space-3)',
+          background: 'linear-gradient(135deg, rgba(72,187,120,.12), rgba(72,187,120,.06))',
+          border: '1px solid rgba(72,187,120,.3)',
+          borderRadius: 'var(--radius-lg)',
+          padding: 'var(--space-4) var(--space-5)',
+          marginBottom: 'var(--space-5)',
+        }}>
+          <div>
+            <div style={{ fontWeight: 800, fontSize: 'var(--text-lg)', color: '#48bb78' }}>
+              {formatINR(summary.netTdsCredit)} claimable at ITR
+            </div>
+            <div style={{ fontSize: 'var(--text-sm)', color: 'var(--text-secondary)', marginTop: 4 }}>
+              Total TDS deducted this FY — fully recoverable when you file your ITR
+            </div>
+          </div>
+          <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', maxWidth: 220, textAlign: 'right' }}>
+            Collect Form 16A from all brands before filing to claim the full amount
+          </div>
+        </div>
+      )}
+
       {/* Summary cards */}
       {loading ? (
         <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(auto-fit, minmax(200px, 1fr))', gap: 'var(--space-4)', marginBottom: 'var(--space-6)' }}>
@@ -145,7 +173,7 @@ export default function TDSPage() {
         </div>
       ) : summary && (
         <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(auto-fit, minmax(200px, 1fr))', gap: 'var(--space-4)', marginBottom: 'var(--space-6)' }}>
-          <StatCard label="Total TDS Deducted" value={formatINR(summary.totalDeducted)} icon={DollarSign} accentColor="var(--warning)" />
+          <StatCard label="Total TDS Deducted" value={formatINR(summary.totalDeducted)} icon={IndianRupee} accentColor="var(--warning)" />
           <StatCard label="Form 16A Received" value={formatINR(summary.form16aReceived)} icon={CheckCircle} accentColor="var(--success)" />
           <StatCard label="Pending Form 16A" value={formatINR(summary.pending)} icon={Clock} accentColor="var(--danger)" />
           <StatCard label="Net TDS Credit" value={formatINR(summary.netTdsCredit)} icon={AlertCircle} accentColor="var(--info)" />

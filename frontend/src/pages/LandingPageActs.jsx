@@ -10,6 +10,7 @@ import {
   Download, IndianRupee, BarChart2,
   Zap, Shield, RefreshCw, Check, ChevronRight,
 } from 'lucide-react';
+import LogoMark from '../components/ui/LogoMark.jsx';
 
 // ─── Shared utils (exported so LandingPageV6.jsx can import) ─────────────────
 
@@ -457,7 +458,7 @@ function EcosystemViz() {
   const [ref, vis] = useInView(0.3);
   const R = 140;
   return (
-    <div ref={ref} style={{ position: 'relative', width: 340, height: 340, flexShrink: 0, margin: '0 auto' }}>
+    <div ref={ref} style={{ position: 'relative', width: 'min(340px, 100%)', aspectRatio: '1 / 1', margin: '0 auto' }}>
       <div aria-hidden="true" style={{ position: 'absolute', top: '50%', left: '50%', width: R * 2, height: R * 2, transform: 'translate(-50%,-50%)', borderRadius: '50%', border: '1px dashed rgba(232,146,26,0.2)', opacity: vis ? 1 : 0, transition: 'opacity 0.8s ease' }} />
       <div style={{ position: 'absolute', top: '50%', left: '50%', width: 72, height: 72, transform: 'translate(-50%,-50%)', borderRadius: '50%', background: 'linear-gradient(135deg, rgba(232,146,26,0.3), rgba(232,146,26,0.1))', border: '2px solid rgba(232,146,26,0.5)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 0 12px rgba(232,146,26,0.06)', opacity: vis ? 1 : 0, transition: 'opacity 0.5s ease', zIndex: 2 }}>
         <span style={{ fontSize: 10, fontWeight: 700, color: '#E8921A', letterSpacing: '0.05em' }}>YOU</span>
@@ -575,7 +576,7 @@ export function ComparisonTable() {
     <section aria-label="Why Kcretio" style={{ maxWidth: 1000, margin: '0 auto', padding: '0 var(--space-6) var(--space-20)' }}>
       <style>{`.cmp-desktop { display:block; overflow-x:auto; } .cmp-mobile { display:none; } @media (max-width:640px) { .cmp-desktop { display:none; } .cmp-mobile { display:flex; flex-direction:column; gap:var(--space-3); } }`}</style>
       <Reveal>
-        <p style={{ fontSize: 'var(--text-xs)', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--accent)', textAlign: 'center', margin: '0 auto var(--space-4)' }}>WHY KCREATIO</p>
+        <p style={{ fontSize: 'var(--text-xs)', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--accent)', textAlign: 'center', margin: '0 auto var(--space-4)' }}>WHY KCRETIO</p>
         <h2 style={{ fontSize: 'var(--text-2xl)', fontWeight: 700, color: 'var(--text-primary)', textAlign: 'center', margin: '0 auto var(--space-10)' }}>Built for this. Nothing else comes close.</h2>
       </Reveal>
       <div className="cmp-desktop">
@@ -607,9 +608,13 @@ export function ComparisonTable() {
 // ─── Pricing ──────────────────────────────────────────────────────────────────
 
 const PLANS = [
-  { name: 'Starter', price: '₹0', period: '/month', desc: 'For creators just starting their business journey.', color: '#60a5fa', features: ['5 invoices/month', 'Basic GST calculation', 'TDS tracking', 'Advance tax reminders'], cta: 'Start free', href: '/register' },
-  { name: 'Creator Pro', price: '₹599', period: '/month', desc: 'For serious creators managing real brand business.', color: '#E8921A', highlight: true, features: ['Unlimited invoices', 'CGST / SGST / IGST auto', 'Full TDS + Form 16A tracker', 'Advance tax calculator', 'Brand deal CRM (unlimited)', 'P&L + income dashboard', 'ITR-ready export (ZIP)', 'Priority support'], cta: 'Start 14-day free trial', href: '/register' },
-  { name: 'Agency', price: '₹1,999', period: '/month', desc: 'For MCNs, talent managers, and creator agencies.', color: '#a78bfa', features: ['Everything in Pro', 'Up to 20 creators', 'Team access', 'White-label invoices', 'Dedicated account manager'], cta: 'Contact us', href: '/register' },
+  { name: 'Basic', price: '₹0', period: '/month', desc: 'For creators just starting their business journey.', color: '#60a5fa', features: ['Unlimited GST invoices (Kcretio watermark)', 'CGST / SGST / IGST auto', 'TDS tracking (10 entries)', 'March advance tax reminder'], cta: 'Start free', href: '/register' },
+  // Paid plans disabled for now — premium is granted on request
+  // { name: 'Starter', price: '₹299', period: '/month', desc: 'For creators with regular brand deals.', color: '#34d399', features: ['Watermark-free invoices, all 7 templates', 'Unlimited TDS + Form 16A tracker', 'Smart Inbox (Gmail auto-detect)', 'All 4 advance tax reminders', 'Expense tracker'], cta: 'Start 28-day free trial', href: '/register' },
+  // { name: 'Creator Pro', price: '₹599', period: '/month', desc: 'For serious creators managing real brand business.', color: '#E8921A', highlight: true, features: ['Everything in Starter', 'Advance tax calculator', 'P&L + income dashboard', 'ITR-ready export (ZIP)', 'Smart Inbox auto-apply'], cta: 'Start 28-day free trial', href: '/register' },
+  { name: 'Creator Pro', price: '₹0', period: ' for 28 days', desc: 'Request free Pro access — we review every request personally.', color: '#E8921A', highlight: true, features: ['Watermark-free invoices, all 7 templates', 'Unlimited TDS + Form 16A tracker', 'Advance tax calculator', 'P&L + income dashboard', 'ITR-ready export (ZIP)', 'Smart Inbox (Gmail auto-detect)'], cta: 'Start free · request Pro', href: '/register' },
+  // Business/Agency plan paused
+  // { name: 'Agency', price: '₹1,999', period: '/month', desc: 'For MCNs, talent managers, and creator agencies.', color: '#a78bfa', features: ['Everything in Pro', 'Up to 20 creators', 'Team access', 'White-label invoices', 'Dedicated account manager'], cta: 'Contact us', href: '/register' },
 ];
 
 function PricingCard({ plan, index }) {
@@ -687,11 +692,11 @@ const FAQ_ITEMS = [
   },
   {
     q: 'What about TDS? Do I need to track it manually?',
-    a: 'Never. When a brand deducts 10% TDS (Section 194C/194J) before paying you, Kcretio records it automatically when you mark the invoice paid. All TDS is reconciled against your PAN throughout the year. At ITR season, everything lines up with your Form 26AS.',
+    a: 'Never. When a brand deducts TDS before paying you (10% under Section 194J, or 1–2% under 194C), Kcretio records it automatically when you mark the invoice paid. All TDS is reconciled against your PAN throughout the year. At ITR season, everything lines up with your Form 26AS.',
   },
   {
     q: 'Is the free plan actually free — or is it a trial?',
-    a: 'Actually free. No credit card. No expiry. The Starter plan gives you 5 invoices per month forever. When you outgrow that — meaning real brand business is coming in — upgrade to Creator Pro for ₹599/month.',
+    a: 'Actually free. No credit card. No expiry. The Basic plan gives you unlimited GST invoices forever, with a small Kcretio watermark. Need more? Request 28 days of free Creator Pro access from inside the app — watermark-free invoices, advance tax calculator, P&L and CA export.',
   },
   {
     q: 'Can I export everything for my CA?',
@@ -772,8 +777,8 @@ export function FAQ() {
         <Reveal delay={200}>
           <div style={{ textAlign: 'center', marginTop: 48, padding: '28px', borderRadius: 16, background: 'var(--surface-1)', border: '1px solid var(--border)' }}>
             <p style={{ fontSize: 14, color: 'var(--text-body)', margin: '0 0 12px' }}>Still have questions?</p>
-            <a href="mailto:hello@kcreatio.in" style={{ fontSize: 14, fontWeight: 600, color: '#E8921A', textDecoration: 'none' }}>
-              hello@kcreatio.in →
+            <a href="mailto:hello@kcretio.in" style={{ fontSize: 14, fontWeight: 600, color: '#E8921A', textDecoration: 'none' }}>
+              hello@kcretio.in →
             </a>
           </div>
         </Reveal>
@@ -844,7 +849,7 @@ export function Footer() {
         <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 32, marginBottom: 40 }}>
           <div style={{ maxWidth: 260 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-              <div style={{ width: 28, height: 28, background: 'linear-gradient(135deg, #E8921A, #c8711a)', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: 13, color: '#fff' }}>K</div>
+              <LogoMark size={28} />
               <span style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: 15 }}>Kcretio</span>
             </div>
             <p style={{ fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.7 }}>
@@ -859,12 +864,15 @@ export function Footer() {
             <div key={group}>
               <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.1em', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 16 }}>{group}</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {links.map(l => (
-                  <a key={l} href="#" style={{ fontSize: 13, color: 'var(--text-body)', textDecoration: 'none', transition: 'color 0.15s' }}
-                    onMouseEnter={e => e.target.style.color = 'var(--text-primary)'}
-                    onMouseLeave={e => e.target.style.color = 'var(--text-body)'}
-                  >{l}</a>
-                ))}
+                {links.map(l => {
+                  const ROUTES = { Privacy: '/privacy', Terms: '/terms' };
+                  const s = { fontSize: 13, color: 'var(--text-body)', textDecoration: 'none', transition: 'color 0.15s' };
+                  const on = e => { e.target.style.color = 'var(--text-primary)'; };
+                  const off = e => { e.target.style.color = 'var(--text-body)'; };
+                  return ROUTES[l]
+                    ? <Link key={l} to={ROUTES[l]} style={s} onMouseEnter={on} onMouseLeave={off}>{l}</Link>
+                    : <a    key={l} href="#"        style={s} onMouseEnter={on} onMouseLeave={off}>{l}</a>;
+                })}
               </div>
             </div>
           ))}
@@ -876,5 +884,236 @@ export function Footer() {
         </div>
       </div>
     </footer>
+  );
+}
+
+// ─── Tax Risk Calculator (public, no login) ────────────────────────────────
+
+function inrFmt(n) {
+  return '₹' + Math.round(n).toLocaleString('en-IN');
+}
+
+export function TaxRiskCalculator() {
+  const [monthly, setMonthly] = useState('');
+  const [brands, setBrands] = useState('');
+  const [result, setResult] = useState(null);
+  const [loading, setLoading] = useState(false);
+
+  async function handleEstimate(e) {
+    e.preventDefault();
+    const m = parseFloat(monthly) || 0;
+    const b = parseInt(brands, 10) || 1;
+    if (m <= 0) return;
+    setLoading(true);
+    try {
+      const r = await fetch(`/api/v1/tax/quick-estimate?monthly_income=${m}&brand_count=${b}`);
+      const data = await r.json();
+      setResult(data);
+    } catch {
+      /* ignore */
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <Reveal>
+      <section style={{
+        maxWidth: 760,
+        margin: '0 auto',
+        padding: 'var(--space-12) var(--space-5)',
+        textAlign: 'center',
+      }}>
+        <div style={{
+          display: 'inline-block',
+          background: 'rgba(232,146,26,.12)',
+          border: '1px solid rgba(232,146,26,.3)',
+          borderRadius: 999,
+          padding: '4px 16px',
+          fontSize: 11,
+          fontWeight: 700,
+          letterSpacing: '.08em',
+          color: 'var(--accent)',
+          textTransform: 'uppercase',
+          marginBottom: 'var(--space-4)',
+        }}>Tax Risk Calculator</div>
+
+        <h2 style={{
+          fontSize: 'clamp(22px, 4vw, 32px)',
+          fontWeight: 800,
+          marginBottom: 'var(--space-3)',
+          lineHeight: 1.25,
+        }}>What actually happens to your income?</h2>
+        <p style={{ color: 'var(--text-secondary)', marginBottom: 'var(--space-6)', fontSize: 15 }}>
+          Enter your monthly earnings — see exactly what brands deduct, what you receive, and what you get back at ITR. No account needed.
+        </p>
+
+        <form onSubmit={handleEstimate} style={{
+          display: 'flex',
+          gap: 'var(--space-3)',
+          justifyContent: 'center',
+          flexWrap: 'wrap',
+          marginBottom: 'var(--space-6)',
+        }}>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 4 }}>
+            <label style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.06em', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>
+              Monthly Income
+            </label>
+            <div style={{ position: 'relative' }}>
+              <span style={{
+                position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)',
+                color: 'var(--text-secondary)', fontSize: 14, pointerEvents: 'none',
+              }}>₹</span>
+              <input
+                type="number"
+                min="0"
+                value={monthly}
+                onChange={e => setMonthly(e.target.value)}
+                placeholder="50000"
+                required
+                style={{
+                  paddingLeft: 28, paddingRight: 12, paddingTop: 10, paddingBottom: 10,
+                  border: '1px solid var(--border)',
+                  borderRadius: 'var(--radius)',
+                  background: 'var(--bg-card)',
+                  color: 'var(--text-primary)',
+                  fontSize: 15,
+                  width: 160,
+                  outline: 'none',
+                }}
+              />
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 4 }}>
+            <label style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.06em', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>
+              No. of Brands
+            </label>
+            <input
+              type="number"
+              min="1"
+              max="50"
+              value={brands}
+              onChange={e => setBrands(e.target.value)}
+              placeholder="3"
+              style={{
+                padding: '10px 12px',
+                border: '1px solid var(--border)',
+                borderRadius: 'var(--radius)',
+                background: 'var(--bg-card)',
+                color: 'var(--text-primary)',
+                fontSize: 15,
+                width: 100,
+                outline: 'none',
+              }}
+            />
+          </div>
+
+          <button type="submit" disabled={loading} style={{
+            alignSelf: 'flex-end',
+            padding: '10px 24px',
+            background: 'var(--accent)',
+            color: '#fff',
+            border: 'none',
+            borderRadius: 'var(--radius)',
+            fontWeight: 700,
+            fontSize: 14,
+            cursor: loading ? 'not-allowed' : 'pointer',
+            opacity: loading ? 0.7 : 1,
+            transition: 'opacity .2s',
+          }}>
+            {loading ? 'Calculating…' : 'Show me the numbers'}
+          </button>
+        </form>
+
+        {result && (
+          <div style={{ textAlign: 'left' }}>
+            {/* Part 1: Money flow */}
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
+              gap: 'var(--space-3)',
+              marginBottom: 'var(--space-4)',
+            }}>
+              {[
+                { label: 'Annual income', value: inrFmt(result.annual), color: 'var(--text-primary)', note: 'before any deductions' },
+                { label: 'TDS brands deduct', value: inrFmt(result.estimatedTds), color: '#e53e3e', note: '10% at source under 194J' },
+                { label: 'You actually receive', value: inrFmt(result.annual - result.estimatedTds), color: '#48bb78', note: 'paid into your account' },
+              ].map(({ label, value, color, note }) => (
+                <div key={label} style={{
+                  background: 'var(--bg-card)',
+                  border: '1px solid var(--border)',
+                  borderRadius: 'var(--radius-lg)',
+                  padding: 'var(--space-4)',
+                }}>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 6, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.06em' }}>{label}</div>
+                  <div style={{ fontSize: 22, fontWeight: 800, color, marginBottom: 4 }}>{value}</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{note}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* Part 2: ITR outcome — refund vs advance tax */}
+            {result.itrRefund > 0 ? (
+              <div style={{
+                background: 'linear-gradient(135deg, rgba(72,187,120,.12), rgba(72,187,120,.06))',
+                border: '1px solid rgba(72,187,120,.3)',
+                borderRadius: 'var(--radius-lg)',
+                padding: 'var(--space-4) var(--space-5)',
+                marginBottom: 'var(--space-3)',
+              }}>
+                <div style={{ fontWeight: 800, fontSize: 16, color: '#48bb78', marginBottom: 4 }}>
+                  {inrFmt(result.itrRefund)} refund when you file ITR
+                </div>
+                <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+                  Your income tax ({inrFmt(result.incomeTax)}) is less than TDS deducted — the government owes <em>you</em> money.
+                  Track every deduction to claim it back.
+                </div>
+              </div>
+            ) : (
+              <div style={{
+                background: 'rgba(237,137,54,.08)',
+                border: '1px solid rgba(237,137,54,.3)',
+                borderRadius: 'var(--radius-lg)',
+                padding: 'var(--space-4) var(--space-5)',
+                marginBottom: 'var(--space-3)',
+              }}>
+                <div style={{ fontWeight: 800, fontSize: 16, color: '#ed8936', marginBottom: 4 }}>
+                  {inrFmt(result.q2Due)} advance tax due by Sep 15 (Q2)
+                </div>
+                <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+                  Income tax ({inrFmt(result.incomeTax)}) exceeds TDS ({inrFmt(result.estimatedTds)}) — {inrFmt(result.advanceTaxOwed)} still owed this FY.
+                  Missing Q2 triggers 234C interest.
+                </div>
+              </div>
+            )}
+
+            {/* Part 3: Form 16A */}
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              gap: 'var(--space-2)',
+              background: 'var(--bg-card)',
+              border: '1px solid var(--border)',
+              borderRadius: 'var(--radius-lg)',
+              padding: 'var(--space-3) var(--space-4)',
+            }}>
+              <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+                <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>Form 16A: </span>
+                {result.form16aRisk} beyond Jun 30 — collect before filing to claim your refund
+              </div>
+            </div>
+          </div>
+        )}
+
+        {result && (
+          <p style={{ marginTop: 'var(--space-4)', fontSize: 12, color: 'var(--text-muted)' }}>
+            New regime slabs + Section 87A rebate (FY 2025-26). Estimates only.{' '}
+            <Link to="/register" style={{ color: 'var(--accent)', fontWeight: 600 }}>Sign up free</Link> to track your actual TDS.
+          </p>
+        )}
+      </section>
+    </Reveal>
   );
 }

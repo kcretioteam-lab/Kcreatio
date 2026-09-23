@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { NavLink } from 'react-router-dom';
 import {
   LayoutDashboard, FileText, Briefcase, TrendingUp,
-  MoreHorizontal, DollarSign, Calculator, Receipt, Settings, X,
+  MoreHorizontal, IndianRupee, Calculator, Receipt, Settings, X,
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth.jsx';
 
@@ -14,7 +14,7 @@ const PRIMARY_NAV = [
 ];
 
 const MORE_ITEMS = [
-  { to: '/tds',         icon: DollarSign,  label: 'TDS Tracker' },
+  { to: '/tds',         icon: IndianRupee, label: 'TDS Tracker' },
   { to: '/tax-planner', icon: Calculator,  label: 'Tax Planner' },
   { to: '/expenses',    icon: Receipt,     label: 'Expenses' },
   { to: '/settings',    icon: Settings,    label: 'Settings' },
@@ -126,7 +126,7 @@ export default function MobileNav() {
               textDecoration: 'none',
             }}
           >
-            Trial: {trialDaysLeft()} days left · Upgrade to Pro →
+            Pro access: {trialDaysLeft()} days left {/* was: · Upgrade to Pro → (paid upgrade disabled) */}
           </NavLink>
         )}
       </div>

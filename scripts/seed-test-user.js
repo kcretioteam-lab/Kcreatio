@@ -1,5 +1,5 @@
 /**
- * Creates a test user: admin@kcreatio.in / admin123
+ * Creates a test user: admin@kcretio.in / admin123
  * Run: node scripts/seed-test-user.js
  * Requires backend/.env to be configured.
  */
@@ -15,7 +15,7 @@ const supabase = createClient(
 );
 
 async function seed() {
-  const email = 'admin@kcreatio.in';
+  const email = 'admin@kcretio.in';
   const password = 'admin123';;
   const name = 'Admin User';
 
@@ -54,7 +54,7 @@ async function seed() {
   }
 
   console.log('✓ Test user created/updated:', data);
-  console.log('\n  Email:    admin@kcreatio.in');
+  console.log('\n  Email:    admin@kcretio.in');
   console.log('  Password: admin123');
   console.log('  Plan:     Pro (all features unlocked)\n');
 }

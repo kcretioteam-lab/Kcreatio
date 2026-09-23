@@ -6,7 +6,8 @@ import Input from '../components/ui/Input.jsx';
 import Modal from '../components/ui/Modal.jsx';
 import { useToast } from '../hooks/useToast.jsx';
 import api from '../utils/api.js';
-import { openSubscriptionCheckout } from '../utils/razorpay.js';
+// import { openSubscriptionCheckout } from '../utils/razorpay.js'; // Payments disabled — premium is granted on request
+import { usePremiumRequest } from '../hooks/usePremiumRequest.jsx';
 import { PLAN_DISPLAY, PLAN_HIERARCHY } from '../utils/planConfig.js';
 
 const SECTIONS = ['Profile', 'Tax Profile', 'Invoice Settings', 'Billing', 'Notifications', 'Security', 'Export', 'Integrations', 'Danger Zone'];
@@ -540,6 +541,77 @@ function InvoiceSettingsSection({ user }) {
           </div>
         )}
       </div>
+
+      {/* ── Saved Brand Profiles (read-only, from invoice history) ── */}
+      <div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-3)' }}>
+          <div>
+            <h3 style={{ fontSize: 'var(--text-base)', fontWeight: 700, color: 'var(--text-primary)' }}>Saved Brand Profiles</h3>
+            <p style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', marginTop: 2 }}>
+              Brands you've invoiced are saved automatically and available in the "Load Saved Brand" picker on the invoice form.
+            </p>
+          </div>
+        </div>
+        <BrandProfilesList />
+      </div>
+    </div>
+  );
+}
+
+// ── Brand Profiles List (read-only view of past invoice brands) ───────────────
+function BrandProfilesList() {
+  const [brands, setBrands] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [q, setQ] = useState('');
+
+  useEffect(() => {
+    api.get('/invoices/brands')
+      .then(r => setBrands(r.data.brands || []))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  const filtered = brands.filter(b =>
+    !q || b.brand_name?.toLowerCase().includes(q.toLowerCase()) ||
+    b.brand_gstin?.toLowerCase().includes(q.toLowerCase())
+  );
+
+  if (loading) return <div style={{ color: 'var(--text-muted)', fontSize: 'var(--text-sm)', padding: 'var(--space-3)' }}>Loading…</div>;
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+      <div style={{ padding: 'var(--space-3)', background: 'var(--accent-dim)', border: '1px solid rgba(232,146,26,0.25)', borderRadius: 'var(--radius-md)', fontSize: 'var(--text-xs)', color: 'var(--text-body)', lineHeight: 1.5 }}>
+        💡 <strong>How it works:</strong> Every time you save an invoice for a brand, their details (name, GSTIN, address, state) are stored automatically. Use <strong>Load Saved Brand</strong> on the new invoice form to quickly re-fill their details.
+      </div>
+      {brands.length > 0 && (
+        <input
+          type="text"
+          value={q}
+          onChange={e => setQ(e.target.value)}
+          placeholder="Search by brand name or GSTIN…"
+          style={{ padding: 'var(--space-2) var(--space-3)', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', color: 'var(--text-primary)', fontSize: 'var(--text-sm)', fontFamily: 'inherit', outline: 'none' }}
+        />
+      )}
+      {filtered.length === 0 ? (
+        <div style={{ padding: 'var(--space-5)', textAlign: 'center', border: '1px dashed var(--border)', borderRadius: 'var(--radius-md)', color: 'var(--text-muted)', fontSize: 'var(--text-sm)' }}>
+          {brands.length === 0
+            ? 'No brands yet — create your first invoice to populate this list.'
+            : 'No brands match your search.'}
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+          {filtered.map((b, i) => (
+            <div key={i} style={{ padding: 'var(--space-3)', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 'var(--space-3)' }}>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontWeight: 600, fontSize: 'var(--text-sm)', color: 'var(--text-primary)' }}>{b.brand_name}</div>
+                {b.brand_gstin && <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', marginTop: 1 }}>GSTIN: <span style={{ fontFamily: 'monospace' }}>{b.brand_gstin}</span></div>}
+                {b.brand_address && <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 320 }}>{b.brand_address}</div>}
+              </div>
+              <span style={{ fontSize: 10, padding: '2px 8px', background: 'var(--surface-3)', border: '1px solid var(--border)', borderRadius: 'var(--radius-full)', color: 'var(--text-muted)', flexShrink: 0, whiteSpace: 'nowrap' }}>Auto-saved</span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -547,334 +619,388 @@ function InvoiceSettingsSection({ user }) {
 // ── Billing Section ───────────────────────────────────────────────────────────
 
 const UPGRADE_FEATURES = {
-  starter:  ['Unlimited invoices (clean PDF)', 'All 7 invoice templates', 'Unlimited TDS tracking', 'Full compliance calendar + email reminders', 'Expense tracker'],
+  starter:  ['Watermark-free invoice PDFs', 'All 7 invoice templates', 'Unlimited TDS tracking', 'Full compliance calendar + email reminders', 'Expense tracker'],
   pro:      ['Everything in Starter', 'Advance tax calculator (both regimes)', 'Income & P&L dashboard', 'CA export (ITR-ready PDF + CSV)'],
-  business: ['Everything in Pro', 'Up to 5 creator seats', 'White-label invoices (no branding)', 'Priority chat support (4hr response)'],
+  // business: ['Everything in Pro', 'Up to 5 creator seats', 'White-label invoices (no branding)', 'Priority chat support (4hr response)'], // Business plan paused
 };
 
-function BillingSection({ user, onPlanChange }) {
-  const [status, setStatus] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [actionLoading, setActionLoading] = useState('');
-  const [annual, setAnnual] = useState(false);
-  const [confirmModal, setConfirmModal] = useState(null); // { type: 'cancel'|'downgrade'|'change', targetPlan? }
-  const toast = useToast();
+// ── Paid billing (Razorpay) — disabled while premium is granted on request. Uncomment to restore. ──
+// function BillingSection({ user, onPlanChange }) {
+//   const [status, setStatus] = useState(null);
+//   const [loading, setLoading] = useState(true);
+//   const [actionLoading, setActionLoading] = useState('');
+//   const [annual, setAnnual] = useState(false);
+//   const [confirmModal, setConfirmModal] = useState(null); // { type: 'cancel'|'downgrade'|'change', targetPlan? }
+//   const toast = useToast();
+//
+//   const fetchStatus = useCallback(async () => {
+//     try {
+//       const res = await api.get('/payments/status');
+//       setStatus(res.data);
+//     } catch {
+//       // Use user data as fallback
+//       setStatus({ plan: user?.plan, trial_ends_at: user?.trial_ends_at, subscription_ends_at: null });
+//     } finally {
+//       setLoading(false);
+//     }
+//   }, [user]);
+//
+//   useEffect(() => { fetchStatus(); }, [fetchStatus]);
+//
+//   const currentPlan = status?.plan || user?.plan || 'basic';
+//   const currentLevel = PLAN_HIERARCHY[currentPlan] ?? 0;
+//
+//   // After the user authorizes payment, the plan is activated by the Razorpay
+//   // `subscription.charged` webhook — which can lag a few seconds. Re-check status
+//   // a handful of times so the UI reflects the new plan without a manual refresh.
+//   const pollForActivation = useCallback(async (tries = 0) => {
+//     try {
+//       const res = await api.get('/payments/status');
+//       setStatus(res.data);
+//       if (['starter', 'pro', 'business'].includes(res.data?.plan)) {
+//         onPlanChange?.();
+//         return true;
+//       }
+//     } catch { /* keep polling */ }
+//     if (tries >= 4) return false;
+//     await new Promise(r => setTimeout(r, 2500));
+//     return pollForActivation(tries + 1);
+//   }, [onPlanChange]);
+//
+//   const handleUpgrade = async (targetPlan) => {
+//     setActionLoading(targetPlan);
+//     setConfirmModal(null);
+//     const d = PLAN_DISPLAY[targetPlan];
+//     const isPaidNow = ['starter', 'pro', 'business'].includes(currentPlan);
+//
+//     try {
+//       // 1. Ask the backend to create (or switch to) the Razorpay subscription.
+//       //    Both endpoints return { subscriptionId } for the checkout step.
+//       const endpoint = isPaidNow && currentPlan !== targetPlan
+//         ? '/payments/change-plan'
+//         : '/payments/create-subscription';
+//       const res = await api.post(endpoint, { plan: targetPlan, period: 'monthly' });
+//       const subscriptionId = res.data?.subscriptionId;
+//
+//       // change-plan may take effect next cycle without a fresh authorization step
+//       if (!subscriptionId) {
+//         toast.success(res.data?.message || `Plan change to ${d?.name} initiated. Takes effect next billing cycle.`);
+//         await fetchStatus();
+//         onPlanChange?.();
+//         setActionLoading('');
+//         return;
+//       }
+//
+//       // 2. Open Razorpay Checkout to authorize the subscription.
+//       await openSubscriptionCheckout({
+//         subscriptionId,
+//         planName: d?.name || targetPlan,
+//         amount: d?.price || 0,
+//         user,
+//         onSuccess: async () => {
+//           toast.info('Payment authorized — activating your plan…');
+//           const activated = await pollForActivation();
+//           toast.success(
+//             activated
+//               ? `You're now on the ${d?.name} plan.`
+//               : 'Payment received. Your plan will activate in a moment — refresh if it doesn\'t update.'
+//           );
+//           await fetchStatus();
+//           onPlanChange?.();
+//           setActionLoading('');
+//         },
+//         onDismiss: () => {
+//           toast.error('Payment cancelled — your plan was not changed.');
+//           setActionLoading('');
+//         },
+//         onError: (msg) => {
+//           toast.error(msg);
+//           setActionLoading('');
+//         },
+//       });
+//     } catch (e) {
+//       toast.error(e.response?.data?.message || 'Failed to start the upgrade. Please try again.');
+//       setActionLoading('');
+//     }
+//   };
+//
+//   const handleCancel = async () => {
+//     setActionLoading('cancel');
+//     try {
+//       await api.post('/payments/cancel');
+//       toast.success('Subscription will cancel at end of billing period.');
+//       await fetchStatus();
+//     } catch (e) {
+//       toast.error(e.response?.data?.message || 'Failed to cancel subscription');
+//     } finally {
+//       setActionLoading('');
+//       setConfirmModal(null);
+//     }
+//   };
+//
+//   const handleReactivate = async () => {
+//     setActionLoading('reactivate');
+//     try {
+//       await api.post('/payments/reactivate');
+//       toast.success('Subscription reactivated successfully.');
+//       await fetchStatus();
+//     } catch (e) {
+//       toast.error(e.response?.data?.message || 'Failed to reactivate');
+//     } finally {
+//       setActionLoading('');
+//     }
+//   };
+//
+//   const trialDaysLeft = () => {
+//     if (!status?.trial_ends_at) return 0;
+//     return Math.max(0, Math.ceil((new Date(status.trial_ends_at) - new Date()) / 86400000));
+//   };
+//
+//   const isTrialActive = currentPlan === 'trial' && trialDaysLeft() > 0;
+//
+//   const planStatusText = () => {
+//     if (isTrialActive) return `Trial · ${trialDaysLeft()} days remaining`;
+//     if (currentPlan === 'basic') return 'Basic plan · Limited access';
+//     if (status?.subscription_ends_at) {
+//       const d = new Date(status.subscription_ends_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+//       return `Active · renews ${d}`;
+//     }
+//     return 'Active';
+//   };
+//
+//   if (loading) {
+//     return <div style={{ padding: 'var(--space-6)', color: 'var(--text-muted)', fontSize: 'var(--text-sm)' }}>Loading billing info…</div>;
+//   }
+//
+//   return (
+//     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }}>
+//
+//       {/* Card 1 — Current Plan Status */}
+//       <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl)', padding: 'var(--space-6)' }}>
+//         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 'var(--space-4)', flexWrap: 'wrap' }}>
+//           <div>
+//             <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', marginBottom: 'var(--space-2)' }}>
+//               <span style={{ fontSize: 'var(--text-lg)', fontWeight: 700, color: 'var(--text-primary)' }}>
+//                 {PLAN_DISPLAY[currentPlan]?.name || 'Basic'} Plan
+//               </span>
+//               <span style={{ padding: '2px 10px', background: isTrialActive ? 'rgba(232,146,26,0.15)' : 'var(--surface-2)', color: isTrialActive ? 'var(--accent)' : 'var(--text-muted)', borderRadius: 'var(--radius-full)', fontSize: 'var(--text-xs)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+//                 {planStatusText()}
+//               </span>
+//             </div>
+//             {PLAN_DISPLAY[currentPlan]?.price > 0 && (
+//               <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)' }}>
+//                 ₹{PLAN_DISPLAY[currentPlan].price.toLocaleString('en-IN')}/month · billed monthly
+//               </p>
+//             )}
+//             {isTrialActive && (
+//               <p style={{ fontSize: 'var(--text-sm)', color: 'var(--accent)', fontWeight: 600, marginTop: 'var(--space-2)' }}>
+//                 ⚠ Upgrade before your trial ends to keep access to all features
+//               </p>
+//             )}
+//           </div>
+//           <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
+//             {['starter', 'pro', 'business'].includes(currentPlan) && (
+//               <button
+//                 onClick={() => setConfirmModal({ type: 'cancel' })}
+//                 disabled={actionLoading === 'cancel'}
+//                 style={{ padding: 'var(--space-2) var(--space-4)', background: 'transparent', border: '1px solid var(--danger)', color: 'var(--danger-text, #ef4444)', borderRadius: 'var(--radius-md)', cursor: 'pointer', fontSize: 'var(--text-sm)', fontWeight: 600 }}
+//               >
+//                 Cancel subscription
+//               </button>
+//             )}
+//             {status?.subscription_ends_at && !['starter', 'pro', 'business'].includes(currentPlan) && (
+//               <button
+//                 onClick={handleReactivate}
+//                 disabled={actionLoading === 'reactivate'}
+//                 style={{ padding: 'var(--space-2) var(--space-4)', background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 'var(--radius-md)', cursor: 'pointer', fontSize: 'var(--text-sm)', fontWeight: 600 }}
+//               >
+//                 {actionLoading === 'reactivate' ? 'Reactivating…' : 'Reactivate'}
+//               </button>
+//             )}
+//           </div>
+//         </div>
+//       </div>
+//
+//       {/* Card 2 — Choose/Change Plan */}
+//       <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl)', padding: 'var(--space-6)' }}>
+//         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-5)', flexWrap: 'wrap', gap: 'var(--space-3)' }}>
+//           <h3 style={{ fontSize: 'var(--text-md)', fontWeight: 700, color: 'var(--text-primary)' }}>
+//             {['starter', 'pro', 'business'].includes(currentPlan) ? 'Change Plan' : 'Choose a Plan'}
+//           </h3>
+//           {/* Monthly / Annual toggle — annual billing not wired to Razorpay yet (monthly plans only) */}
+//           <div style={{ display: 'inline-flex', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 'var(--radius-full)', padding: 3, gap: 2 }}>
+//             {[{ label: 'Monthly', val: false, disabled: false }, { label: 'Annual · soon', val: true, disabled: true }].map(opt => (
+//               <button
+//                 key={String(opt.val)}
+//                 onClick={() => { if (!opt.disabled) setAnnual(opt.val); }}
+//                 disabled={opt.disabled}
+//                 title={opt.disabled ? 'Annual billing is coming soon' : undefined}
+//                 style={{ padding: 'var(--space-1) var(--space-3)', borderRadius: 'var(--radius-full)', fontWeight: 600, fontSize: 'var(--text-xs)', border: 'none', cursor: opt.disabled ? 'not-allowed' : 'pointer', background: annual === opt.val ? 'var(--accent)' : 'transparent', color: annual === opt.val ? '#fff' : 'var(--text-muted)', opacity: opt.disabled ? 0.45 : 1, fontFamily: 'inherit' }}
+//               >
+//                 {opt.label}
+//               </button>
+//             ))}
+//           </div>
+//         </div>
+//
+//         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 'var(--space-4)' }}>
+//           {['starter', 'pro' /* , 'business' — paused */].map(plan => {
+//             const d = PLAN_DISPLAY[plan];
+//             const price = annual ? d.annualPrice : d.price;
+//             const targetLevel = PLAN_HIERARCHY[plan] ?? 0;
+//             const isCurrentPlan = plan === currentPlan;
+//             const isUpgrade = targetLevel > currentLevel;
+//
+//             return (
+//               <div key={plan} style={{ border: `1px solid ${isCurrentPlan ? 'var(--accent)' : 'var(--border)'}`, borderRadius: 'var(--radius-xl)', padding: 'var(--space-5)', display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', position: 'relative' }}>
+//                 {plan === 'pro' && !isCurrentPlan && (
+//                   <div style={{ position: 'absolute', top: -12, left: '50%', transform: 'translateX(-50%)', background: 'var(--accent)', color: '#fff', padding: '2px 12px', borderRadius: 'var(--radius-full)', fontSize: 'var(--text-xs)', fontWeight: 700, whiteSpace: 'nowrap' }}>
+//                     Most Popular
+//                   </div>
+//                 )}
+//                 <div>
+//                   <p style={{ fontWeight: 700, color: 'var(--text-primary)', marginBottom: 'var(--space-1)' }}>{d.name}</p>
+//                   <div style={{ display: 'flex', alignItems: 'baseline', gap: 'var(--space-1)' }}>
+//                     <span style={{ fontSize: 'var(--text-xl)', fontWeight: 700, color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>₹{price.toLocaleString('en-IN')}</span>
+//                     <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>/month</span>
+//                   </div>
+//                   {annual && <p style={{ fontSize: 'var(--text-xs)', color: 'var(--success-text, #22c55e)', fontWeight: 600 }}>Save ₹{((d.price - d.annualPrice) * 12).toLocaleString('en-IN')}/year</p>}
+//                 </div>
+//                 <ul style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', listStyle: 'none', padding: 0, margin: 0 }}>
+//                   {(UPGRADE_FEATURES[plan] || []).map(f => (
+//                     <li key={f} style={{ fontSize: 'var(--text-xs)', color: 'var(--text-body)', display: 'flex', gap: 'var(--space-2)', alignItems: 'flex-start' }}>
+//                       <span style={{ color: 'var(--success, #22c55e)', flexShrink: 0, marginTop: 1 }}>✓</span> {f}
+//                     </li>
+//                   ))}
+//                 </ul>
+//                 {isCurrentPlan ? (
+//                   <div style={{ textAlign: 'center', padding: 'var(--space-2)', background: 'rgba(232,146,26,0.1)', color: 'var(--accent)', borderRadius: 'var(--radius-md)', fontSize: 'var(--text-xs)', fontWeight: 700 }}>
+//                     Current Plan
+//                   </div>
+//                 ) : (
+//                   <button
+//                     onClick={() => isUpgrade ? handleUpgrade(plan) : setConfirmModal({ type: 'downgrade', targetPlan: plan })}
+//                     disabled={!!actionLoading}
+//                     style={{ padding: 'var(--space-2)', background: isUpgrade ? 'var(--accent)' : 'transparent', color: isUpgrade ? '#fff' : 'var(--text-muted)', border: `1px solid ${isUpgrade ? 'var(--accent)' : 'var(--border)'}`, borderRadius: 'var(--radius-md)', fontWeight: 700, fontSize: 'var(--text-sm)', cursor: actionLoading ? 'not-allowed' : 'pointer', opacity: actionLoading ? 0.6 : 1, fontFamily: 'inherit' }}
+//                   >
+//                     {actionLoading === plan ? 'Processing…' : isUpgrade ? `Upgrade to ${d.name} →` : `Downgrade to ${d.name}`}
+//                   </button>
+//                 )}
+//               </div>
+//             );
+//           })}
+//         </div>
+//
+//         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginTop: 'var(--space-5)', paddingTop: 'var(--space-4)', borderTop: '1px solid var(--border)' }}>
+//           <ShieldCheck size={14} style={{ color: 'var(--text-muted)', flexShrink: 0 }} aria-hidden="true" />
+//           <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>
+//             Payments are processed securely by Razorpay. Billed monthly in INR · cancel anytime.
+//           </span>
+//         </div>
+//       </div>
+//
+//       {/* Card 3 — Payment Method */}
+//       <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl)', padding: 'var(--space-6)' }}>
+//         <h3 style={{ fontSize: 'var(--text-md)', fontWeight: 700, color: 'var(--text-primary)', marginBottom: 'var(--space-4)' }}>Payment Method</h3>
+//         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 'var(--space-3)' }}>
+//           <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)' }}>
+//             {status?.subscription_id
+//               ? 'Payment method on file via Razorpay.'
+//               : 'No payment method on file.'}
+//           </p>
+//           {status?.subscription_id && (
+//             <a
+//               href="https://payments.razorpay.com"
+//               target="_blank"
+//               rel="noopener noreferrer"
+//               style={{ fontSize: 'var(--text-sm)', color: 'var(--accent)', fontWeight: 600, textDecoration: 'none' }}
+//             >
+//               Update payment method →
+//             </a>
+//           )}
+//         </div>
+//       </div>
+//
+//       {/* Confirm Modal for cancel/downgrade */}
+//       {confirmModal && (
+//         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 'var(--space-4)' }}
+//           onClick={() => setConfirmModal(null)}>
+//           <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl)', padding: 'var(--space-6)', maxWidth: 400, width: '100%' }}
+//             onClick={e => e.stopPropagation()}>
+//             <h3 style={{ fontWeight: 700, color: 'var(--text-primary)', marginBottom: 'var(--space-3)' }}>
+//               {confirmModal.type === 'cancel' ? 'Cancel Subscription?' : `Downgrade to ${PLAN_DISPLAY[confirmModal.targetPlan]?.name}?`}
+//             </h3>
+//             <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)', lineHeight: 1.6, marginBottom: 'var(--space-5)' }}>
+//               {confirmModal.type === 'cancel'
+//                 ? `Your ${PLAN_DISPLAY[currentPlan]?.name} plan will stay active until the end of your billing period. After that, your account switches to the Basic plan. Your existing data remains accessible — you just won't be able to add new records beyond Basic limits.`
+//                 : `You will lose access to ${PLAN_DISPLAY[currentPlan]?.name} features. The change takes effect at the next billing cycle.`}
+//             </p>
+//             <div style={{ display: 'flex', gap: 'var(--space-3)', justifyContent: 'flex-end' }}>
+//               <button onClick={() => setConfirmModal(null)} style={{ padding: 'var(--space-2) var(--space-4)', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', cursor: 'pointer', fontWeight: 600, fontSize: 'var(--text-sm)', color: 'var(--text-body)', fontFamily: 'inherit' }}>
+//                 Keep my subscription
+//               </button>
+//               <button
+//                 onClick={confirmModal.type === 'cancel' ? handleCancel : () => handleUpgrade(confirmModal.targetPlan)}
+//                 disabled={!!actionLoading}
+//                 style={{ padding: 'var(--space-2) var(--space-4)', background: 'var(--danger, #ef4444)', color: '#fff', border: 'none', borderRadius: 'var(--radius-md)', cursor: 'pointer', fontWeight: 700, fontSize: 'var(--text-sm)', fontFamily: 'inherit' }}
+//               >
+//                 {confirmModal.type === 'cancel' ? 'Cancel subscription' : 'Confirm downgrade'}
+//               </button>
+//             </div>
+//           </div>
+//         </div>
+//       )}
+//     </div>
+//   );
+// }
 
-  const fetchStatus = useCallback(async () => {
-    try {
-      const res = await api.get('/payments/status');
-      setStatus(res.data);
-    } catch {
-      // Use user data as fallback
-      setStatus({ plan: user?.plan, trial_ends_at: user?.trial_ends_at, subscription_ends_at: null });
-    } finally {
-      setLoading(false);
-    }
-  }, [user]);
-
-  useEffect(() => { fetchStatus(); }, [fetchStatus]);
-
-  const currentPlan = status?.plan || user?.plan || 'basic';
-  const currentLevel = PLAN_HIERARCHY[currentPlan] ?? 0;
-
-  // After the user authorizes payment, the plan is activated by the Razorpay
-  // `subscription.charged` webhook — which can lag a few seconds. Re-check status
-  // a handful of times so the UI reflects the new plan without a manual refresh.
-  const pollForActivation = useCallback(async (tries = 0) => {
-    try {
-      const res = await api.get('/payments/status');
-      setStatus(res.data);
-      if (['starter', 'pro', 'business'].includes(res.data?.plan)) {
-        onPlanChange?.();
-        return true;
-      }
-    } catch { /* keep polling */ }
-    if (tries >= 4) return false;
-    await new Promise(r => setTimeout(r, 2500));
-    return pollForActivation(tries + 1);
-  }, [onPlanChange]);
-
-  const handleUpgrade = async (targetPlan) => {
-    setActionLoading(targetPlan);
-    setConfirmModal(null);
-    const d = PLAN_DISPLAY[targetPlan];
-    const isPaidNow = ['starter', 'pro', 'business'].includes(currentPlan);
-
-    try {
-      // 1. Ask the backend to create (or switch to) the Razorpay subscription.
-      //    Both endpoints return { subscriptionId } for the checkout step.
-      const endpoint = isPaidNow && currentPlan !== targetPlan
-        ? '/payments/change-plan'
-        : '/payments/create-subscription';
-      const res = await api.post(endpoint, { plan: targetPlan, period: 'monthly' });
-      const subscriptionId = res.data?.subscriptionId;
-
-      // change-plan may take effect next cycle without a fresh authorization step
-      if (!subscriptionId) {
-        toast.success(res.data?.message || `Plan change to ${d?.name} initiated. Takes effect next billing cycle.`);
-        await fetchStatus();
-        onPlanChange?.();
-        setActionLoading('');
-        return;
-      }
-
-      // 2. Open Razorpay Checkout to authorize the subscription.
-      await openSubscriptionCheckout({
-        subscriptionId,
-        planName: d?.name || targetPlan,
-        amount: d?.price || 0,
-        user,
-        onSuccess: async () => {
-          toast.info('Payment authorized — activating your plan…');
-          const activated = await pollForActivation();
-          toast.success(
-            activated
-              ? `You're now on the ${d?.name} plan.`
-              : 'Payment received. Your plan will activate in a moment — refresh if it doesn\'t update.'
-          );
-          await fetchStatus();
-          onPlanChange?.();
-          setActionLoading('');
-        },
-        onDismiss: () => {
-          toast.error('Payment cancelled — your plan was not changed.');
-          setActionLoading('');
-        },
-        onError: (msg) => {
-          toast.error(msg);
-          setActionLoading('');
-        },
-      });
-    } catch (e) {
-      toast.error(e.response?.data?.message || 'Failed to start the upgrade. Please try again.');
-      setActionLoading('');
-    }
-  };
-
-  const handleCancel = async () => {
-    setActionLoading('cancel');
-    try {
-      await api.post('/payments/cancel');
-      toast.success('Subscription will cancel at end of billing period.');
-      await fetchStatus();
-    } catch (e) {
-      toast.error(e.response?.data?.message || 'Failed to cancel subscription');
-    } finally {
-      setActionLoading('');
-      setConfirmModal(null);
-    }
-  };
-
-  const handleReactivate = async () => {
-    setActionLoading('reactivate');
-    try {
-      await api.post('/payments/reactivate');
-      toast.success('Subscription reactivated successfully.');
-      await fetchStatus();
-    } catch (e) {
-      toast.error(e.response?.data?.message || 'Failed to reactivate');
-    } finally {
-      setActionLoading('');
-    }
-  };
-
-  const trialDaysLeft = () => {
-    if (!status?.trial_ends_at) return 0;
-    return Math.max(0, Math.ceil((new Date(status.trial_ends_at) - new Date()) / 86400000));
-  };
-
-  const isTrialActive = currentPlan === 'trial' && trialDaysLeft() > 0;
-
-  const planStatusText = () => {
-    if (isTrialActive) return `Trial · ${trialDaysLeft()} days remaining`;
-    if (currentPlan === 'basic') return 'Basic plan · Limited access';
-    if (status?.subscription_ends_at) {
-      const d = new Date(status.subscription_ends_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
-      return `Active · renews ${d}`;
-    }
-    return 'Active';
-  };
-
-  if (loading) {
-    return <div style={{ padding: 'var(--space-6)', color: 'var(--text-muted)', fontSize: 'var(--text-sm)' }}>Loading billing info…</div>;
-  }
+function BillingSection({ user }) {
+  const { openRequest, isPending, request } = usePremiumRequest();
+  const currentPlan = user?.plan || 'basic';
+  const daysLeft = user?.trial_ends_at
+    ? Math.max(0, Math.ceil((new Date(user.trial_ends_at) - new Date()) / 86400000))
+    : 0;
+  const hasPro = currentPlan === 'trial' ? daysLeft > 0 : ['starter', 'pro', 'business'].includes(currentPlan);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }}>
-
-      {/* Card 1 — Current Plan Status */}
+      {/* Current plan */}
       <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl)', padding: 'var(--space-6)' }}>
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 'var(--space-4)', flexWrap: 'wrap' }}>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', marginBottom: 'var(--space-2)' }}>
-              <span style={{ fontSize: 'var(--text-lg)', fontWeight: 700, color: 'var(--text-primary)' }}>
-                {PLAN_DISPLAY[currentPlan]?.name || 'Basic'} Plan
-              </span>
-              <span style={{ padding: '2px 10px', background: isTrialActive ? 'rgba(232,146,26,0.15)' : 'var(--surface-2)', color: isTrialActive ? 'var(--accent)' : 'var(--text-muted)', borderRadius: 'var(--radius-full)', fontSize: 'var(--text-xs)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                {planStatusText()}
-              </span>
-            </div>
-            {PLAN_DISPLAY[currentPlan]?.price > 0 && (
-              <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)' }}>
-                ₹{PLAN_DISPLAY[currentPlan].price.toLocaleString('en-IN')}/month · billed monthly
-              </p>
-            )}
-            {isTrialActive && (
-              <p style={{ fontSize: 'var(--text-sm)', color: 'var(--accent)', fontWeight: 600, marginTop: 'var(--space-2)' }}>
-                ⚠ Upgrade before your trial ends to keep access to all features
-              </p>
-            )}
-          </div>
-          <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
-            {['starter', 'pro', 'business'].includes(currentPlan) && (
-              <button
-                onClick={() => setConfirmModal({ type: 'cancel' })}
-                disabled={actionLoading === 'cancel'}
-                style={{ padding: 'var(--space-2) var(--space-4)', background: 'transparent', border: '1px solid var(--danger)', color: 'var(--danger-text, #ef4444)', borderRadius: 'var(--radius-md)', cursor: 'pointer', fontSize: 'var(--text-sm)', fontWeight: 600 }}
-              >
-                Cancel subscription
-              </button>
-            )}
-            {status?.subscription_ends_at && !['starter', 'pro', 'business'].includes(currentPlan) && (
-              <button
-                onClick={handleReactivate}
-                disabled={actionLoading === 'reactivate'}
-                style={{ padding: 'var(--space-2) var(--space-4)', background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 'var(--radius-md)', cursor: 'pointer', fontSize: 'var(--text-sm)', fontWeight: 600 }}
-              >
-                {actionLoading === 'reactivate' ? 'Reactivating…' : 'Reactivate'}
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Card 2 — Choose/Change Plan */}
-      <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl)', padding: 'var(--space-6)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-5)', flexWrap: 'wrap', gap: 'var(--space-3)' }}>
-          <h3 style={{ fontSize: 'var(--text-md)', fontWeight: 700, color: 'var(--text-primary)' }}>
-            {['starter', 'pro', 'business'].includes(currentPlan) ? 'Change Plan' : 'Choose a Plan'}
-          </h3>
-          {/* Monthly / Annual toggle — annual billing not wired to Razorpay yet (monthly plans only) */}
-          <div style={{ display: 'inline-flex', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 'var(--radius-full)', padding: 3, gap: 2 }}>
-            {[{ label: 'Monthly', val: false, disabled: false }, { label: 'Annual · soon', val: true, disabled: true }].map(opt => (
-              <button
-                key={String(opt.val)}
-                onClick={() => { if (!opt.disabled) setAnnual(opt.val); }}
-                disabled={opt.disabled}
-                title={opt.disabled ? 'Annual billing is coming soon' : undefined}
-                style={{ padding: 'var(--space-1) var(--space-3)', borderRadius: 'var(--radius-full)', fontWeight: 600, fontSize: 'var(--text-xs)', border: 'none', cursor: opt.disabled ? 'not-allowed' : 'pointer', background: annual === opt.val ? 'var(--accent)' : 'transparent', color: annual === opt.val ? '#fff' : 'var(--text-muted)', opacity: opt.disabled ? 0.45 : 1, fontFamily: 'inherit' }}
-              >
-                {opt.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 'var(--space-4)' }}>
-          {['starter', 'pro', 'business'].map(plan => {
-            const d = PLAN_DISPLAY[plan];
-            const price = annual ? d.annualPrice : d.price;
-            const targetLevel = PLAN_HIERARCHY[plan] ?? 0;
-            const isCurrentPlan = plan === currentPlan;
-            const isUpgrade = targetLevel > currentLevel;
-
-            return (
-              <div key={plan} style={{ border: `1px solid ${isCurrentPlan ? 'var(--accent)' : 'var(--border)'}`, borderRadius: 'var(--radius-xl)', padding: 'var(--space-5)', display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', position: 'relative' }}>
-                {plan === 'pro' && !isCurrentPlan && (
-                  <div style={{ position: 'absolute', top: -12, left: '50%', transform: 'translateX(-50%)', background: 'var(--accent)', color: '#fff', padding: '2px 12px', borderRadius: 'var(--radius-full)', fontSize: 'var(--text-xs)', fontWeight: 700, whiteSpace: 'nowrap' }}>
-                    Most Popular
-                  </div>
-                )}
-                <div>
-                  <p style={{ fontWeight: 700, color: 'var(--text-primary)', marginBottom: 'var(--space-1)' }}>{d.name}</p>
-                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 'var(--space-1)' }}>
-                    <span style={{ fontSize: 'var(--text-xl)', fontWeight: 700, color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>₹{price.toLocaleString('en-IN')}</span>
-                    <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>/month</span>
-                  </div>
-                  {annual && <p style={{ fontSize: 'var(--text-xs)', color: 'var(--success-text, #22c55e)', fontWeight: 600 }}>Save ₹{((d.price - d.annualPrice) * 12).toLocaleString('en-IN')}/year</p>}
-                </div>
-                <ul style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', listStyle: 'none', padding: 0, margin: 0 }}>
-                  {(UPGRADE_FEATURES[plan] || []).map(f => (
-                    <li key={f} style={{ fontSize: 'var(--text-xs)', color: 'var(--text-body)', display: 'flex', gap: 'var(--space-2)', alignItems: 'flex-start' }}>
-                      <span style={{ color: 'var(--success, #22c55e)', flexShrink: 0, marginTop: 1 }}>✓</span> {f}
-                    </li>
-                  ))}
-                </ul>
-                {isCurrentPlan ? (
-                  <div style={{ textAlign: 'center', padding: 'var(--space-2)', background: 'rgba(232,146,26,0.1)', color: 'var(--accent)', borderRadius: 'var(--radius-md)', fontSize: 'var(--text-xs)', fontWeight: 700 }}>
-                    Current Plan
-                  </div>
-                ) : (
-                  <button
-                    onClick={() => isUpgrade ? handleUpgrade(plan) : setConfirmModal({ type: 'downgrade', targetPlan: plan })}
-                    disabled={!!actionLoading}
-                    style={{ padding: 'var(--space-2)', background: isUpgrade ? 'var(--accent)' : 'transparent', color: isUpgrade ? '#fff' : 'var(--text-muted)', border: `1px solid ${isUpgrade ? 'var(--accent)' : 'var(--border)'}`, borderRadius: 'var(--radius-md)', fontWeight: 700, fontSize: 'var(--text-sm)', cursor: actionLoading ? 'not-allowed' : 'pointer', opacity: actionLoading ? 0.6 : 1, fontFamily: 'inherit' }}
-                  >
-                    {actionLoading === plan ? 'Processing…' : isUpgrade ? `Upgrade to ${d.name} →` : `Downgrade to ${d.name}`}
-                  </button>
-                )}
-              </div>
-            );
-          })}
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginTop: 'var(--space-5)', paddingTop: 'var(--space-4)', borderTop: '1px solid var(--border)' }}>
-          <ShieldCheck size={14} style={{ color: 'var(--text-muted)', flexShrink: 0 }} aria-hidden="true" />
-          <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>
-            Payments are processed securely by Razorpay. Billed monthly in INR · cancel anytime.
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', flexWrap: 'wrap' }}>
+          <span style={{ fontSize: 'var(--text-lg)', fontWeight: 700, color: 'var(--text-primary)' }}>
+            {currentPlan === 'trial' ? 'Pro' : (PLAN_DISPLAY[currentPlan]?.name || 'Basic')} Plan
+          </span>
+          <span style={{ padding: '2px 10px', background: hasPro ? 'var(--accent-dim)' : 'var(--surface-2)', color: hasPro ? 'var(--accent)' : 'var(--text-muted)', borderRadius: 'var(--radius-full)', fontSize: 'var(--text-xs)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+            {currentPlan === 'trial' && daysLeft > 0 ? `Pro access · ${daysLeft} days left` : hasPro ? 'Active' : 'Free forever'}
           </span>
         </div>
+        <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)', marginTop: 'var(--space-2)' }}>
+          {hasPro
+            ? 'You have full Pro access.'
+            : 'Unlimited GST invoices (with Kcretio watermark), TDS tracker (10 entries), March advance tax reminder.'}
+        </p>
       </div>
 
-      {/* Card 3 — Payment Method */}
-      <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl)', padding: 'var(--space-6)' }}>
-        <h3 style={{ fontSize: 'var(--text-md)', fontWeight: 700, color: 'var(--text-primary)', marginBottom: 'var(--space-4)' }}>Payment Method</h3>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 'var(--space-3)' }}>
-          <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)' }}>
-            {status?.subscription_id
-              ? 'Payment method on file via Razorpay.'
-              : 'No payment method on file.'}
-          </p>
-          {status?.subscription_id && (
-            <a
-              href="https://payments.razorpay.com"
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{ fontSize: 'var(--text-sm)', color: 'var(--accent)', fontWeight: 600, textDecoration: 'none' }}
-            >
-              Update payment method →
-            </a>
-          )}
-        </div>
-      </div>
-
-      {/* Confirm Modal for cancel/downgrade */}
-      {confirmModal && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 'var(--space-4)' }}
-          onClick={() => setConfirmModal(null)}>
-          <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl)', padding: 'var(--space-6)', maxWidth: 400, width: '100%' }}
-            onClick={e => e.stopPropagation()}>
-            <h3 style={{ fontWeight: 700, color: 'var(--text-primary)', marginBottom: 'var(--space-3)' }}>
-              {confirmModal.type === 'cancel' ? 'Cancel Subscription?' : `Downgrade to ${PLAN_DISPLAY[confirmModal.targetPlan]?.name}?`}
-            </h3>
-            <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)', lineHeight: 1.6, marginBottom: 'var(--space-5)' }}>
-              {confirmModal.type === 'cancel'
-                ? `Your ${PLAN_DISPLAY[currentPlan]?.name} plan will stay active until the end of your billing period. After that, your account switches to the Free plan. Your existing data remains accessible — you just won't be able to add new records beyond Free limits.`
-                : `You will lose access to ${PLAN_DISPLAY[currentPlan]?.name} features. The change takes effect at the next billing cycle.`}
+      {/* Request premium */}
+      {!hasPro && (
+        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl)', padding: 'var(--space-6)', display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+          <h3 style={{ fontSize: 'var(--text-md)', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>Request 28 days of Pro — free</h3>
+          <ul style={{ margin: 0, paddingLeft: 'var(--space-5)', fontSize: 'var(--text-sm)', color: 'var(--text-body)', display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
+            {UPGRADE_FEATURES.pro.concat(UPGRADE_FEATURES.starter).filter(f => f !== 'Everything in Starter').map(f => <li key={f}>{f}</li>)}
+          </ul>
+          <button
+            type="button"
+            onClick={openRequest}
+            disabled={isPending}
+            style={{ alignSelf: 'flex-start', padding: 'var(--space-2) var(--space-5)', background: isPending ? 'var(--border-2)' : 'var(--accent)', color: '#fff', border: 'none', borderRadius: 'var(--radius-md)', cursor: isPending ? 'default' : 'pointer', fontSize: 'var(--text-sm)', fontWeight: 600, fontFamily: 'inherit' }}
+          >
+            {isPending ? 'Request pending review' : 'Request premium access →'}
+          </button>
+          {isPending && request?.created_at && (
+            <p style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', margin: 0 }}>
+              Requested on {new Date(request.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}. We’ll email you once it’s approved.
             </p>
-            <div style={{ display: 'flex', gap: 'var(--space-3)', justifyContent: 'flex-end' }}>
-              <button onClick={() => setConfirmModal(null)} style={{ padding: 'var(--space-2) var(--space-4)', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', cursor: 'pointer', fontWeight: 600, fontSize: 'var(--text-sm)', color: 'var(--text-body)', fontFamily: 'inherit' }}>
-                Keep my subscription
-              </button>
-              <button
-                onClick={confirmModal.type === 'cancel' ? handleCancel : () => handleUpgrade(confirmModal.targetPlan)}
-                disabled={!!actionLoading}
-                style={{ padding: 'var(--space-2) var(--space-4)', background: 'var(--danger, #ef4444)', color: '#fff', border: 'none', borderRadius: 'var(--radius-md)', cursor: 'pointer', fontWeight: 700, fontSize: 'var(--text-sm)', fontFamily: 'inherit' }}
-              >
-                {confirmModal.type === 'cancel' ? 'Cancel subscription' : 'Confirm downgrade'}
-              </button>
-            </div>
-          </div>
+          )}
         </div>
       )}
     </div>
@@ -1072,11 +1198,11 @@ function ExportSection({ user }) {
   async function download() {
     setDownloading(true);
     try {
-      const res = await api.get(`/export/annual?fy=${selectedFY}`, { responseType: 'blob' });
+      const res = await api.get(`/export/annual?fy=${selectedFY}`, { responseType: 'blob', timeout: 120000 });
       const url = URL.createObjectURL(res.data);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `kcreatio-${selectedFY}.zip`;
+      a.download = `kcretio-${selectedFY}.zip`;
       a.click();
       URL.revokeObjectURL(url);
       toast.success('Export downloaded');
@@ -1093,7 +1219,7 @@ function ExportSection({ user }) {
       </p>
       {!isPro && (
         <div style={{ padding: 'var(--space-3) var(--space-4)', background: 'var(--warning-dim)', border: '1px solid var(--warning)', borderRadius: 'var(--radius-md)', fontSize: 'var(--text-sm)', color: 'var(--warning-text)', marginBottom: 'var(--space-4)' }}>
-          CA Export is a Pro plan feature. Upgrade to download your annual summary.
+          CA Export is a Pro feature. Request premium access in Billing to download your annual summary.
         </div>
       )}
       <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>

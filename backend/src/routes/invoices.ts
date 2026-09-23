@@ -1,5 +1,6 @@
 import { Router, Response } from 'express';
 import { z } from 'zod';
+import rateLimit from 'express-rate-limit';
 import { supabase } from '../lib/supabase.js';
 import { authenticate, AuthRequest } from '../middleware/auth.js';
 import { validateBody } from '../middleware/validateBody.js';
@@ -12,11 +13,31 @@ import {
   CREATOR_GST_CONFIG,
 } from '../services/invoiceService.js';
 import { generateInvoicePdf } from '../services/pdfService.js';
+import { generateInvoicePdfWithPuppeteer, warmBrowser } from '../services/puppeteerPdfService.js';
 import { PLAN_LIMITS, Plan } from '../config/plans.js';
 
 const router = Router();
 
 const GSTIN_REGEX = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
+const DATA_URL_REGEX = /^data:image\/(png|jpeg|gif|webp|svg\+xml);base64,[A-Za-z0-9+/]+=*$/;
+
+function isValidImageField(val: string | undefined | null): boolean {
+  if (!val) return true;
+  if (DATA_URL_REGEX.test(val)) return true;
+  const supabaseUrl = process.env.SUPABASE_URL || '';
+  return supabaseUrl.length > 0 &&
+    val.startsWith(supabaseUrl) &&
+    val.includes('/storage/v1/object/public/invoice-signatures/');
+}
+
+const pdfRateLimit = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 20,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  keyGenerator: (req) => (req as AuthRequest).userId || 'anonymous',
+  message: { error: 'RATE_LIMITED', message: 'PDF generation limit reached — please try again in an hour' },
+});
 
 // ── Public route: payment confirmation by brand ──────────────────────────────
 // Must be defined BEFORE router.use(authenticate) to skip auth middleware
@@ -83,6 +104,9 @@ const CreateInvoiceSchema = z.object({
   reverseCharge: z.enum(['Yes', 'No']).default('No'),
   templateId: z.string().max(20).default('classic'),
   paymentTerms: z.string().max(100).default('Net 30'),
+  purchaseOrderNumber: z.string().max(100).optional(),
+  discountValue: z.number().min(0).optional(),
+  discountType: z.enum(['flat', 'percent']).optional(),
   // Bank details
   includeBankDetails: z.boolean().default(false),
   bankName: z.string().max(100).optional(),
@@ -96,14 +120,22 @@ const CreateInvoiceSchema = z.object({
   // Signatory
   includeSignatory: z.boolean().default(false),
   signatoryName: z.string().max(200).optional(),
-  signatoryImageUrl: z.string().optional(),
+  signatoryImageUrl: z.string().optional().refine(isValidImageField, { message: 'signatoryImageUrl must be a base64 data URL or Supabase storage URL' }),
   sellerBusinessName: z.string().max(200).optional(),
   // Contact fields
   brandEmail: z.string().email().optional().or(z.literal('')),
   brandPhone: z.string().max(20).optional(),
   // UPI QR
   includeUpi: z.boolean().default(false),
-  upiScannerUrl: z.string().optional(),
+  upiScannerUrl: z.string().optional().refine(isValidImageField, { message: 'upiScannerUrl must be a base64 data URL or Supabase storage URL' }),
+  // Accent color override
+  invoiceAccentColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional().nullable(),
+});
+
+// GET /invoices/warm — pre-warms Puppeteer browser (called on page load from frontend)
+router.get('/warm', async (_req: AuthRequest, res: Response): Promise<void> => {
+  warmBrowser().catch(() => {});
+  res.json({ ok: true });
 });
 
 // GET /invoices/next-number — must come before /:id routes
@@ -115,35 +147,61 @@ router.get('/next-number', async (req: AuthRequest, res: Response): Promise<void
   const fyCode = getFYCode(fy);
   const prefix = user.invoice_prefix || 'INV';
 
-  const { count } = await supabase
-    .from('invoices')
-    .select('id', { count: 'exact', head: true })
-    .eq('user_id', req.userId!)
-    .like('invoice_number', `${prefix}/${fyCode}/%`);
+  res.json({ invoiceNumber: await nextInvoiceNumber(req.userId!, prefix, fyCode) });
+});
 
-  const nextSeq = String((count || 0) + 1).padStart(4, '0');
-  res.json({ invoiceNumber: `${prefix}/${fyCode}/${nextSeq}` });
+// GET /invoices/brands — distinct past brands for party picker
+router.get('/brands', async (req: AuthRequest, res: Response): Promise<void> => {
+  const { data } = await supabase
+    .from('invoices')
+    .select('brand_name, brand_gstin, brand_address, brand_state_code, brand_pan, brand_email, brand_phone')
+    .eq('user_id', req.userId!)
+    .not('brand_name', 'is', null)
+    .order('created_at', { ascending: false })
+    .limit(200);
+
+  if (!data) { res.json({ brands: [] }); return; }
+
+  // Deduplicate by brand_name (keep most recent)
+  const seen = new Set<string>();
+  const brands = data.filter(b => {
+    const key = (b.brand_name || '').toLowerCase().trim();
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  }).slice(0, 50);
+
+  res.json({ brands });
 });
 
 // GET /invoices
 router.get('/', async (req: AuthRequest, res: Response): Promise<void> => {
-  const { status, fy, page = '1', limit = '20' } = req.query as Record<string, string>;
-  const offset = (parseInt(page) - 1) * parseInt(limit);
+  const { status, fy, search, sort, dir, page = '1', limit = '20', offset: offsetParam } = req.query as Record<string, string>;
+  const lim = Math.min(Math.max(parseInt(limit) || 20, 1), 100);
+  const offset = offsetParam !== undefined ? Math.max(parseInt(offsetParam) || 0, 0) : (Math.max(parseInt(page) || 1, 1) - 1) * lim;
+  const SORTABLE = ['invoice_number', 'brand_name', 'base_amount', 'total_amount', 'status', 'invoice_date', 'created_at'];
+  const sortCol = SORTABLE.includes(sort) ? sort : 'created_at';
 
   let query = supabase
     .from('invoices')
     .select('*', { count: 'exact' })
     .eq('user_id', req.userId!)
+    .order(sortCol, { ascending: dir === 'asc' })
     .order('created_at', { ascending: false })
-    .range(offset, offset + parseInt(limit) - 1);
+    .range(offset, offset + lim - 1);
 
-  if (status) query = query.eq('status', status);
+  if (status && ['draft', 'sent', 'paid', 'overdue'].includes(status)) query = query.eq('status', status);
   if (fy) query = query.eq('financial_year', fy);
+  if (search && search.trim()) {
+    // Strip characters that would break PostgREST's or() filter syntax
+    const term = search.trim().slice(0, 100).replace(/[,()*%\\]/g, ' ');
+    query = query.or(`brand_name.ilike.%${term}%,invoice_number.ilike.%${term}%`);
+  }
 
   const { data, error, count } = await query;
   if (error) { res.status(500).json({ error: 'INTERNAL_ERROR', message: error.message }); return; }
 
-  res.json({ invoices: data, total: count, page: parseInt(page), limit: parseInt(limit) });
+  res.json({ invoices: data, total: count, limit: lim, offset });
 });
 
 // POST /invoices
@@ -171,26 +229,26 @@ router.post('/', validateBody(CreateInvoiceSchema), async (req: AuthRequest, res
   const user = await getUser(req.userId!);
   if (!user) { res.status(404).json({ error: 'NOT_FOUND', message: 'User not found' }); return; }
 
-  // Invoice monthly quota (free: 5/month)
-  if (limits.invoices_monthly !== null) {
-    const startOfMonth = new Date();
-    startOfMonth.setDate(1);
-    startOfMonth.setHours(0, 0, 0, 0);
-    const { count } = await supabase
-      .from('invoices')
-      .select('id', { count: 'exact', head: true })
-      .eq('user_id', req.userId!)
-      .gte('created_at', startOfMonth.toISOString());
-    if ((count ?? 0) >= limits.invoices_monthly) {
-      res.status(403).json({
-        error: 'QUOTA_EXCEEDED',
-        message: `Free plan allows ${limits.invoices_monthly} invoices per month. Upgrade to Starter for unlimited invoices.`,
-        required_plan: 'starter',
-        quota: { limit: limits.invoices_monthly, used: count, feature: 'invoices_monthly' },
-      });
-      return;
-    }
-  }
+  // Invoice monthly quota — disabled: invoices are unlimited on every plan (Basic gets a watermarked PDF instead)
+  // if (limits.invoices_monthly !== null) {
+  //   const startOfMonth = new Date();
+  //   startOfMonth.setDate(1);
+  //   startOfMonth.setHours(0, 0, 0, 0);
+  //   const { count } = await supabase
+  //     .from('invoices')
+  //     .select('id', { count: 'exact', head: true })
+  //     .eq('user_id', req.userId!)
+  //     .gte('created_at', startOfMonth.toISOString());
+  //   if ((count ?? 0) >= limits.invoices_monthly) {
+  //     res.status(403).json({
+  //       error: 'QUOTA_EXCEEDED',
+  //       message: `Basic plan allows ${limits.invoices_monthly} invoices per month. Upgrade to Starter for unlimited invoices.`,
+  //       required_plan: 'starter',
+  //       quota: { limit: limits.invoices_monthly, used: count, feature: 'invoices_monthly' },
+  //     });
+  //     return;
+  //   }
+  // }
 
   // GSTIN state code cross-validation: first 2 digits must match brand's state code
   if (body.brandGstin && body.brandStateCode && body.brandGstin.slice(0, 2) !== body.brandStateCode) {
@@ -209,15 +267,7 @@ router.post('/', validateBody(CreateInvoiceSchema), async (req: AuthRequest, res
   const fyCode = getFYCode(fy);
   const prefix = user.invoice_prefix || 'INV';
 
-  // Get next sequence (atomic-ish — good enough for V1 solo user scale)
-  const { count } = await supabase
-    .from('invoices')
-    .select('id', { count: 'exact', head: true })
-    .eq('user_id', req.userId!)
-    .like('invoice_number', `${prefix}/${fyCode}/%`);
-
-  const seq = String((count || 0) + 1).padStart(4, '0');
-  const invoiceNumber = `${prefix}/${fyCode}/${seq}`;
+  let invoiceNumber = await nextInvoiceNumber(req.userId!, prefix, fyCode);
 
   const dueDate = body.dueDate || (() => {
     const d = new Date(body.invoiceDate + 'T00:00:00');
@@ -225,7 +275,7 @@ router.post('/', validateBody(CreateInvoiceSchema), async (req: AuthRequest, res
     return d.toISOString().split('T')[0];
   })();
 
-  const { data: invoice, error } = await supabase
+  const insertInvoice = () => supabase
     .from('invoices')
     .insert({
       user_id: req.userId!,
@@ -257,6 +307,9 @@ router.post('/', validateBody(CreateInvoiceSchema), async (req: AuthRequest, res
       reverse_charge: body.reverseCharge || 'No',
       template_id: body.templateId || 'classic',
       payment_terms: body.paymentTerms || 'Net 30',
+      purchase_order_number: body.purchaseOrderNumber || null,
+      discount_value: body.discountValue ?? null,
+      discount_type: body.discountType || null,
       // Bank details
       include_bank_details: body.includeBankDetails || false,
       bank_name: body.bankName || null,
@@ -278,9 +331,17 @@ router.post('/', validateBody(CreateInvoiceSchema), async (req: AuthRequest, res
       // UPI QR
       include_upi: body.includeUpi || false,
       upi_scanner_url: body.upiScannerUrl || null,
+      invoice_accent_color: body.invoiceAccentColor || null,
     })
     .select()
     .single();
+
+  let { data: invoice, error } = await insertInvoice();
+  // Unique (user_id, invoice_number) clash — e.g. two tabs saving at once — take the next number and retry
+  for (let attempt = 0; attempt < 3 && error?.code === '23505'; attempt++) {
+    invoiceNumber = await nextInvoiceNumber(req.userId!, prefix, fyCode);
+    ({ data: invoice, error } = await insertInvoice());
+  }
 
   if (error || !invoice) {
     res.status(500).json({ error: 'INTERNAL_ERROR', message: error?.message || 'Failed to create invoice' });
@@ -310,7 +371,7 @@ router.get('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
 });
 
 // GET /invoices/:id/pdf
-router.get('/:id/pdf', async (req: AuthRequest, res: Response): Promise<void> => {
+router.get('/:id/pdf', pdfRateLimit, async (req: AuthRequest, res: Response): Promise<void> => {
   const { data: invoice } = await supabase
     .from('invoices')
     .select('*')
@@ -324,43 +385,69 @@ router.get('/:id/pdf', async (req: AuthRequest, res: Response): Promise<void> =>
   if (!user) { res.status(404).json({ error: 'NOT_FOUND', message: 'User not found' }); return; }
 
   try {
-    const pdfBuffer = await generateInvoicePdf({
-      invoiceNumber: invoice.invoice_number,
-      invoiceDate: invoice.invoice_date,
-      dueDate: invoice.due_date,
-      seller: {
-        name: user.business_name || user.name,
-        gstin: user.gstin,
-        address: user.business_address,
-        stateCode: user.state_code,
-      },
-      buyer: {
-        name: invoice.brand_name,
-        gstin: invoice.brand_gstin,
-        address: invoice.brand_address,
-        stateCode: invoice.brand_state_code,
-      },
-      serviceDescription: invoice.service_description,
-      gst: {
-        baseAmount: invoice.base_amount,
-        gstRate: invoice.gst_rate,
-        gstAmount: invoice.gst_amount,
-        totalAmount: invoice.total_amount,
-        supplyType: invoice.supply_type,
-        cgstAmount: invoice.cgst_amount,
-        sgstAmount: invoice.sgst_amount,
-        igstAmount: invoice.igst_amount,
-      },
-      notes: invoice.notes,
-    });
+    const cacheKey = `${invoice.id}:${invoice.updated_at || invoice.created_at}`;
+    const pdfBuffer = await generateInvoicePdfWithPuppeteer(invoice, user, cacheKey, req.userPlan);
 
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="${invoice.invoice_number.replace(/\//g, '-')}.pdf"`);
     res.send(pdfBuffer);
-  } catch (err) {
-    console.error('PDF generation error:', err);
-    res.status(500).json({ error: 'INTERNAL_ERROR', message: 'Failed to generate PDF' });
+  } catch (puppeteerErr) {
+    console.warn('Puppeteer PDF failed, falling back to pdfmake:', puppeteerErr);
+    try {
+      const pdfBuffer = await generateInvoicePdf({
+        invoiceNumber: invoice.invoice_number,
+        invoiceDate: invoice.invoice_date,
+        dueDate: invoice.due_date,
+        seller: {
+          name: user.business_name || user.name,
+          gstin: user.gstin,
+          address: user.business_address,
+          stateCode: user.state_code,
+        },
+        buyer: {
+          name: invoice.brand_name,
+          gstin: invoice.brand_gstin,
+          address: invoice.brand_address,
+          stateCode: invoice.brand_state_code,
+        },
+        serviceDescription: invoice.service_description,
+        gst: {
+          baseAmount: invoice.base_amount,
+          gstRate: invoice.gst_rate,
+          gstAmount: invoice.gst_amount,
+          totalAmount: invoice.total_amount,
+          supplyType: invoice.supply_type,
+          cgstAmount: invoice.cgst_amount,
+          sgstAmount: invoice.sgst_amount,
+          igstAmount: invoice.igst_amount,
+        },
+        notes: invoice.notes,
+      });
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="${invoice.invoice_number.replace(/\//g, '-')}.pdf"`);
+      res.send(pdfBuffer);
+    } catch (err) {
+      console.error('PDF generation error:', err);
+      res.status(500).json({ error: 'INTERNAL_ERROR', message: 'Failed to generate PDF' });
+    }
   }
+});
+
+// GET /invoices/:id/export
+router.get('/:id/export', async (req: AuthRequest, res: Response): Promise<void> => {
+  const { data: invoice } = await supabase
+    .from('invoices')
+    .select('*')
+    .eq('id', req.params.id)
+    .eq('user_id', req.userId!)
+    .maybeSingle();
+
+  if (!invoice) { res.status(404).json({ error: 'NOT_FOUND', message: 'Invoice not found' }); return; }
+
+  const filename = `${(invoice.invoice_number || 'invoice').replace(/\//g, '-')}.json`;
+  res.setHeader('Content-Type', 'application/json');
+  res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+  res.json(invoice);
 });
 
 // PUT /invoices/:id
@@ -403,7 +490,8 @@ router.put('/:id', validateBody(CreateInvoiceSchema.partial()), async (req: Auth
     cgstAmount: 'cgst_amount', sgstAmount: 'sgst_amount', igstAmount: 'igst_amount',
     invoiceDate: 'invoice_date', dueDate: 'due_date', notes: 'notes',
     placeOfSupply: 'place_of_supply', reverseCharge: 'reverse_charge',
-    templateId: 'template_id', paymentTerms: 'payment_terms',
+    templateId: 'template_id', paymentTerms: 'payment_terms', purchaseOrderNumber: 'purchase_order_number',
+    discountValue: 'discount_value', discountType: 'discount_type',
     includeBankDetails: 'include_bank_details', bankName: 'bank_name',
     accountNumber: 'account_number', ifscCode: 'ifsc_code',
     accountHolderName: 'account_holder_name', upiId: 'upi_id',
@@ -411,10 +499,34 @@ router.put('/:id', validateBody(CreateInvoiceSchema.partial()), async (req: Auth
     includeTerms: 'include_terms', termsText: 'terms_text',
     includeSignatory: 'include_signatory', signatoryName: 'signatory_name',
     signatoryImageUrl: 'signatory_image_url', sellerBusinessName: 'seller_business_name',
+    invoiceAccentColor: 'invoice_accent_color',
   };
   for (const [camel, snake] of Object.entries(fieldMap)) {
     if (body[camel] !== undefined) updates[snake] = body[camel];
   }
+
+  // Amounts are always recomputed server-side — never trust client totals
+  if (body.baseAmount !== undefined || body.gstRate !== undefined || body.brandStateCode !== undefined) {
+    const { data: current } = await supabase
+      .from('invoices')
+      .select('base_amount, gst_rate, brand_state_code')
+      .eq('id', req.params.id)
+      .eq('user_id', req.userId!)
+      .maybeSingle();
+    const user = await getUser(req.userId!);
+    const gst = calculateGst(
+      body.baseAmount ?? Number(current?.base_amount),
+      body.gstRate ?? Number(current?.gst_rate),
+      user?.state_code || '',
+      body.brandStateCode ?? current?.brand_state_code,
+    );
+    Object.assign(updates, {
+      base_amount: gst.baseAmount, gst_rate: gst.gstRate, gst_amount: gst.gstAmount,
+      total_amount: gst.totalAmount, supply_type: gst.supplyType,
+      cgst_amount: gst.cgstAmount, sgst_amount: gst.sgstAmount, igst_amount: gst.igstAmount,
+    });
+  }
+  if (body.invoiceDate) updates.financial_year = getFinancialYear(new Date(body.invoiceDate));
 
   const { data, error } = await supabase
     .from('invoices')
@@ -452,6 +564,20 @@ router.delete('/:id', async (req: AuthRequest, res: Response): Promise<void> => 
   if (error) { res.status(500).json({ error: 'INTERNAL_ERROR', message: error.message }); return; }
   res.status(204).send();
 });
+
+// Next sequence = highest existing number in this prefix/FY + 1 (not a count — deleted drafts leave gaps)
+async function nextInvoiceNumber(userId: string, prefix: string, fyCode: string): Promise<string> {
+  const { data } = await supabase
+    .from('invoices')
+    .select('invoice_number')
+    .eq('user_id', userId)
+    .like('invoice_number', `${prefix}/${fyCode}/%`);
+  const maxSeq = (data || []).reduce((max, row) => {
+    const n = parseInt(String(row.invoice_number).split('/').pop() || '0', 10);
+    return Number.isFinite(n) && n > max ? n : max;
+  }, 0);
+  return `${prefix}/${fyCode}/${String(maxSeq + 1).padStart(4, '0')}`;
+}
 
 async function getUser(userId: string) {
   const { data } = await supabase
@@ -525,6 +651,21 @@ router.post('/:id/send', async (req: AuthRequest, res: Response): Promise<void> 
   } catch (err: any) {
     res.status(500).json({ error: 'EMAIL_FAILED', message: 'Failed to send email. Check your email configuration.', statusCode: 500 });
   }
+});
+
+// PATCH /invoices/:id/mark-paid — creator marks an invoice as paid
+router.patch('/:id/mark-paid', async (req: AuthRequest, res: Response): Promise<void> => {
+  const { data, error } = await supabase
+    .from('invoices')
+    .update({ status: 'paid', updated_at: new Date().toISOString() })
+    .eq('id', req.params.id)
+    .eq('user_id', req.userId!)
+    .neq('status', 'paid')
+    .select('id, status')
+    .maybeSingle();
+  if (error) { res.status(500).json({ error: 'INTERNAL_ERROR', message: error.message }); return; }
+  if (!data) { res.status(404).json({ error: 'NOT_FOUND', message: 'Invoice not found or already paid' }); return; }
+  res.json(data);
 });
 
 // POST /invoices/:id/payment-confirm-token — generate one-time brand confirmation link

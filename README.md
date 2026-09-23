@@ -1,4 +1,4 @@
-# Kcreatio
+# Kcretio
 
 > **"Generate GST-compliant invoices for brand deals in 30 seconds. Never miss a TDS deduction or advance tax deadline again."**
 
@@ -8,7 +8,7 @@ The financial operating system for Indian content creators.
 
 ## What This Is
 
-Kcreatio replaces the CA-visit-once-a-year panic cycle and the spreadsheet chaos with one product that handles:
+Kcretio replaces the CA-visit-once-a-year panic cycle and the spreadsheet chaos with one product that handles:
 
 - **GST Invoice Generation** — Rule 46-compliant invoices with auto-calculated CGST/SGST/IGST, correct SAC code (998399), and multiple template layouts
 - **TDS Tracking** — Log every deduction from every brand, track Form 16A status, reconcile at year-end
@@ -69,12 +69,16 @@ Indian creators earning ₹5L–₹50L/year face legally mandated business-grade
 
 ## Pricing
 
+> **Payments are currently disabled.** New users start on Basic and can request 28 days of free Pro access from inside the app. Each request is saved to the `premium_requests` table and emailed to `ADMIN_EMAIL` with a one-click Approve link. The paid tiers below are the planned pricing for later.
+
 | Plan | Price | Included |
 |------|-------|----------|
-| Basic | Free | 5 invoices/month, TDS tracker (10 entries), March advance tax reminder |
-| Starter | ₹299/month | Unlimited invoices + TDS, **Gmail Smart Inbox** (auto-detect payments/deals/TDS), manual email paste, invoice auto-overdue, deal stale alerts, smart invoice pre-fill from deal, full quarterly advance tax reminders |
+| Basic | Free | Unlimited invoices (PDFs carry a Kcretio watermark), TDS tracker (10 entries), March advance tax reminder |
+| Starter | ₹299/month | Watermark-free invoices, all templates, unlimited TDS, **Gmail Smart Inbox** (auto-detect payments/deals/TDS), manual email paste, invoice auto-overdue, deal stale alerts, smart invoice pre-fill from deal, full quarterly advance tax reminders |
 | Pro | ₹599/month | Everything in Starter + advance tax calculator, P&L dashboard, CA export, **auto-apply mode** (high-confidence detections apply without review), YouTube AdSense sync, WhatsApp notifications |
+<!-- Business plan paused for launch:
 | Business | ₹1,499/month | Everything + multi-creator (up to 5), white-label invoices, priority support |
+-->
 | Annual | 2 months free | Any plan, billed annually |
 
 **Unit economics at Pro (₹599/month):**
@@ -102,7 +106,7 @@ Indian creators earning ₹5L–₹50L/year face legally mandated business-grade
 1. **SEO content** (near-zero CAC) — "GST for YouTubers India", "TDS on brand deals", "advance tax for creators" — zero competition, high intent
 2. **CA Partner Program** — CAs refer creator clients, earn 20% recurring commission
 3. **Creator ambassador program** — 10 creators (50K–200K followers) get free lifetime Pro for honest feedback + organic mention
-4. **Invoice watermark viral loop** — "Created with Kcreatio" on every invoice sent to brands
+4. **Invoice watermark viral loop** — Basic invoices are unlimited but carry a faint Kcretio logo + "Kcretio.in" footer, so every free invoice sent to a brand markets the product
 5. **The March Effect** — India's financial year ends March 31. Every creator panics January–March. Peak acquisition season. Plan major feature launches and marketing spend for February–March.
 
 ---
@@ -144,14 +148,15 @@ Connect Gmail once. App scans every 6 hours for payment confirmations, brand dea
 **Completed:**
 - GST Invoice Generator — 7 templates (3 distinct layouts: Classic, Corporate, Minimal), multiple service lines, bank details, UPI QR, T&C, authorized signatory
 - Invoice Settings — saved bank accounts (up to 5), UPI IDs with QR scanner, T&C profiles, signatory with signature image upload
-- TDS Tracker
-- Advance Tax Planner (New Regime + Old Regime slabs)
+- TDS Tracker — log every deduction, track Form 16A status, reconcile at year-end
+- Advance Tax Planner — new regime + old regime slabs, Section 87A rebate, no standard deduction (creator income is professional, not salary), quarterly schedule
 - Brand Deals CRM (Kanban + list view)
 - Income Dashboard
 - Expenses
 - Settings — 3-card profile (avatar upload, personal info, business & tax), sticky nav
 - Landing Page with ChaosHero scroll animation
-- Auth — register, login, JWT in httpOnly cookies, 28-day trial, Razorpay subscription flow
+- Auth — register, login, JWT in httpOnly cookies
+- **Premium by request** — users request 28 days of Pro (features wanted + platform + follower count); admin gets an email with a signed Approve link. Razorpay subscription flow is built but commented out until paid plans launch
 - Dev bypass — full app works without Supabase for local testing
 - **Smart Inbox** — Gmail auto-scan for payments, deal confirmations, TDS deductions, subscription expenses; keyword classifier with confidence scoring; provenance info icon on every detection; email timestamp on every card
 - **Manual email paste** — paste any missed email → classifier analyses it → one-click confirm
@@ -159,9 +164,14 @@ Connect Gmail once. App scans every 6 hours for payment confirmations, brand dea
 - **Deal stale alerts** — scheduled nudge when a deal is stuck >14 days in the same stage
 - **Smart invoice pre-fill from deal** — navigate to new invoice with `deal_id` to auto-fill brand fields
 - **Bell badge** — TopBar bell shows live count of pending Smart Inbox items
+- **Tax Risk Calculator** (public, no account) — landing page widget that shows annual income → TDS deducted → amount received → ITR refund or advance tax owed. Uses actual new regime slabs + Section 87A rebate (FY 2025-26). Creators earning ≤ ₹12L/year see a green "₹X refund at ITR" banner instead of scary red numbers. Backed by `/api/v1/tax/quick-estimate` (no auth required).
+- **Invoice Compliance Panel** — sticky footer on the invoice form with live Rule 46 CGST compliance badges ("RULE 46 4/7" counters) and a blocking error list. Prevents non-compliant invoice saves.
+- **Net-in-Hand Breakdown** — below the Tax Calculation section on invoice form: shows exact amount brand pays, TDS deducted (10%), and net creator receives, with a Form 16A reminder.
+- **ITR Claimable Banner** — green callout at the top of the TDS page showing total TDS deducted for the FY and a reminder to collect Form 16A from all brands before filing.
+- **PDF watermark** — Basic plan PDFs carry a faint diagonal Kcretio logo and a "Kcretio.in — upgrade for watermark-free invoices" footer (Puppeteer server-side, same watermark in the client-side fallback). Starter and above get clean PDFs.
 
 **Pending (requires Supabase credentials):**
-- Run 11 DB migrations (see `SETUP.md`) — migrations 001–011
+- Run DB migrations 001–015 (see `SETUP.md`)
 - Create `invoice-signatures` storage bucket
 - Replace placeholder `.env` values with real Supabase URL + service_role_key
 
@@ -173,7 +183,9 @@ Connect Gmail once. App scans every 6 hours for payment confirmations, brand dea
 - GST filing integration (requires GSP license)
 - Mobile app (PWA first, then native)
 - Marketplace (brand-creator matching)
-- Agency/multi-creator management
+- Agency/multi-creator management (Business plan — paused for launch)
+- TDS section per deal (194J 10% vs 194C 1–2% vs 194R barter) — today every deal assumes 194J 10%
+- Section 44ADA presumptive scheme (single advance tax instalment by Mar 15)
 
 ---
 
@@ -202,7 +214,7 @@ Frontend details: [`frontend/README.md`](./frontend/README.md)
 npm run install:all
 
 # 2. Set up Supabase (see SETUP.md for full instructions)
-# Run 5 migrations in Supabase SQL Editor
+# Run migrations 001–015 in Supabase SQL Editor
 # Create 'invoice-signatures' storage bucket
 
 # 3. Configure backend/.env with real Supabase credentials

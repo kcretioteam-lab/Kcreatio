@@ -1,4 +1,4 @@
-# Kcreatio — Frontend
+# Kcretio — Frontend
 
 React 18 + Vite app for Indian content creators to manage GST invoices, TDS, brand deals, and advance tax planning.
 
@@ -25,7 +25,7 @@ src/
 │   └── useToast.jsx           # Toast notification hook
 ├── utils/
 │   ├── api.js                 # Axios instance (withCredentials, X-Dev-User-Id header)
-│   ├── formatINR.js           # Indian rupee formatter
+│   ├── formatINR.js           # Indian rupee formatter + amountInWords()
 │   └── planConfig.js          # Plan hierarchy, feature gates, limit helpers
 ├── components/
 │   ├── layout/
@@ -44,10 +44,11 @@ src/
 │           └── InvoiceList.jsx # Sortable table + view modal + actions
 └── pages/
     ├── LandingPage.jsx         # Public landing with ChaosHero scroll
-    ├── InvoicePage.jsx         # Create/edit/list invoices (all 3 views)
+    ├── LandingPageActs.jsx     # Landing page interactive sections: Tax Risk Calculator, feature demos
+    ├── InvoicePage.jsx         # Create/edit/list invoices (all 3 views, ~2200 lines)
     ├── SettingsPage.jsx        # Profile + Invoice Settings + Integrations (Smart Inbox settings)
     ├── DashboardPage.jsx       # Stats + Smart Inbox widget + charts + recent invoices
-    ├── TDSPage.jsx
+    ├── TDSPage.jsx             # TDS tracker with ITR claimable banner
     ├── TaxPlannerPage.jsx
     ├── DealsPage.jsx
     ├── IncomePage.jsx
@@ -214,6 +215,59 @@ The Smart Inbox is the automation layer for the app. It connects to Gmail, scans
 - `POST /api/v1/email-detections/paste` — classify a pasted email
 - `PUT /api/v1/email-detections/:id/accept` — create linked record
 - `PUT /api/v1/email-detections/:id/reject` — dismiss
+
+---
+
+## Tax Risk Calculator (Landing Page, Public)
+
+`LandingPageActs.jsx` — `TaxRiskCalculator` component. No auth required.
+
+Calls `GET /api/v1/tax/quick-estimate?monthly_income=X&brand_count=Y` and displays:
+
+**Part 1 — Money flow (3 cards):**
+- Annual income (neutral)
+- TDS brands deduct — red, "10% at source under 194J"
+- You actually receive — green, "paid into your account"
+
+**Part 2 — ITR outcome (conditional):**
+- `itrRefund > 0` → green banner "₹X refund when you file ITR" — the common case for creators earning ≤ ₹12L (Section 87A rebate eliminates income tax entirely)
+- `advanceTaxOwed > 0` → amber banner with Q2 deadline amount (45% cumulative by Sep 15)
+
+**Part 3 — Form 16A risk row:**
+- For 1-2 brands: percentage string ("80% chance of delay")
+- For 3+ brands: count string ("~2 of 5 brands likely late")
+
+The old calculator showed `estimatedTds × 0.45` as "advance tax due" — completely wrong math that scared users who should have seen a refund. This is now replaced with proper slab calculation and 87A rebate.
+
+---
+
+## Invoice Compliance Panel
+
+`InvoicePage.jsx` — `CompliancePanel` component, rendered as a sticky footer below the invoice form.
+
+Shows live Rule 46 CGST compliance badges: "RULE 46 4/7" style counter for how many required fields are filled. Blocks the Save button when mandatory GST fields are missing, surfacing a specific error list. Fields validated: supplier GSTIN/PAN/address, brand name/address/state code, place of supply, SAC code, service description.
+
+---
+
+## Net-in-Hand Breakdown
+
+`InvoicePage.jsx` — rendered below the Tax Calculation section.
+
+Shows:
+- Invoice total (what brand pays)
+- TDS deducted (10% under 194J, if applicable)
+- **Net you receive** = invoice total − TDS
+- Inline reminder: "Request Form 16A from brand to claim TDS at ITR"
+
+Only visible when invoice amount > 0.
+
+---
+
+## ITR Claimable Banner (TDS Page)
+
+`TDSPage.jsx` — green callout rendered at the top of the page (above summary cards) when `summary.totalDeducted > 0`.
+
+Shows total TDS deducted for the FY as "₹X claimable at ITR" with a note to collect Form 16A from all brands before filing.
 
 ---
 

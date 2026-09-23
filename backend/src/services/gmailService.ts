@@ -1,9 +1,9 @@
-import { google } from 'googleapis';
+import { gmail as createGmail } from '@googleapis/gmail';
+import { OAuth2Client } from 'google-auth-library';
 import { classifyEmail, ClassifierResult } from './emailClassifier.js';
 
 function getClient(accessToken: string, refreshToken?: string | null) {
-  // Use googleapis bundled OAuth2 to avoid version conflicts
-  const client = new google.auth.OAuth2(
+  const client = new OAuth2Client(
     process.env.GOOGLE_CLIENT_ID,
     process.env.GOOGLE_CLIENT_SECRET,
   );
@@ -64,7 +64,7 @@ export async function scanInbox(
   sinceDate?: Date,
 ): Promise<InboxScanResult[]> {
   const auth = getClient(accessToken, refreshToken);
-  const gmail = google.gmail({ version: 'v1', auth });
+  const gmail = createGmail({ version: 'v1', auth });
 
   // Build query: look for emails from the past 7 days (or since last scan)
   const daysBack = sinceDate
@@ -147,7 +147,7 @@ export async function scanForPayments(
   refreshToken?: string | null
 ): Promise<PaymentSignal[]> {
   const auth = getClient(accessToken, refreshToken);
-  const gmail = google.gmail({ version: 'v1', auth });
+  const gmail = createGmail({ version: 'v1', auth });
 
   const q = `(${BANK_PATTERNS.subjects.map(s => `subject:${s}`).join(' OR ')}) newer_than:30d`;
 
@@ -231,7 +231,7 @@ export async function sendViaGmail(
   }
 ) {
   const auth = getClient(accessToken, refreshToken);
-  const gmail = google.gmail({ version: 'v1', auth });
+  const gmail = createGmail({ version: 'v1', auth });
 
   const boundary = `boundary_${Date.now()}`;
   const from = opts.fromEmail ? `${opts.fromName || opts.fromEmail} <${opts.fromEmail}>` : (opts.fromName || '');

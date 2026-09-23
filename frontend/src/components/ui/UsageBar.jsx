@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { usePremiumRequest } from '../../hooks/usePremiumRequest.jsx';
 import { getRequiredPlan, PLAN_DISPLAY } from '../../utils/planConfig.js';
 
 /**
@@ -12,6 +13,7 @@ import { getRequiredPlan, PLAN_DISPLAY } from '../../utils/planConfig.js';
  *   upgradeText — CTA text shown when at limit (optional)
  */
 export default function UsageBar({ label, used, limit, upgradeText }) {
+  const { openRequest } = usePremiumRequest();
   if (limit === null || limit === undefined) return null;
 
   const percent = Math.min(100, Math.round((used / limit) * 100));
@@ -51,19 +53,22 @@ export default function UsageBar({ label, used, limit, upgradeText }) {
         }} />
       </div>
 
+      {/* Paid upgrade disabled — premium is granted on request
       {atLimit && upgradeText && (
-        <Link
-          to="/settings#billing"
+        <Link to="/settings#billing" ...>{upgradeText} →</Link>
+      )} */}
+      {atLimit && upgradeText && (
+        <button
+          type="button"
+          onClick={openRequest}
           style={{
-            fontSize: 'var(--text-xs)',
-            color: 'var(--accent)',
-            textDecoration: 'none',
-            fontWeight: 600,
-            marginTop: 2,
+            fontSize: 'var(--text-xs)', color: 'var(--accent)', fontWeight: 600,
+            marginTop: 2, background: 'none', border: 'none', padding: 0,
+            cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
           }}
         >
-          {upgradeText} →
-        </Link>
+          Request premium access for unlimited →
+        </button>
       )}
     </div>
   );
