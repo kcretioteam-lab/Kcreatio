@@ -209,6 +209,7 @@ function getErrors(form) {
   if (form.brandGstin && GSTIN_REGEX.test(form.brandGstin) && form.brandStateCode && form.brandGstin.slice(0, 2) !== form.brandStateCode) {
     e.brandGstin = `GSTIN state code (${form.brandGstin.slice(0, 2)}) does not match selected brand state (${form.brandStateCode})`;
   }
+  if (form.brandPan && !/^[A-Z]{5}[0-9]{4}[A-Z]$/.test(form.brandPan)) e.brandPan = 'Invalid PAN (format: AAACM9517F)';
   if (!form.serviceDescription.trim() || form.serviceDescription.trim().length < 5)
                                                            e.serviceDescription = 'Description of services is mandatory';
   if (!form.sacCode.trim())                                e.sacCode = 'SAC/HSN code is mandatory for service invoices';
@@ -225,10 +226,14 @@ function isComplete(form) {
 
 
 // ── localStorage helpers — works without backend ──────────────────────────────
-const LS_KEY = 'creator_tax_invoices';
-const DRAFT_KEY = 'kcretio:invoice_draft';
-function lsLoad() { try { return JSON.parse(localStorage.getItem(LS_KEY) || '[]'); } catch { return []; } }
-function lsSave(arr) { localStorage.setItem(LS_KEY, JSON.stringify(arr)); }
+// Keys are scoped per user so a different account on the same browser never sees another user's data
+let lsUserId = 'anon';
+const lsKey = () => `creator_tax_invoices:${lsUserId}`;
+const draftKey = () => `kcretio:invoice_draft:${lsUserId}`;
+// One-time cleanup of the old browser-wide draft (pre per-user keys) so it can't leak between accounts
+try { localStorage.removeItem('kcretio:invoice_draft'); } catch {}
+function lsLoad() { try { return JSON.parse(localStorage.getItem(lsKey()) || '[]'); } catch { return []; } }
+function lsSave(arr) { localStorage.setItem(lsKey(), JSON.stringify(arr)); }
 function lsNextNumber(user) {
   const prefix = user?.invoice_prefix || 'INV';
   const now = new Date();
@@ -737,6 +742,25 @@ ${inv.include_terms && inv.terms_text ? `
 </body></html>`;
 }
 
+// Save a PDF blob. On phones, open the native share sheet (Save to Files / WhatsApp / Drive);
+// fall back to a normal download if sharing isn't supported or is refused.
+async function savePdfBlob(blob, filename) {
+  const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+  if (isMobile && navigator.canShare) {
+    const file = new File([blob], filename, { type: 'application/pdf' });
+    if (navigator.canShare({ files: [file] })) {
+      try { await navigator.share({ files: [file], title: filename }); return; }
+      catch (err) { if (err?.name === 'AbortError') return; /* user closed the sheet */ }
+    }
+  }
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  // Revoking immediately cancels the download on some mobile browsers
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
+}
+
 function downloadInvoicePDF(inv, user, template, plan) {
   const t = template || TEMPLATES[0];
   const effectiveT = { ...t, accentColor: inv.invoiceAccentColor || t.accentColor };
@@ -942,6 +966,7 @@ export default function InvoicePage({ initialView }) {
     : location.pathname.includes('/edit') ? 'edit'
     : 'list';
 
+  lsUserId = user?.id || 'anon';
   const [form, setForm] = useState({ ...EMPTY_FORM });
   const [touched, setTouched] = useState({});
   const [submitting, setSubmitting] = useState(false);
@@ -1005,7 +1030,7 @@ export default function InvoicePage({ initialView }) {
     clearTimeout(autosaveTimer.current);
     autosaveTimer.current = setTimeout(() => {
       try {
-        localStorage.setItem(DRAFT_KEY, JSON.stringify({ form, savedAt: Date.now() }));
+        localStorage.setItem(draftKey(), JSON.stringify({ form, savedAt: Date.now() }));
         setLastDraftSaved(Date.now());
       } catch {}
     }, 600);
@@ -1071,7 +1096,7 @@ export default function InvoicePage({ initialView }) {
       const hasDealId = !!(location.state?.deal_id || new URLSearchParams(location.search).get('deal_id'));
       if (!hasDealId) {
         try {
-          const saved = JSON.parse(localStorage.getItem(DRAFT_KEY) || 'null');
+          const saved = JSON.parse(localStorage.getItem(draftKey()) || 'null');
           if (saved?.form && Date.now() - saved.savedAt < 24 * 60 * 60 * 1000) {
             setForm(saved.form);
             setLastDraftSaved(saved.savedAt);
@@ -1325,7 +1350,7 @@ export default function InvoicePage({ initialView }) {
     e?.preventDefault();
     const inv = await doSave();
     if (!inv) return;
-    try { localStorage.removeItem(DRAFT_KEY); } catch {}
+    try { localStorage.removeItem(draftKey()); } catch {}
     setLastDraftSaved(null);
     toast.success(editingId ? 'Invoice updated' : 'Invoice saved');
     resetAndGoList();
@@ -1335,7 +1360,7 @@ export default function InvoicePage({ initialView }) {
     e?.preventDefault();
     const inv = await doSave();
     if (!inv) return;
-    try { localStorage.removeItem(DRAFT_KEY); } catch {}
+    try { localStorage.removeItem(draftKey()); } catch {}
     setLastDraftSaved(null);
     toast.success('Invoice saved — downloading PDF…');
     resetAndGoList();
@@ -1346,12 +1371,7 @@ export default function InvoicePage({ initialView }) {
       if (inv.id && !String(inv.id).startsWith('local-')) {
         try {
           const res = await api.get(`/invoices/${inv.id}/pdf`, { responseType: 'blob', signal, timeout: 90000 });
-          const url = URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }));
-          const a = document.createElement('a');
-          a.href = url;
-          a.download = `${(inv.invoice_number || 'invoice').replace(/\//g, '-')}.pdf`;
-          a.click();
-          setTimeout(() => URL.revokeObjectURL(url), 5000);
+          await savePdfBlob(new Blob([res.data], { type: 'application/pdf' }), `${(inv.invoice_number || 'invoice').replace(/\//g, '-')}.pdf`);
         } catch (err) {
           if (err?.name !== 'CanceledError' && err?.name !== 'AbortError') {
             downloadInvoicePDF(inv, user, TEMPLATES.find(t => t.id === inv.template_id) || TEMPLATES[0], user?.plan);
@@ -1380,10 +1400,7 @@ export default function InvoicePage({ initialView }) {
     const signal = pdfAbortRef.current.signal;
     try {
       const res = await api.get(`/invoices/${inv.id}/pdf`, { responseType: 'blob', signal, timeout: 90000 });
-      const url = URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }));
-      const a = document.createElement('a');
-      a.href = url; a.download = `${(inv.invoice_number||'invoice').replace(/\//g,'-')}.pdf`; a.click();
-      URL.revokeObjectURL(url);
+      await savePdfBlob(new Blob([res.data], { type: 'application/pdf' }), `${(inv.invoice_number||'invoice').replace(/\//g,'-')}.pdf`);
     } catch {
       downloadInvoicePDF(inv, user, TEMPLATES.find(t => t.id===inv.template_id)||TEMPLATES[0], user?.plan);
     }
@@ -1489,7 +1506,7 @@ export default function InvoicePage({ initialView }) {
           </div>
         )}
 
-        <div style={{ padding: isMobile ? '0 var(--space-3)' : '0 var(--space-5)', display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'minmax(0,1fr) minmax(0,1fr)', gap: 'var(--space-5)', paddingTop: 'var(--space-4)', paddingBottom: isMobile ? 'calc(80px + var(--space-4))' : 'calc(72px + var(--space-4))' }}>
+        <div style={{ padding: isMobile ? '0 var(--space-3)' : '0 var(--space-5)', display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'minmax(0,1fr) minmax(0,1fr)', gap: 'var(--space-5)', paddingTop: 'var(--space-4)', paddingBottom: isMobile ? 'calc(160px + var(--space-4))' : 'calc(72px + var(--space-4))' }}>
           <form noValidate style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)', minWidth: 0, width: '100%', overflow: 'hidden' }}>
 
             <Sect title="Creator (Your Details)" collapsible defaultOpen={false}>
@@ -1511,7 +1528,7 @@ export default function InvoicePage({ initialView }) {
               </div>
               <Input id="brandName" label="Brand / Company Name *" value={form.brandName} onChange={e => update('brandName', e.target.value)} onBlur={() => touch('brandName')} error={showErr('brandName')} placeholder="Mamaearth Pvt Ltd" tooltip="Legal name of the brand or company you are billing. Must match their GST registration exactly for B2B invoices." />
               <Input id="brandGstin" label="Brand GSTIN" value={form.brandGstin} onChange={e => update('brandGstin', e.target.value.toUpperCase().slice(0,15))} onBlur={() => touch('brandGstin')} error={showErr('brandGstin')} placeholder="27AAACM9517F1ZW" hint={form.brandGstin.length === 15 && GSTIN_REGEX.test(form.brandGstin) ? '✓ Valid GSTIN format' : 'Mandatory for B2B input tax credit'} maxLength={15} tooltip="15-digit GST Identification Number of the brand. Format: 2 digits state code + 10 digit PAN + 1 digit entity number + Z + 1 check digit. Required for B2B input tax credit." style={form.brandGstin.length === 15 && GSTIN_REGEX.test(form.brandGstin) ? { borderColor: 'var(--success)', boxShadow: '0 0 0 3px var(--success-dim)' } : {}} />
-              <Input id="brandPan" label="Brand PAN" value={form.brandPan} onChange={e => update('brandPan', e.target.value.toUpperCase().slice(0,10))} placeholder="AAACM9517F" maxLength={10} tooltip="10-character Permanent Account Number of the brand. Optional but useful for TDS reconciliation and Form 26AS." />
+              <Input id="brandPan" label="Brand PAN" value={form.brandPan} onChange={e => update('brandPan', e.target.value.toUpperCase().slice(0,10))} onBlur={() => touch('brandPan')} error={showErr('brandPan')} placeholder="AAACM9517F" maxLength={10} tooltip="10-character Permanent Account Number of the brand. Optional but useful for TDS reconciliation and Form 26AS." />
               <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 'var(--space-3)' }}>
                 <Input id="brandEmail" label="Brand Email (optional)" type="email" value={form.brandEmail} onChange={e => update('brandEmail', e.target.value)} placeholder="accounts@brand.com" tooltip="Brand's billing or accounts email address. Optional — appears on invoice for reference." />
                 <Input id="brandPhone" label="Brand Contact No. (optional)" type="tel" value={form.brandPhone} onChange={e => update('brandPhone', e.target.value)} placeholder="+91 98765 43210" tooltip="Brand contact number. Optional — appears on invoice for reference." />
@@ -1978,6 +1995,9 @@ export default function InvoicePage({ initialView }) {
             )}
           </form>
 
+          {/* Mobile: compliance checklist sits at the end of the form, keeping the pinned bar compact */}
+          {isMobile && <CompliancePanel form={form} />}
+
           {/* Desktop: sticky right-side preview */}
           {!isMobile && (
           <div style={{ position: 'sticky', top: 'calc(52px + var(--space-4))', alignSelf: 'flex-start', maxHeight: 'calc(100dvh - 120px)', overflowY: 'auto' }}>
@@ -1994,11 +2014,11 @@ export default function InvoicePage({ initialView }) {
           ...(isMobile ? { left: 0, right: 0, zIndex: 25 } : {}),
           background: 'var(--bg)',
           borderTop: '1px solid var(--border)',
-          padding: 'var(--space-3) var(--space-5)',
+          padding: isMobile ? 'var(--space-2) var(--space-3)' : 'var(--space-3) var(--space-5)',
           flexShrink: 0,
         }}>
           {/* Validation hint — only shown after user has touched fields */}
-          <CompliancePanel form={form} />
+          {!isMobile && <CompliancePanel form={form} />}
           {!complete && Object.keys(touched).length > 0 && (
             <p style={{ fontSize: 'var(--text-xs)', color: 'var(--warning-text)', marginBottom: 'var(--space-2)', textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
               <AlertCircle size={12} aria-hidden="true" />
