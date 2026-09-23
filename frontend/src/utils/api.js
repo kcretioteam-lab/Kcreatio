@@ -6,6 +6,10 @@ const isDev = import.meta.env.DEV;
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || 'http://localhost:4000/api/v1',
   withCredentials: true,
+  // Without a timeout a stalled request never rejects — e.g. in dev with the backend down, Chrome can
+  // leave requests to localhost:4000 pending forever, so the localStorage fallbacks never run and
+  // buttons stay stuck on "Saving…". Short in dev so fallbacks kick in fast; PDF/export calls override.
+  timeout: isDev ? 8000 : 30000,
   headers: {
     'Content-Type': 'application/json',
     // Send dev bypass header in development so the backend accepts requests without a real JWT cookie

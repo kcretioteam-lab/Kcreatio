@@ -13,7 +13,8 @@ import taxPlannerRoutes from './routes/taxPlanner.js';
 import dealsRoutes from './routes/deals.js';
 import incomeRoutes from './routes/income.js';
 import expensesRoutes from './routes/expenses.js';
-import paymentsRoutes from './routes/payments.js';
+// import paymentsRoutes from './routes/payments.js'; // Payments disabled — premium is granted on request
+import premiumRequestsRoutes from './routes/premiumRequests.js';
 import usageRoutes from './routes/usage.js';
 import notificationsRoutes from './routes/notifications.js';
 import exportRoutes from './routes/export.js';
@@ -88,7 +89,8 @@ const authLimiter = rateLimit({
 
 // Razorpay webhook needs raw body BEFORE express.json() parses it
 // Must be registered as a specific path middleware BEFORE the global json parser
-app.use('/api/v1/payments/webhook', express.raw({ type: 'application/json' }));
+// Payments disabled — premium is granted on request
+// app.use('/api/v1/payments/webhook', express.raw({ type: 'application/json' }));
 
 app.use(express.json({ limit: '1mb' }));
 app.use(cookieParser());
@@ -106,7 +108,8 @@ app.use('/api/v1/tax', taxPlannerRoutes);
 app.use('/api/v1/deals', dealsRoutes);
 app.use('/api/v1/income', incomeRoutes);
 app.use('/api/v1/expenses', expensesRoutes);
-app.use('/api/v1/payments', paymentsRoutes);
+// app.use('/api/v1/payments', paymentsRoutes); // Payments disabled
+app.use('/api/v1/premium-requests', premiumRequestsRoutes);
 app.use('/api/v1/usage', usageRoutes);
 app.use('/api/v1/notifications', notificationsRoutes);
 app.use('/api/v1/export', exportRoutes);

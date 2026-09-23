@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './hooks/useAuth.jsx';
 import { UsageProvider } from './hooks/useUsage.jsx';
 import { ToastProvider } from './hooks/useToast.jsx';
+import { PremiumRequestProvider } from './hooks/usePremiumRequest.jsx';
 import AppShell from './components/layout/AppShell.jsx';
 import { SkeletonPage } from './components/ui/Skeleton.jsx';
 import PageTransition from './components/ui/PageTransition.jsx';
@@ -85,6 +86,7 @@ export default function App() {
         <AuthProvider>
           <UsageProvider>
             <ToastProvider>
+            <PremiumRequestProvider>
               <AppInitializer />
               <a href="#main-content" className="skip-link">Skip to content</a>
               <Routes>
@@ -121,6 +123,7 @@ export default function App() {
                 {/* 404 — show NotFoundPage instead of redirecting */}
                 <Route path="*" element={<NotFoundPage />} />
               </Routes>
+            </PremiumRequestProvider>
             </ToastProvider>
           </UsageProvider>
         </AuthProvider>

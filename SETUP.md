@@ -10,7 +10,7 @@
 ## 1. Clone & Install
 
 ```bash
-cd kcreatio
+cd kcretio
 npm run install:all
 ```
 
@@ -31,6 +31,8 @@ npm run install:all
    - `backend/migrations/009_password_reset_tokens.sql` — password_reset_tokens table
    - `backend/migrations/010_email_detections.sql` — email_detections table (Smart Inbox)
    - `backend/migrations/011_notification_prefs_auto_apply.sql` — gmail_auto_apply, threshold, deal_followup_alerts columns
+   - `backend/migrations/012_purchase_order_number.sql`, `013_invoice_discount.sql`, `014_invoice_accent_color.sql` — invoice extras
+   - `backend/migrations/015_premium_requests.sql` — premium_requests table (request-based Pro access)
 
 3. Create a Storage bucket named **`invoice-signatures`** (public read):
    - Go to Storage → New bucket → Name: `invoice-signatures` → Public: ON
@@ -61,6 +63,8 @@ GOOGLE_CLIENT_SECRET=<from google cloud console>
 GOOGLE_REDIRECT_URI=http://localhost:4000/api/v1/auth/google/callback
 GMAIL_REDIRECT_URI=http://localhost:4000/api/v1/auth/gmail/callback
 RESEND_API_KEY=re_xxxx       # optional for dev
+ADMIN_EMAIL=kcretioteam@gmail.com   # receives premium access requests
+API_URL=http://localhost:4000       # public backend URL, used in the Approve link
 FRONTEND_URL=http://localhost:5173
 NODE_ENV=development
 PORT=4000
@@ -76,16 +80,18 @@ VITE_API_URL=http://localhost:4000/api/v1
 
 ## 4. Razorpay Plans (for subscriptions)
 
-Create 3 plans in Razorpay Dashboard → Subscriptions → Plans:
+> **Skip for now** — payments are disabled; premium is granted on request (see README → Pricing). The payments route is commented out in `server.ts`.
+
+Create 2 plans in Razorpay Dashboard → Subscriptions → Plans:
 - Starter: ₹299/month
-- Pro: ₹599/month  
-- Business: ₹1,499/month
+- Pro: ₹599/month
+<!-- - Business: ₹1,499/month — Business plan paused -->
 
 Add the plan IDs to `backend/.env`:
 ```
 RAZORPAY_STARTER_PLAN_ID=plan_xxxx
 RAZORPAY_PRO_PLAN_ID=plan_yyyy
-RAZORPAY_BUSINESS_PLAN_ID=plan_zzzz
+# RAZORPAY_BUSINESS_PLAN_ID=plan_zzzz   # Business plan paused
 ```
 
 ---
@@ -116,7 +122,7 @@ The app has a dev bypass built in — no real login required during development:
 - Backend `auth.ts` middleware accepts this header when `NODE_ENV !== 'production'`
 - `fetchUser()` only clears user on 401/403, not on 5xx — so MOCK_USER persists even without a live Supabase connection
 
-**To test with real auth:** configure Supabase credentials, run all migrations, then the dev user `admin@kcreatio.in` / `admin123` is seeded by migration 002.
+**To test with real auth:** configure Supabase credentials, run all migrations, then the dev user `admin@kcretio.in` / `admin123` is seeded by migration 002.
 
 ---
 
@@ -155,7 +161,7 @@ kcretio/
 
 **Key data flows:**
 - JWT in httpOnly cookies — never localStorage
-- All monetary amounts stored as integers (paise) to avoid floating point errors
+- All monetary arithmetic done in integer paise to avoid floating point errors; stored in DB as `numeric(12,2)` rupees
 - Invoice settings (bank accounts, UPI, T&C, signatory) stored in `invoice_settings` table with `setting_type` discriminator
 - Images stored in Supabase Storage `invoice-signatures` bucket, DB stores only the public URL
 
@@ -165,7 +171,7 @@ kcretio/
 
 1. **Inter variable font** — Single variable woff2 instead of 4 weight files. Same visual result, one fewer HTTP request.
 
-2. **Invoice PDF via Blob URL** — PDFs are generated client-side as HTML blobs, opened in a new tab, and printed via `window.print()`. Avoids Supabase Storage bucket setup for PDFs in V1.
+2. **Invoice PDF: server-first, Blob fallback** — `GET /invoices/:id/pdf` renders the PDF server-side with Puppeteer (watermark for Basic). If that fails, the frontend falls back to building the HTML client-side as a Blob URL and printing via `window.print()`. No PDFs are stored in Supabase Storage.
 
 3. **3 PDF layout templates** — `buildClassicHTML`, `buildCorporateHTML`, `buildMinimalHTML` — dispatched by `template.layout` field. Print CSS includes `@page { margin: 0 }` and `print-color-adjust: exact` to suppress browser watermarks and preserve background colors.
 

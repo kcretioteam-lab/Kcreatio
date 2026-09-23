@@ -608,9 +608,13 @@ export function ComparisonTable() {
 // ─── Pricing ──────────────────────────────────────────────────────────────────
 
 const PLANS = [
-  { name: 'Starter', price: '₹0', period: '/month', desc: 'For creators just starting their business journey.', color: '#60a5fa', features: ['5 invoices/month', 'Basic GST calculation', 'TDS tracking', 'Advance tax reminders'], cta: 'Start free', href: '/register' },
-  { name: 'Creator Pro', price: '₹599', period: '/month', desc: 'For serious creators managing real brand business.', color: '#E8921A', highlight: true, features: ['Unlimited invoices', 'CGST / SGST / IGST auto', 'Full TDS + Form 16A tracker', 'Advance tax calculator', 'Brand deal CRM (unlimited)', 'P&L + income dashboard', 'ITR-ready export (ZIP)', 'Priority support'], cta: 'Start 14-day free trial', href: '/register' },
-  { name: 'Agency', price: '₹1,999', period: '/month', desc: 'For MCNs, talent managers, and creator agencies.', color: '#a78bfa', features: ['Everything in Pro', 'Up to 20 creators', 'Team access', 'White-label invoices', 'Dedicated account manager'], cta: 'Contact us', href: '/register' },
+  { name: 'Basic', price: '₹0', period: '/month', desc: 'For creators just starting their business journey.', color: '#60a5fa', features: ['Unlimited GST invoices (Kcretio watermark)', 'CGST / SGST / IGST auto', 'TDS tracking (10 entries)', 'March advance tax reminder'], cta: 'Start free', href: '/register' },
+  // Paid plans disabled for now — premium is granted on request
+  // { name: 'Starter', price: '₹299', period: '/month', desc: 'For creators with regular brand deals.', color: '#34d399', features: ['Watermark-free invoices, all 7 templates', 'Unlimited TDS + Form 16A tracker', 'Smart Inbox (Gmail auto-detect)', 'All 4 advance tax reminders', 'Expense tracker'], cta: 'Start 28-day free trial', href: '/register' },
+  // { name: 'Creator Pro', price: '₹599', period: '/month', desc: 'For serious creators managing real brand business.', color: '#E8921A', highlight: true, features: ['Everything in Starter', 'Advance tax calculator', 'P&L + income dashboard', 'ITR-ready export (ZIP)', 'Smart Inbox auto-apply'], cta: 'Start 28-day free trial', href: '/register' },
+  { name: 'Creator Pro', price: '₹0', period: ' for 28 days', desc: 'Request free Pro access — we review every request personally.', color: '#E8921A', highlight: true, features: ['Watermark-free invoices, all 7 templates', 'Unlimited TDS + Form 16A tracker', 'Advance tax calculator', 'P&L + income dashboard', 'ITR-ready export (ZIP)', 'Smart Inbox (Gmail auto-detect)'], cta: 'Start free · request Pro', href: '/register' },
+  // Business/Agency plan paused
+  // { name: 'Agency', price: '₹1,999', period: '/month', desc: 'For MCNs, talent managers, and creator agencies.', color: '#a78bfa', features: ['Everything in Pro', 'Up to 20 creators', 'Team access', 'White-label invoices', 'Dedicated account manager'], cta: 'Contact us', href: '/register' },
 ];
 
 function PricingCard({ plan, index }) {
@@ -688,11 +692,11 @@ const FAQ_ITEMS = [
   },
   {
     q: 'What about TDS? Do I need to track it manually?',
-    a: 'Never. When a brand deducts 10% TDS (Section 194C/194J) before paying you, Kcretio records it automatically when you mark the invoice paid. All TDS is reconciled against your PAN throughout the year. At ITR season, everything lines up with your Form 26AS.',
+    a: 'Never. When a brand deducts TDS before paying you (10% under Section 194J, or 1–2% under 194C), Kcretio records it automatically when you mark the invoice paid. All TDS is reconciled against your PAN throughout the year. At ITR season, everything lines up with your Form 26AS.',
   },
   {
     q: 'Is the free plan actually free — or is it a trial?',
-    a: 'Actually free. No credit card. No expiry. The Starter plan gives you 5 invoices per month forever. When you outgrow that — meaning real brand business is coming in — upgrade to Creator Pro for ₹599/month.',
+    a: 'Actually free. No credit card. No expiry. The Basic plan gives you unlimited GST invoices forever, with a small Kcretio watermark. Need more? Request 28 days of free Creator Pro access from inside the app — watermark-free invoices, advance tax calculator, P&L and CA export.',
   },
   {
     q: 'Can I export everything for my CA?',
@@ -773,8 +777,8 @@ export function FAQ() {
         <Reveal delay={200}>
           <div style={{ textAlign: 'center', marginTop: 48, padding: '28px', borderRadius: 16, background: 'var(--surface-1)', border: '1px solid var(--border)' }}>
             <p style={{ fontSize: 14, color: 'var(--text-body)', margin: '0 0 12px' }}>Still have questions?</p>
-            <a href="mailto:hello@kcreatio.in" style={{ fontSize: 14, fontWeight: 600, color: '#E8921A', textDecoration: 'none' }}>
-              hello@kcreatio.in →
+            <a href="mailto:hello@kcretio.in" style={{ fontSize: 14, fontWeight: 600, color: '#E8921A', textDecoration: 'none' }}>
+              hello@kcretio.in →
             </a>
           </div>
         </Reveal>

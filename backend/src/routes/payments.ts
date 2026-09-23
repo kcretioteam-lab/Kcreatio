@@ -11,11 +11,11 @@ const router = Router();
 const PLAN_TO_PLAN_ID: Record<string, string> = {
   starter: process.env.RAZORPAY_STARTER_PLAN_ID || '',
   pro: process.env.RAZORPAY_PRO_PLAN_ID || '',
-  business: process.env.RAZORPAY_BUSINESS_PLAN_ID || '',
+  // business: process.env.RAZORPAY_BUSINESS_PLAN_ID || '', // Business plan paused
 };
 
 const CreateSubscriptionSchema = z.object({
-  plan: z.enum(['starter', 'pro', 'business']),
+  plan: z.enum(['starter', 'pro' /* , 'business' — paused */]),
   period: z.enum(['monthly', 'annual']).default('monthly'),
 });
 
@@ -168,8 +168,8 @@ router.post('/reactivate', authenticate, async (req: AuthRequest, res: Response)
 // User stays on current plan until billing period ends, then new plan activates.
 router.post('/change-plan', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
   const { plan } = req.body;
-  if (!plan || !['starter', 'pro', 'business'].includes(plan)) {
-    res.status(400).json({ error: 'VALIDATION_ERROR', message: 'Invalid plan. Must be starter, pro, or business.' });
+  if (!plan || !['starter', 'pro' /* , 'business' — paused */].includes(plan)) {
+    res.status(400).json({ error: 'VALIDATION_ERROR', message: 'Invalid plan. Must be starter or pro.' });
     return;
   }
 

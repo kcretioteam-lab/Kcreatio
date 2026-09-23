@@ -1,4 +1,4 @@
--- Kcreatio — Initial Schema
+-- Kcretio — Initial Schema
 -- Run this in Supabase SQL Editor
 
 -- ─── Users ──────────────────────────────────────────────────────────────────

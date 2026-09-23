@@ -129,11 +129,10 @@ export default function Sidebar({ collapsed, onToggle }) {
           borderRadius: 'var(--radius-md)',
         }}>
           <p style={{ fontSize: 'var(--text-xs)', color: 'var(--accent)', fontWeight: 700, marginBottom: 2 }}>
-            Trial: {trialDaysLeft()} days left
+            Pro access: {trialDaysLeft()} days left
           </p>
-          <NavLink to="/settings" style={{ fontSize: 'var(--text-xs)', color: 'var(--accent)', textDecoration: 'underline' }}>
-            Upgrade to Pro →
-          </NavLink>
+          {/* Paid upgrade disabled — premium is granted on request
+          <NavLink to="/settings" ...>Upgrade to Pro →</NavLink> */}
         </div>
       )}
 

@@ -1,6 +1,6 @@
 # Kcretio — Backend
 
-Express 4 + TypeScript API for the Kcreatio frontend.
+Express 4 + TypeScript API for the Kcretio frontend.
 
 ---
 
@@ -39,7 +39,7 @@ Backend reads env from `backend/.env`. See root `SETUP.md` for required variable
 | Prefix | File | Description |
 |--------|------|-------------|
 | `/api/v1/auth` | `routes/auth.ts` | Register, login, logout, refresh, Google OAuth, Gmail connect/disconnect |
-| `/api/v1/invoices` | `routes/invoices.ts` | CRUD + PDF generation (server-side Puppeteer with watermark for non-Pro) + payment confirm token + email share |
+| `/api/v1/invoices` | `routes/invoices.ts` | CRUD (unlimited on all plans) + PDF generation (server-side Puppeteer with watermark for Basic) + payment confirm token + email share |
 | `/api/v1/invoice-settings` | `routes/invoiceSettings.ts` | Bank accounts, UPI IDs, T&C profiles, signatory |
 | `/api/v1/upload` | `routes/upload.ts` | Signature + UPI QR image upload to Supabase Storage |
 | `/api/v1/tds` | `routes/tds.ts` | TDS records + Form 16A tracking |
@@ -47,7 +47,8 @@ Backend reads env from `backend/.env`. See root `SETUP.md` for required variable
 | `/api/v1/deals` | `routes/deals.ts` | Brand deal CRM + mark-paid (auto-creates income) |
 | `/api/v1/income` | `routes/income.ts` | Income entries + summary |
 | `/api/v1/expenses` | `routes/expenses.ts` | Expense entries + summary |
-| `/api/v1/payments` | `routes/payments.ts` | Razorpay subscription management + webhook |
+| `/api/v1/payments` | `routes/payments.ts` | Razorpay subscription management + webhook — **disabled** (not mounted in `server.ts`) |
+| `/api/v1/premium-requests` | `routes/premiumRequests.ts` | `POST /` request 28 days of Pro, `GET /me` latest request, **public** `GET /approve?token=` (signed link from the admin email) |
 | `/api/v1/usage` | `routes/usage.ts` | Quota status per plan |
 | `/api/v1/notifications` | `routes/notifications.ts` | Notification + Smart Inbox preferences |
 | `/api/v1/export` | `routes/export.ts` | Annual CSV export (Pro) |
@@ -75,12 +76,14 @@ Used by the landing page Tax Risk Calculator. No authentication required — reg
 
 **Calculation logic:**
 1. Annual income = `monthlyIncome × 12`
-2. Taxable income = `max(0, annual − ₹50,000 standard deduction)`
+2. Taxable income = `annual` — no standard deduction (it applies to salary only; creator income is professional income)
 3. Apply new regime slabs FY 2025-26 (0% / 5% / 10% / 15% / 20% / 25% / 30%)
 4. Section 87A rebate: if taxable income ≤ ₹12L, subtract up to ₹60,000 — most creators pay ₹0 income tax
 5. Add 4% health & education cess
 6. `itrRefund = max(0, estimatedTds − incomeTax)` — the common case for creators
-7. `advanceTaxOwed = max(0, incomeTax − estimatedTds)` — only triggers for income >~₹13L
+7. `advanceTaxOwed = max(0, incomeTax − estimatedTds)` — only triggers above ~₹12.5L
+
+The authenticated `/estimate` uses the same rules via `calcTax()` (new regime 87A: ≤ ₹12L, up to ₹60K; old regime 87A: ≤ ₹5L, up to ₹12.5K). Known gaps: TDS is assumed at 194J 10% for every deal, and the 44ADA single-instalment schedule is not modelled.
 
 **Response fields:** `annual`, `estimatedTds`, `incomeTax`, `advanceTaxOwed`, `itrRefund`, `q2Due`, `form16aRisk`
 
@@ -90,9 +93,9 @@ Used by the landing page Tax Risk Calculator. No authentication required — reg
 
 Server-side PDF rendering via `services/puppeteerPdfService.ts`.
 
-- `POST /api/v1/invoices/:id/pdf` — generates and streams a PDF
-- **Plan gating:** Basic and Starter users get a diagonal "DRAFT — Upgrade to Pro to remove watermark" overlay injected into the HTML before rendering. Pro users get clean PDFs.
-- The watermark is injected as an absolutely-positioned `<div>` in the HTML template, not post-processed — so it prints correctly at any scale.
+- `GET /api/v1/invoices/:id/pdf` — generates and streams a PDF
+- **Plan gating:** Basic users get a faint diagonal Kcretio logo plus a "Kcretio.in — upgrade for watermark-free invoices" footer. Starter and above get clean PDFs.
+- The watermark is injected as `body::before` / `body::after` CSS in the HTML template, not post-processed — so it prints correctly at any scale. The frontend Blob fallback uses the same watermark.
 
 ---
 
@@ -124,7 +127,7 @@ Run in Supabase SQL Editor in order:
 | File | What it creates |
 |------|----------------|
 | `001_initial_schema.sql` | users, invoices, tds_records, deals, income, expenses, tax_payments |
-| `002_seed_test_user.sql` | Test user (admin@kcreatio.in / admin123) |
+| `002_seed_test_user.sql` | Test user (admin@kcretio.in / admin123) |
 | `003_invoice_settings_and_invoice_extras.sql` | invoice_settings table + 18 invoice columns |
 | `004_upi_settings_contact_fields.sql` | UPI setting type, scanner_image_url, brand email/phone |
 | `005_user_phone_invoice_contact.sql` | users.phone, show_phone_on_invoice, invoice_phone/email, avatar_url |
@@ -134,6 +137,8 @@ Run in Supabase SQL Editor in order:
 | `009_password_reset_tokens.sql` | password_reset_tokens table |
 | `010_email_detections.sql` | email_detections table (Smart Inbox) |
 | `011_notification_prefs_auto_apply.sql` | gmail_auto_apply + threshold + deal_followup_alerts columns |
+| `012`–`014` | purchase_order_number, invoice discount, invoice accent color |
+| `015_premium_requests.sql` | premium_requests table (request-based Pro access) |
 
 ---
 
@@ -145,7 +150,7 @@ SUPABASE_URL=
 SUPABASE_SERVICE_ROLE_KEY=
 
 # Auth
-JWT_SECRET=
+JWT_ACCESS_SECRET=
 JWT_REFRESH_SECRET=
 
 # Google OAuth (for Google login + Gmail connect)
@@ -161,6 +166,8 @@ RAZORPAY_WEBHOOK_SECRET=
 
 # Email
 RESEND_API_KEY=
+ADMIN_EMAIL=          # receives premium access requests
+API_URL=http://localhost:4000   # used to build the Approve link
 
 # App
 NODE_ENV=development

@@ -2,6 +2,7 @@ import { Lock } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { canAccess, getRequiredPlan, PLAN_DISPLAY } from '../../utils/planConfig.js';
 import { useAuth } from '../../hooks/useAuth.jsx';
+import { usePremiumRequest } from '../../hooks/usePremiumRequest.jsx';
 
 /**
  * PlanGate — shows children if user has access, otherwise shows a locked upgrade card.
@@ -14,6 +15,7 @@ import { useAuth } from '../../hooks/useAuth.jsx';
  */
 export default function PlanGate({ feature, children, teaserContent = null, compact = false }) {
   const { user } = useAuth();
+  const { openRequest, isPending } = usePremiumRequest();
   const plan = user?.plan || 'basic';
 
   if (canAccess(feature, plan)) return children;
@@ -32,15 +34,19 @@ export default function PlanGate({ feature, children, teaserContent = null, comp
         <span style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)' }}>
           Available on <strong style={{ color: 'var(--text-primary)' }}>{requiredDisplay.name}</strong> plan
         </span>
-        <Link
-          to="/settings#billing"
+        {/* Paid upgrade disabled — premium is granted on request
+        <Link to="/settings#billing" ...>Upgrade →</Link> */}
+        <button
+          type="button"
+          onClick={openRequest}
           style={{
             marginLeft: 'auto', fontSize: 'var(--text-xs)', color: 'var(--accent)',
-            fontWeight: 600, textDecoration: 'none', whiteSpace: 'nowrap',
+            fontWeight: 600, whiteSpace: 'nowrap', background: 'none', border: 'none',
+            cursor: 'pointer', fontFamily: 'inherit', padding: 0,
           }}
         >
-          Upgrade →
-        </Link>
+          {isPending ? 'Request pending' : 'Request access →'}
+        </button>
       </div>
     );
   }
@@ -90,10 +96,11 @@ export default function PlanGate({ feature, children, teaserContent = null, comp
             fontSize: 'var(--text-sm)', color: 'var(--text-muted)',
             maxWidth: 320, lineHeight: 1.5,
           }}>
-            Upgrade to unlock this feature and get full access to all {requiredDisplay.name} capabilities.
+            Request 28 days of free Pro access to unlock this feature.
           </p>
         </div>
 
+        {/* Paid upgrade disabled — premium is granted on request
         <Link
           to="/settings#billing"
           style={{
@@ -116,7 +123,22 @@ export default function PlanGate({ feature, children, teaserContent = null, comp
           style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', textDecoration: 'underline' }}
         >
           View all plans
-        </Link>
+        </Link> */}
+        <button
+          type="button"
+          onClick={openRequest}
+          disabled={isPending}
+          style={{
+            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+            padding: '0 var(--space-6)', height: 44,
+            background: isPending ? 'var(--border-2)' : 'var(--accent)', color: '#fff',
+            borderRadius: 'var(--radius-md)', fontWeight: 700, border: 'none',
+            fontSize: 'var(--text-sm)', fontFamily: 'inherit',
+            cursor: isPending ? 'default' : 'pointer',
+          }}
+        >
+          {isPending ? 'Request pending review' : 'Request premium access →'}
+        </button>
       </div>
     </div>
   );
