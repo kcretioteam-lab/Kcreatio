@@ -1,4 +1,4 @@
-# Kcreatio — Claude Context
+# Kcretio — Claude Context
 
 ## What this is
 Financial OS for Indian content creators: GST invoicing, TDS tracking, advance tax planning, brand deal CRM.
@@ -20,12 +20,15 @@ cd backend && node -r dotenv/config dist/server.js   # http://localhost:4000
 ## Architecture
 - Frontend: `src/pages/` + `src/components/layout/` + `src/hooks/` + `src/utils/`
 - Backend: `src/routes/` + `src/services/` + `src/middleware/`
-- DB: Supabase PostgreSQL — run migrations in `backend/migrations/` in order (001→005)
+- DB: Supabase PostgreSQL — run migrations in `backend/migrations/` in order (001→011, see SETUP.md)
+- Product name is **Kcretio** everywhere (never "Kcreatio")
 - Storage: Supabase bucket `invoice-signatures` for avatars, signatures, UPI QR images
 
 ## Critical rules
 - JWT in httpOnly cookies — NEVER localStorage
 - All monetary values in paise internally; `numeric(12,2)` in DB
+- Plans: Basic (free, unlimited watermarked invoices) / Starter ₹299 / Pro ₹599. Business plan is paused (commented out)
+- Payments disabled: signup = Basic; users request 28 days of Pro via `usePremiumRequest().openRequest()` → `premium_requests` table + admin email with Approve link (sets plan='trial'). Never link to Razorpay checkout until payments are re-enabled
 - All API inputs validated with Zod before touching DB
 - Every DB query scoped with `user_id` filter
 - CSS: use `var(--token)` always — no hardcoded hex or px values
@@ -34,7 +37,7 @@ cd backend && node -r dotenv/config dist/server.js   # http://localhost:4000
 
 ## DB migrations (run in Supabase SQL Editor in order)
 - 001: initial schema (users, invoices, tds_records, deals, income, expenses)
-- 002: seed test user (admin@kcreatio.in / admin123)
+- 002: seed test user (admin@kcretio.in / admin123)
 - 003: invoice_settings table + 18 new invoice columns (bank, T&C, signatory, etc.)
 - 004: UPI setting type, scanner_image_url, brand_email, brand_phone, include_upi
 - 005: users.phone, show_phone_on_invoice, invoice_phone, invoice_email, avatar_url

@@ -8,6 +8,7 @@ import { format, isToday, isYesterday, formatDistanceToNow } from 'date-fns';
 import api from '../utils/api.js';
 import { canAccess } from '../utils/planConfig.js';
 import { useToast } from '../hooks/useToast.jsx';
+import { usePremiumRequest } from '../hooks/usePremiumRequest.jsx';
 
 const TYPE_META = {
   payment_received: { label: 'Payment Received',   icon: CreditCard,  accent: 'var(--success)',         dim: 'var(--success-dim)' },
@@ -406,6 +407,7 @@ function EditAcceptModal({ detection, onConfirm, onClose }) {
 // ── Main widget ────────────────────────────────────────────────────────────────
 
 export default function SmartInboxWidget({ user, onManualPaste, onPendingCountChange }) {
+  const { openRequest } = usePremiumRequest();
   const { toast } = useToast();
   const [detections, setDetections] = useState([]);
   const [pendingCount, setPendingCount] = useState(0);
@@ -561,15 +563,17 @@ export default function SmartInboxWidget({ user, onManualPaste, onPendingCountCh
             </span>
           </div>
           <p style={{ margin: '0 0 var(--space-4)', fontSize: 12, color: 'var(--text-muted)' }}>
-            Connect Gmail and upgrade to Starter to review and log them automatically.
+            Request premium access to review and log them automatically.
           </p>
-          <a href="/settings#billing" style={{
+          {/* Paid upgrade disabled — premium is granted on request
+          <a href="/settings#billing" ...>Upgrade to Starter →</a> */}
+          <button type="button" onClick={openRequest} style={{
             display: 'inline-block', padding: '8px 20px',
             background: 'var(--accent)', color: '#fff', borderRadius: 'var(--radius-sm)',
-            fontWeight: 700, fontSize: 12, textDecoration: 'none',
+            fontWeight: 700, fontSize: 12, border: 'none', cursor: 'pointer', fontFamily: 'inherit',
           }}>
-            Upgrade to Starter →
-          </a>
+            Request premium access →
+          </button>
         </div>
       )}
 

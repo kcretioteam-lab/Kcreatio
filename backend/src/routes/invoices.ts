@@ -147,14 +147,7 @@ router.get('/next-number', async (req: AuthRequest, res: Response): Promise<void
   const fyCode = getFYCode(fy);
   const prefix = user.invoice_prefix || 'INV';
 
-  const { count } = await supabase
-    .from('invoices')
-    .select('id', { count: 'exact', head: true })
-    .eq('user_id', req.userId!)
-    .like('invoice_number', `${prefix}/${fyCode}/%`);
-
-  const nextSeq = String((count || 0) + 1).padStart(4, '0');
-  res.json({ invoiceNumber: `${prefix}/${fyCode}/${nextSeq}` });
+  res.json({ invoiceNumber: await nextInvoiceNumber(req.userId!, prefix, fyCode) });
 });
 
 // GET /invoices/brands — distinct past brands for party picker
@@ -183,23 +176,32 @@ router.get('/brands', async (req: AuthRequest, res: Response): Promise<void> => 
 
 // GET /invoices
 router.get('/', async (req: AuthRequest, res: Response): Promise<void> => {
-  const { status, fy, page = '1', limit = '20' } = req.query as Record<string, string>;
-  const offset = (parseInt(page) - 1) * parseInt(limit);
+  const { status, fy, search, sort, dir, page = '1', limit = '20', offset: offsetParam } = req.query as Record<string, string>;
+  const lim = Math.min(Math.max(parseInt(limit) || 20, 1), 100);
+  const offset = offsetParam !== undefined ? Math.max(parseInt(offsetParam) || 0, 0) : (Math.max(parseInt(page) || 1, 1) - 1) * lim;
+  const SORTABLE = ['invoice_number', 'brand_name', 'base_amount', 'total_amount', 'status', 'invoice_date', 'created_at'];
+  const sortCol = SORTABLE.includes(sort) ? sort : 'created_at';
 
   let query = supabase
     .from('invoices')
     .select('*', { count: 'exact' })
     .eq('user_id', req.userId!)
+    .order(sortCol, { ascending: dir === 'asc' })
     .order('created_at', { ascending: false })
-    .range(offset, offset + parseInt(limit) - 1);
+    .range(offset, offset + lim - 1);
 
-  if (status) query = query.eq('status', status);
+  if (status && ['draft', 'sent', 'paid', 'overdue'].includes(status)) query = query.eq('status', status);
   if (fy) query = query.eq('financial_year', fy);
+  if (search && search.trim()) {
+    // Strip characters that would break PostgREST's or() filter syntax
+    const term = search.trim().slice(0, 100).replace(/[,()*%\\]/g, ' ');
+    query = query.or(`brand_name.ilike.%${term}%,invoice_number.ilike.%${term}%`);
+  }
 
   const { data, error, count } = await query;
   if (error) { res.status(500).json({ error: 'INTERNAL_ERROR', message: error.message }); return; }
 
-  res.json({ invoices: data, total: count, page: parseInt(page), limit: parseInt(limit) });
+  res.json({ invoices: data, total: count, limit: lim, offset });
 });
 
 // POST /invoices
@@ -227,26 +229,26 @@ router.post('/', validateBody(CreateInvoiceSchema), async (req: AuthRequest, res
   const user = await getUser(req.userId!);
   if (!user) { res.status(404).json({ error: 'NOT_FOUND', message: 'User not found' }); return; }
 
-  // Invoice monthly quota (free: 5/month)
-  if (limits.invoices_monthly !== null) {
-    const startOfMonth = new Date();
-    startOfMonth.setDate(1);
-    startOfMonth.setHours(0, 0, 0, 0);
-    const { count } = await supabase
-      .from('invoices')
-      .select('id', { count: 'exact', head: true })
-      .eq('user_id', req.userId!)
-      .gte('created_at', startOfMonth.toISOString());
-    if ((count ?? 0) >= limits.invoices_monthly) {
-      res.status(403).json({
-        error: 'QUOTA_EXCEEDED',
-        message: `Free plan allows ${limits.invoices_monthly} invoices per month. Upgrade to Starter for unlimited invoices.`,
-        required_plan: 'starter',
-        quota: { limit: limits.invoices_monthly, used: count, feature: 'invoices_monthly' },
-      });
-      return;
-    }
-  }
+  // Invoice monthly quota — disabled: invoices are unlimited on every plan (Basic gets a watermarked PDF instead)
+  // if (limits.invoices_monthly !== null) {
+  //   const startOfMonth = new Date();
+  //   startOfMonth.setDate(1);
+  //   startOfMonth.setHours(0, 0, 0, 0);
+  //   const { count } = await supabase
+  //     .from('invoices')
+  //     .select('id', { count: 'exact', head: true })
+  //     .eq('user_id', req.userId!)
+  //     .gte('created_at', startOfMonth.toISOString());
+  //   if ((count ?? 0) >= limits.invoices_monthly) {
+  //     res.status(403).json({
+  //       error: 'QUOTA_EXCEEDED',
+  //       message: `Basic plan allows ${limits.invoices_monthly} invoices per month. Upgrade to Starter for unlimited invoices.`,
+  //       required_plan: 'starter',
+  //       quota: { limit: limits.invoices_monthly, used: count, feature: 'invoices_monthly' },
+  //     });
+  //     return;
+  //   }
+  // }
 
   // GSTIN state code cross-validation: first 2 digits must match brand's state code
   if (body.brandGstin && body.brandStateCode && body.brandGstin.slice(0, 2) !== body.brandStateCode) {
@@ -265,15 +267,7 @@ router.post('/', validateBody(CreateInvoiceSchema), async (req: AuthRequest, res
   const fyCode = getFYCode(fy);
   const prefix = user.invoice_prefix || 'INV';
 
-  // Get next sequence (atomic-ish — good enough for V1 solo user scale)
-  const { count } = await supabase
-    .from('invoices')
-    .select('id', { count: 'exact', head: true })
-    .eq('user_id', req.userId!)
-    .like('invoice_number', `${prefix}/${fyCode}/%`);
-
-  const seq = String((count || 0) + 1).padStart(4, '0');
-  const invoiceNumber = `${prefix}/${fyCode}/${seq}`;
+  let invoiceNumber = await nextInvoiceNumber(req.userId!, prefix, fyCode);
 
   const dueDate = body.dueDate || (() => {
     const d = new Date(body.invoiceDate + 'T00:00:00');
@@ -281,7 +275,7 @@ router.post('/', validateBody(CreateInvoiceSchema), async (req: AuthRequest, res
     return d.toISOString().split('T')[0];
   })();
 
-  const { data: invoice, error } = await supabase
+  const insertInvoice = () => supabase
     .from('invoices')
     .insert({
       user_id: req.userId!,
@@ -341,6 +335,13 @@ router.post('/', validateBody(CreateInvoiceSchema), async (req: AuthRequest, res
     })
     .select()
     .single();
+
+  let { data: invoice, error } = await insertInvoice();
+  // Unique (user_id, invoice_number) clash — e.g. two tabs saving at once — take the next number and retry
+  for (let attempt = 0; attempt < 3 && error?.code === '23505'; attempt++) {
+    invoiceNumber = await nextInvoiceNumber(req.userId!, prefix, fyCode);
+    ({ data: invoice, error } = await insertInvoice());
+  }
 
   if (error || !invoice) {
     res.status(500).json({ error: 'INTERNAL_ERROR', message: error?.message || 'Failed to create invoice' });
@@ -504,6 +505,29 @@ router.put('/:id', validateBody(CreateInvoiceSchema.partial()), async (req: Auth
     if (body[camel] !== undefined) updates[snake] = body[camel];
   }
 
+  // Amounts are always recomputed server-side — never trust client totals
+  if (body.baseAmount !== undefined || body.gstRate !== undefined || body.brandStateCode !== undefined) {
+    const { data: current } = await supabase
+      .from('invoices')
+      .select('base_amount, gst_rate, brand_state_code')
+      .eq('id', req.params.id)
+      .eq('user_id', req.userId!)
+      .maybeSingle();
+    const user = await getUser(req.userId!);
+    const gst = calculateGst(
+      body.baseAmount ?? Number(current?.base_amount),
+      body.gstRate ?? Number(current?.gst_rate),
+      user?.state_code || '',
+      body.brandStateCode ?? current?.brand_state_code,
+    );
+    Object.assign(updates, {
+      base_amount: gst.baseAmount, gst_rate: gst.gstRate, gst_amount: gst.gstAmount,
+      total_amount: gst.totalAmount, supply_type: gst.supplyType,
+      cgst_amount: gst.cgstAmount, sgst_amount: gst.sgstAmount, igst_amount: gst.igstAmount,
+    });
+  }
+  if (body.invoiceDate) updates.financial_year = getFinancialYear(new Date(body.invoiceDate));
+
   const { data, error } = await supabase
     .from('invoices')
     .update(updates)
@@ -540,6 +564,20 @@ router.delete('/:id', async (req: AuthRequest, res: Response): Promise<void> => 
   if (error) { res.status(500).json({ error: 'INTERNAL_ERROR', message: error.message }); return; }
   res.status(204).send();
 });
+
+// Next sequence = highest existing number in this prefix/FY + 1 (not a count — deleted drafts leave gaps)
+async function nextInvoiceNumber(userId: string, prefix: string, fyCode: string): Promise<string> {
+  const { data } = await supabase
+    .from('invoices')
+    .select('invoice_number')
+    .eq('user_id', userId)
+    .like('invoice_number', `${prefix}/${fyCode}/%`);
+  const maxSeq = (data || []).reduce((max, row) => {
+    const n = parseInt(String(row.invoice_number).split('/').pop() || '0', 10);
+    return Number.isFinite(n) && n > max ? n : max;
+  }, 0);
+  return `${prefix}/${fyCode}/${String(maxSeq + 1).padStart(4, '0')}`;
+}
 
 async function getUser(userId: string) {
   const { data } = await supabase
@@ -613,6 +651,21 @@ router.post('/:id/send', async (req: AuthRequest, res: Response): Promise<void> 
   } catch (err: any) {
     res.status(500).json({ error: 'EMAIL_FAILED', message: 'Failed to send email. Check your email configuration.', statusCode: 500 });
   }
+});
+
+// PATCH /invoices/:id/mark-paid — creator marks an invoice as paid
+router.patch('/:id/mark-paid', async (req: AuthRequest, res: Response): Promise<void> => {
+  const { data, error } = await supabase
+    .from('invoices')
+    .update({ status: 'paid', updated_at: new Date().toISOString() })
+    .eq('id', req.params.id)
+    .eq('user_id', req.userId!)
+    .neq('status', 'paid')
+    .select('id, status')
+    .maybeSingle();
+  if (error) { res.status(500).json({ error: 'INTERNAL_ERROR', message: error.message }); return; }
+  if (!data) { res.status(404).json({ error: 'NOT_FOUND', message: 'Invoice not found or already paid' }); return; }
+  res.json(data);
 });
 
 // POST /invoices/:id/payment-confirm-token — generate one-time brand confirmation link

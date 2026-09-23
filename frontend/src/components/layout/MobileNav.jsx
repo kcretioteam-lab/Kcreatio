@@ -126,7 +126,7 @@ export default function MobileNav() {
               textDecoration: 'none',
             }}
           >
-            Trial: {trialDaysLeft()} days left · Upgrade to Pro →
+            Pro access: {trialDaysLeft()} days left {/* was: · Upgrade to Pro → (paid upgrade disabled) */}
           </NavLink>
         )}
       </div>

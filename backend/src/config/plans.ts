@@ -6,7 +6,7 @@ export const PLAN_HIERARCHY: Record<Plan, number> = {
   starter:  1,
   trial:    2,
   pro:      2,
-  business: 3,
+  business: 3, // Business plan paused — kept only so existing DB rows type-check; not purchasable
 };
 
 // null = unlimited
@@ -18,7 +18,8 @@ export const PLAN_LIMITS: Record<Plan, {
   tc_profiles: number;
   free_templates: string[] | null; // null = all templates allowed
 }> = {
-  basic:    { invoices_monthly: 5,    tds_entries: 10,   bank_accounts: 1, upi_ids: 1, tc_profiles: 1, free_templates: ['classic', 'modern', 'compact'] },
+  // Invoices are unlimited on Basic — Basic PDFs carry the Kcretio watermark instead (was: invoices_monthly: 5)
+  basic:    { invoices_monthly: null, tds_entries: 10,   bank_accounts: 1, upi_ids: 1, tc_profiles: 1, free_templates: ['classic', 'modern', 'compact'] },
   trial:    { invoices_monthly: null, tds_entries: null, bank_accounts: 5, upi_ids: 5, tc_profiles: 5, free_templates: null },
   starter:  { invoices_monthly: null, tds_entries: null, bank_accounts: 5, upi_ids: 5, tc_profiles: 5, free_templates: null },
   pro:      { invoices_monthly: null, tds_entries: null, bank_accounts: 5, upi_ids: 5, tc_profiles: 5, free_templates: null },

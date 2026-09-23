@@ -267,7 +267,7 @@ function ResolvedCTA({ withRule }) {
             display: 'inline-block',
           }}
         >
-          Start 28-day free trial
+          Start free
         </Link>
         <a
           href="#features"
@@ -285,7 +285,7 @@ function ResolvedCTA({ withRule }) {
         </a>
       </div>
       <p style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', marginTop: 'var(--space-3)' }}>
-        No credit card required · 28-day free trial
+        No credit card required · request 28 days of Pro free
       </p>
     </div>
   );

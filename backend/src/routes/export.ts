@@ -107,7 +107,7 @@ router.get('/annual', checkPlan('pro'), async (req: AuthRequest, res: Response):
 
   // Stream ZIP response
   res.setHeader('Content-Type', 'application/zip');
-  res.setHeader('Content-Disposition', `attachment; filename="kcreatio-${fy}.zip"`);
+  res.setHeader('Content-Disposition', `attachment; filename="kcretio-${fy}.zip"`);
 
   const archive = archiver('zip', { zlib: { level: 9 } });
   archive.pipe(res);

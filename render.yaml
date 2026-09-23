@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: kcreatio-backend
+    name: kcretio-backend
     runtime: node
     region: oregon
     rootDir: backend

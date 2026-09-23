@@ -953,7 +953,7 @@ function HeroCTA() {
             fontFamily: 'system-ui, sans-serif',
           }}
         >
-          Start free — 28 days
+          Start free
         </Link>
         <a
           href="#features"

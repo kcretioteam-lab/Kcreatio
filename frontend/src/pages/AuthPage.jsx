@@ -262,7 +262,7 @@ export default function AuthPage({ defaultMode = 'register' }) {
         {/* Right form panel */}
         <div style={{ padding: isMobile ? 'var(--space-6)' : 'var(--space-10)' }}>
           <h1 style={{ fontSize: 'var(--text-xl)', fontWeight: 700, color: 'var(--text-primary)', marginBottom: 'var(--space-1)' }}>
-            {mode === 'register' ? 'Start your 28-day trial' : 'Welcome back'}
+            {mode === 'register' ? 'Create your free account' : 'Welcome back'}
           </h1>
           {mode === 'register' && (
             <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)', marginBottom: 'var(--space-6)' }}>
@@ -495,7 +495,7 @@ export default function AuthPage({ defaultMode = 'register' }) {
             {mode === 'register' ? 'Already have an account? ' : "Don't have an account? "}
             <Link to={mode === 'register' ? '/login' : '/register'} onClick={() => { setErrors({}); setOtpVerified(false); setOtpStep(false); }}
               style={{ color: 'var(--accent)', fontWeight: 600, textDecoration: 'underline' }}>
-              {mode === 'register' ? 'Sign in' : 'Start free trial'}
+              {mode === 'register' ? 'Sign in' : 'Start free'}
             </Link>
           </p>
         </div>

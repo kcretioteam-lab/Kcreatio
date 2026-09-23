@@ -20,7 +20,7 @@ const SECTIONS = [
   },
   {
     title: '5. Payment Information',
-    body: 'Subscription payments are processed by Razorpay. Kcretio does not receive or store your card, UPI PIN, or bank login details — Razorpay handles that directly and shares back only your subscription status and plan.',
+    body: 'Kcretio does not currently take payments. When paid plans launch, subscription payments will be processed by Razorpay. Kcretio does not receive or store your card, UPI PIN, or bank login details — Razorpay handles that directly and shares back only your subscription status and plan.',
   },
   {
     title: '6. Cookies & Sessions',

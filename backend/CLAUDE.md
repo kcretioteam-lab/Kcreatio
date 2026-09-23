@@ -63,4 +63,8 @@ If adding new custom headers to frontend requests, add here too.
 ```json
 { "error": "ERROR_CODE", "message": "human readable", "field": "fieldName", "statusCode": 422 }
 ```
-Codes: VALIDATION_ERROR, UNAUTHORIZED, FORBIDDEN, NOT_FOUND, RATE_LIMITED, INTERNAL_ERROR, LIMIT_EXCEEDED
+Codes: see backend/README.md — quota errors use QUOTA_EXCEEDED (there is no LIMIT_EXCEEDED)
+
+## Plans
+- basic / starter / pro / trial are live. `business` is paused: kept in the `Plan` type and DB CHECK only, commented out of payments + UI.
+- Invoices are unlimited on every plan; the monthly quota check in `POST /invoices` is commented out. Basic PDFs carry the watermark.

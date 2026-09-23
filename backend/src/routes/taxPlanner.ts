@@ -12,7 +12,8 @@ router.get('/quick-estimate', (req, res): void => {
   const monthlyIncome = parseFloat(req.query.monthly_income as string) || 0;
   const brandCount = parseInt(req.query.brand_count as string, 10) || 1;
   const annual = monthlyIncome * 12;
-  const taxableIncome = Math.max(0, annual - 50000); // ₹50K standard deduction (new regime)
+  // No standard deduction — it applies to salary income only; creator income is professional/business income
+  const taxableIncome = Math.max(0, annual);
 
   // New regime slabs FY 2025-26 (matches NEW_REGIME_SLABS in this file)
   const slabs: [number, number, number][] = [
@@ -71,14 +72,18 @@ const INSTALMENT_SCHEDULE = [
 
 function calcTax(annualIncomePaise: number, regime: string): number {
   const slabs = regime === 'old' ? OLD_REGIME_SLABS : NEW_REGIME_SLABS;
-  const standardDeduction = regime === 'new' ? 5000000 : 0; // ₹50,000 in paise
-  const taxableIncomePaise = Math.max(0, annualIncomePaise - standardDeduction);
+  // No standard deduction — it applies to salary income only; creator income is professional/business income
+  const taxableIncomePaise = Math.max(0, annualIncomePaise);
   let taxPaise = 0;
   for (const slab of slabs) {
     if (taxableIncomePaise <= slab.min * 100) break;
     const inSlab = Math.min(taxableIncomePaise, slab.max === Infinity ? Infinity : slab.max * 100) - slab.min * 100;
     taxPaise += Math.round(inSlab * slab.rate);
   }
+  // Section 87A rebate — new regime: taxable ≤ ₹12L, up to ₹60,000; old regime: taxable ≤ ₹5L, up to ₹12,500
+  const rebateLimitPaise = regime === 'old' ? 500000 * 100 : 1200000 * 100;
+  const maxRebatePaise = regime === 'old' ? 12500 * 100 : 60000 * 100;
+  if (taxableIncomePaise <= rebateLimitPaise) taxPaise = Math.max(0, taxPaise - maxRebatePaise);
   const cessPaise = Math.round(taxPaise * 0.04);
   return taxPaise + cessPaise;
 }

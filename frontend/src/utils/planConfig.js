@@ -2,11 +2,13 @@
 // This is the single source of truth for all plan logic on the frontend.
 // Never hardcode plan names or limits directly in page/component files.
 
-export const PLAN_HIERARCHY = { free: 0, starter: 1, trial: 2, pro: 2, business: 3 };
+// business: 3 — Business plan paused; kept so existing rows resolve, not purchasable
+export const PLAN_HIERARCHY = { basic: 0, starter: 1, trial: 2, pro: 2, business: 3 };
 
 // null = unlimited
 export const PLAN_LIMITS = {
-  basic:     { invoices_monthly: 5,    tds_entries: 10,   bank_accounts: 1, upi_ids: 1, tc_profiles: 1, templates: ['classic', 'modern', 'compact'] },
+  // Invoices are unlimited on Basic — Basic PDFs carry the Kcretio watermark instead (was: invoices_monthly: 5)
+  basic:    { invoices_monthly: null, tds_entries: 10,   bank_accounts: 1, upi_ids: 1, tc_profiles: 1, templates: ['classic', 'modern', 'compact'] },
   trial:    { invoices_monthly: null, tds_entries: null, bank_accounts: 5, upi_ids: 5, tc_profiles: 5, templates: null },
   starter:  { invoices_monthly: null, tds_entries: null, bank_accounts: 5, upi_ids: 5, tc_profiles: 5, templates: null },
   pro:      { invoices_monthly: null, tds_entries: null, bank_accounts: 5, upi_ids: 5, tc_profiles: 5, templates: null },
@@ -34,7 +36,7 @@ export const PLAN_DISPLAY = {
   trial:    { name: 'Trial',    price: 0,    annualPrice: 0 },
   starter:  { name: 'Starter',  price: 299,  annualPrice: 249 },
   pro:      { name: 'Pro',      price: 599,  annualPrice: 499 },
-  business: { name: 'Business', price: 1499, annualPrice: 1249 },
+  // business: { name: 'Business', price: 1499, annualPrice: 1249 }, // Business plan paused
 };
 
 export function canAccess(feature, plan) {

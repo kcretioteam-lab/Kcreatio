@@ -24,11 +24,11 @@ const SECTIONS = [
   },
   {
     title: '6. Payments & Subscriptions',
-    body: 'Paid plans are billed through Razorpay. Subscriptions renew automatically at the end of each billing period until cancelled. Cancelling stops future renewals; it does not refund the current billing period unless required by law.',
+    body: 'Kcretio does not currently charge for any plan. When paid plans launch, they will be billed through Razorpay, renew automatically at the end of each billing period until cancelled, and cancelling will stop future renewals without refunding the current billing period unless required by law.',
   },
   {
-    title: '7. Free Trial',
-    body: 'New accounts receive a 28-day free trial with full access. At the end of the trial, your account moves to the free plan unless you subscribe to a paid plan.',
+    title: '7. Premium Access',
+    body: 'New accounts start on the free Basic plan. You may request 28 days of free premium (Pro) access; requests are reviewed and approval is at our discretion. At the end of the 28 days, your account returns to the Basic plan.',
   },
   {
     title: '8. Acceptable Use',

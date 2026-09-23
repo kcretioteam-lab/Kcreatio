@@ -226,7 +226,7 @@ function isComplete(form) {
 
 // ── localStorage helpers — works without backend ──────────────────────────────
 const LS_KEY = 'creator_tax_invoices';
-const DRAFT_KEY = 'kcreatio:invoice_draft';
+const DRAFT_KEY = 'kcretio:invoice_draft';
 function lsLoad() { try { return JSON.parse(localStorage.getItem(LS_KEY) || '[]'); } catch { return []; } }
 function lsSave(arr) { localStorage.setItem(LS_KEY, JSON.stringify(arr)); }
 function lsNextNumber(user) {
@@ -234,8 +234,10 @@ function lsNextNumber(user) {
   const now = new Date();
   const y = now.getMonth() >= 3 ? now.getFullYear() : now.getFullYear() - 1;
   const fyCode = `${String(y).slice(-2)}${String(y+1).slice(-2)}`;
-  const count = lsLoad().filter(i => i.invoice_number?.startsWith(`${prefix}/${fyCode}/`)).length;
-  return `${prefix}/${fyCode}/${String(count+1).padStart(4,'0')}`;
+  const maxSeq = lsLoad()
+    .filter(i => i.invoice_number?.startsWith(`${prefix}/${fyCode}/`))
+    .reduce((max, i) => Math.max(max, parseInt(i.invoice_number.split('/').pop(), 10) || 0), 0);
+  return `${prefix}/${fyCode}/${String(maxSeq+1).padStart(4,'0')}`;
 }
 
 // base64-embedded logo for PDF watermark — avoids external URL resolution in Blob docs
@@ -311,7 +313,7 @@ function buildClassicHTML(inv, user, t, plan) {
   @page { margin: 0; size: A4 portrait; }
   * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; }
   @media print { body { padding: 16px 24px; } .hdr { border-radius: 0; } .body { border-radius: 0; } }
-  ${plan === 'basic' ? `body::before{content:'';position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-45deg);width:65%;height:65%;background:url('data:image/svg+xml;base64,${_WMARK_B64}') no-repeat center/contain;opacity:.07;pointer-events:none;z-index:9999;}body::after{content:'Kcretio.in — upgrade for watermark-free invoices';position:fixed;bottom:10px;left:0;right:0;text-align:center;font-size:8px;color:#a0aec0;font-family:Arial,sans-serif;letter-spacing:.04em;pointer-events:none;z-index:9999;}` : ''}
+  ${plan === 'basic' ? `body::before{content:'';position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-45deg);width:65%;height:65%;background:url('data:image/svg+xml;base64,${_WMARK_B64}') no-repeat center/contain;opacity:.07;pointer-events:none;z-index:9999;}body::after{content:'Made with ease on Kcretio.com';position:fixed;bottom:10px;left:0;right:0;text-align:center;font-size:8px;color:#a0aec0;font-family:Arial,sans-serif;letter-spacing:.04em;pointer-events:none;z-index:9999;}` : ''}
 </style>
 </head><body>
 <div class="hdr">
@@ -410,7 +412,7 @@ function buildClassicHTML(inv, user, t, plan) {
       </div>
     </div>
   </div>` : ''}
-  <div class="footer">GST-compliant invoice &nbsp;·&nbsp; Kcretio.in &nbsp;·&nbsp; Subject to GST as applicable</div>
+  <div class="footer">GST-compliant invoice &nbsp;·&nbsp; Kcretio.com &nbsp;·&nbsp; Subject to GST as applicable</div>
 </div>
 <script>window.onload = function() { window.print(); };</script>
 </body></html>`;
@@ -466,7 +468,7 @@ function buildCorporateHTML(inv, user, t, plan) {
   @page { margin: 0; size: A4 portrait; }
   * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; }
   @media print { body { padding: 16px 24px; } }
-  ${plan === 'basic' ? `body::before{content:'';position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-45deg);width:65%;height:65%;background:url('data:image/svg+xml;base64,${_WMARK_B64}') no-repeat center/contain;opacity:.07;pointer-events:none;z-index:9999;}body::after{content:'Kcretio.in — upgrade for watermark-free invoices';position:fixed;bottom:10px;left:0;right:0;text-align:center;font-size:8px;color:#a0aec0;font-family:Arial,sans-serif;letter-spacing:.04em;pointer-events:none;z-index:9999;}` : ''}
+  ${plan === 'basic' ? `body::before{content:'';position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-45deg);width:65%;height:65%;background:url('data:image/svg+xml;base64,${_WMARK_B64}') no-repeat center/contain;opacity:.07;pointer-events:none;z-index:9999;}body::after{content:'Made with ease on Kcretio.com';position:fixed;bottom:10px;left:0;right:0;text-align:center;font-size:8px;color:#a0aec0;font-family:Arial,sans-serif;letter-spacing:.04em;pointer-events:none;z-index:9999;}` : ''}
 </style>
 </head><body>
 <div class="hdr">
@@ -572,7 +574,7 @@ ${inv.include_terms && inv.terms_text ? `
   <strong>Terms &amp; Conditions:</strong>
   <div style="margin-top:4px;white-space:pre-line;color:#666;font-size:9px">${inv.terms_text}</div>
 </div>` : ''}
-<div style="margin-top:16px;text-align:center;font-size:8px;color:#ccc">GST-compliant invoice · Kcretio.in · Subject to GST as applicable</div>
+<div style="margin-top:16px;text-align:center;font-size:8px;color:#ccc">GST-compliant invoice · Kcretio.com · Subject to GST as applicable</div>
 <script>window.onload = function() { window.print(); };</script>
 </body></html>`;
 }
@@ -623,7 +625,7 @@ function buildMinimalHTML(inv, user, t, plan) {
   @page { margin: 0; size: A4 portrait; }
   * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; }
   @media print { body { padding: 16px 24px; } }
-  ${plan === 'basic' ? `body::before{content:'';position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-45deg);width:65%;height:65%;background:url('data:image/svg+xml;base64,${_WMARK_B64}') no-repeat center/contain;opacity:.07;pointer-events:none;z-index:9999;}body::after{content:'Kcretio.in — upgrade for watermark-free invoices';position:fixed;bottom:10px;left:0;right:0;text-align:center;font-size:8px;color:#a0aec0;font-family:Arial,sans-serif;letter-spacing:.04em;pointer-events:none;z-index:9999;}` : ''}
+  ${plan === 'basic' ? `body::before{content:'';position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-45deg);width:65%;height:65%;background:url('data:image/svg+xml;base64,${_WMARK_B64}') no-repeat center/contain;opacity:.07;pointer-events:none;z-index:9999;}body::after{content:'Made with ease on Kcretio.com';position:fixed;bottom:10px;left:0;right:0;text-align:center;font-size:8px;color:#a0aec0;font-family:Arial,sans-serif;letter-spacing:.04em;pointer-events:none;z-index:9999;}` : ''}
 </style>
 </head><body>
 <div class="top">
@@ -730,7 +732,7 @@ ${inv.include_terms && inv.terms_text ? `
   <strong>Terms &amp; Conditions:</strong>
   <div style="margin-top:4px;white-space:pre-line;color:#666;font-size:9px">${inv.terms_text}</div>
 </div>` : ''}
-<div style="margin-top:16px;text-align:center;font-size:8px;color:#ccc">GST-compliant invoice · Kcretio.in · Subject to GST as applicable</div>
+<div style="margin-top:16px;text-align:center;font-size:8px;color:#ccc">GST-compliant invoice · Kcretio.com · Subject to GST as applicable</div>
 <script>window.onload = function() { window.print(); };</script>
 </body></html>`;
 }
@@ -928,7 +930,9 @@ export default function InvoicePage({ initialView }) {
   const { user } = useAuth();
   const toast = useToast();
   const { usage, isAtLimit, refresh: refreshUsage } = useUsage();
-  const invoiceLimitReached = isAtLimit('invoices_monthly');
+  // Invoices are unlimited on every plan — monthly limit disabled (Basic gets a watermarked PDF instead)
+  // const invoiceLimitReached = isAtLimit('invoices_monthly');
+  const invoiceLimitReached = false;
   const navigate = useNavigate();
   const { id: editId } = useParams();
   const location = useLocation();
@@ -960,6 +964,11 @@ export default function InvoicePage({ initialView }) {
   const PAGE_SIZE = 10;
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(searchQuery.trim()), 300);
+    return () => clearTimeout(t);
+  }, [searchQuery]);
   const autosaveTimer = useRef(null);
   const pdfAbortRef = useRef(null);
   const sigCanvasRef = useRef(null);
@@ -988,7 +997,7 @@ export default function InvoicePage({ initialView }) {
   });
 
   // Load list whenever page/sort/search/filter changes
-  useEffect(() => { loadInvoices(); }, [page, sortCol, sortDir, searchQuery, filterStatus]);
+  useEffect(() => { loadInvoices(); }, [page, sortCol, sortDir, debouncedSearch, filterStatus]);
 
   // Debounced autosave to localStorage (create view only)
   useEffect(() => {
@@ -1133,10 +1142,6 @@ export default function InvoicePage({ initialView }) {
         if (defaultUpi) setSelectedUpiId(defaultUpi.id);
       }).catch(() => {});
     }
-    if (view === 'edit') {
-      setNextNumber(lsNextNumber(user));
-      api.get('/invoices/next-number').then(r => setNextNumber(r.data.invoiceNumber)).catch(() => {});
-    }
   }, [view]);
 
   useEffect(() => {
@@ -1173,10 +1178,10 @@ export default function InvoicePage({ initialView }) {
       invoiceAccentColor: inv.invoice_accent_color||'',
     });
     api.get(`/invoices/${editId}`)
-      .then(res => setForm(buildForm(res.data)))
+      .then(res => { setForm(buildForm(res.data)); setNextNumber(res.data.invoice_number || ''); })
       .catch(() => {
         const inv = lsLoad().find(i => i.id === editId);
-        if (inv) setForm(buildForm(inv));
+        if (inv) { setForm(buildForm(inv)); setNextNumber(inv.invoice_number || ''); }
       });
   }, [editId]);
 
@@ -1190,7 +1195,7 @@ export default function InvoicePage({ initialView }) {
     setListLoading(true);
     const offset = (page - 1) * PAGE_SIZE;
     const params = { limit: PAGE_SIZE, offset, sort: sortCol, dir: sortDir };
-    if (searchQuery.trim()) params.search = searchQuery.trim();
+    if (debouncedSearch) params.search = debouncedSearch;
     if (filterStatus !== 'all') params.status = filterStatus;
     api.get('/invoices', { params })
       .then(res => { setInvoices(res.data.invoices || []); setTotalCount(res.data.total || 0); })
@@ -1267,7 +1272,8 @@ export default function InvoicePage({ initialView }) {
 
     let saved = null;
     try {
-      const res = await api.post('/invoices', {
+      const isRemoteEdit = editingId && !String(editingId).startsWith('local-');
+      const body = {
         brandName: payload.brand_name, brandGstin: payload.brand_gstin,
         brandAddress: payload.brand_address, brandStateCode: payload.brand_state_code,
         brandPan: payload.brand_pan,
@@ -1293,9 +1299,18 @@ export default function InvoicePage({ initialView }) {
         includeSignatory: payload.include_signatory, signatoryName: payload.signatory_name,
         signatoryImageUrl: payload.signatory_image_url,
         sellerBusinessName: payload.seller_business_name,
-      });
-      saved = { ...payload, id: res.data.id };
-    } catch {
+      };
+      const res = isRemoteEdit
+        ? await api.put(`/invoices/${editingId}`, body)
+        : await api.post('/invoices', body);
+      saved = { ...payload, ...res.data, id: res.data.id };
+    } catch (err) {
+      // Server answered with an error — show it instead of silently saving to this browser only
+      if (err?.response) {
+        toast.error(err.response.data?.message || 'Could not save invoice');
+        setSubmitting(false);
+        return null;
+      }
       const existing = lsLoad();
       const id = editingId || `local-${Date.now()}`;
       saved = { ...payload, id };
@@ -1330,7 +1345,7 @@ export default function InvoicePage({ initialView }) {
       const signal = pdfAbortRef.current.signal;
       if (inv.id && !String(inv.id).startsWith('local-')) {
         try {
-          const res = await api.get(`/invoices/${inv.id}/pdf`, { responseType: 'blob', signal });
+          const res = await api.get(`/invoices/${inv.id}/pdf`, { responseType: 'blob', signal, timeout: 90000 });
           const url = URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }));
           const a = document.createElement('a');
           a.href = url;
@@ -1364,7 +1379,7 @@ export default function InvoicePage({ initialView }) {
     pdfAbortRef.current = new AbortController();
     const signal = pdfAbortRef.current.signal;
     try {
-      const res = await api.get(`/invoices/${inv.id}/pdf`, { responseType: 'blob', signal });
+      const res = await api.get(`/invoices/${inv.id}/pdf`, { responseType: 'blob', signal, timeout: 90000 });
       const url = URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }));
       const a = document.createElement('a');
       a.href = url; a.download = `${(inv.invoice_number||'invoice').replace(/\//g,'-')}.pdf`; a.click();
@@ -1376,7 +1391,7 @@ export default function InvoicePage({ initialView }) {
 
   async function handleExportJson(inv) {
     try {
-      const res = await api.get(`/invoices/${inv.id}/export`, { responseType: 'blob' });
+      const res = await api.get(`/invoices/${inv.id}/export`, { responseType: 'blob', timeout: 90000 });
       const url = URL.createObjectURL(new Blob([res.data], { type: 'application/json' }));
       const a = document.createElement('a');
       a.href = url; a.download = `${(inv.invoice_number||'invoice').replace(/\//g,'-')}.json`; a.click();
@@ -1401,8 +1416,11 @@ export default function InvoicePage({ initialView }) {
     const fy = month >= 4 ? `${fyStart}-${String(parseInt(fyStart)+1).slice(-2)}` : `${parseInt(fyStart)-1}-${String(parseInt(fyStart)).slice(-2)}`;
 
     // Update invoice status
-    const existing = lsLoad();
-    lsSave(existing.map(i => i.id === inv.id ? { ...i, status: 'paid' } : i));
+    try { await api.patch(`/invoices/${inv.id}/mark-paid`); }
+    catch (err) {
+      if (err?.response) { toast.error(err.response.data?.message || 'Could not mark invoice as paid'); return; }
+      lsSave(lsLoad().map(i => i.id === inv.id ? { ...i, status: 'paid' } : i));
+    }
 
     // Try backend for income + TDS logging
     try {
@@ -2300,6 +2318,7 @@ export default function InvoicePage({ initialView }) {
       <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-4)', flexWrap: 'wrap', gap: 'var(--space-3)' }}>
         <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)' }}>GST-compliant · Rule 46 CGST Rules{totalCount > 0 ? (' · ' + totalCount + ' total') : ''}</p>
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
+          {/* Monthly invoice counter — disabled, invoices are unlimited on every plan
           {usage.invoices_limit !== null && (
             <span style={{
               fontSize: 'var(--text-xs)', color: 'var(--text-muted)',
@@ -2307,7 +2326,7 @@ export default function InvoicePage({ initialView }) {
             }}>
               {usage.invoices_this_month ?? 0}/{usage.invoices_limit} this month
             </span>
-          )}
+          )} */}
           <button
             onClick={invoiceLimitReached ? undefined : () => navigate('/invoices/new')}
             disabled={invoiceLimitReached}
@@ -2327,6 +2346,7 @@ export default function InvoicePage({ initialView }) {
           >
             <Plus size={14} aria-hidden="true" />
             New Invoice
+            {/* Monthly invoice counter badge — disabled, invoices are unlimited on every plan
             {usage.invoices_limit !== null && (
               <span style={{
                 marginLeft: 2,
@@ -2340,13 +2360,14 @@ export default function InvoicePage({ initialView }) {
               }}>
                 {usage.invoices_this_month ?? 0}/{usage.invoices_limit}
               </span>
-            )}
+            )} */}
           </button>
+          {/* Invoice limit upgrade link — disabled, invoices are unlimited on every plan
           {invoiceLimitReached && (
             <a href="/settings#billing" style={{ fontSize: 'var(--text-xs)', color: 'var(--accent)', fontWeight: 600, textDecoration: 'none' }}>
               Upgrade →
             </a>
-          )}
+          )} */}
         </div>
       </header>
 
@@ -2378,6 +2399,7 @@ export default function InvoicePage({ initialView }) {
         invoices={invoices} loading={listLoading}
         onDownload={handleDownloadFromList} onExportJson={handleExportJson} onDelete={handleDelete} onMarkPaid={handleMarkPaid} onRefresh={loadInvoices}
         sortCol={sortCol} sortDir={sortDir}
+        isFiltered={!!debouncedSearch || filterStatus !== 'all'}
         onSort={(col) => {
           if (col === sortCol) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
           else { setSortCol(col); setSortDir('desc'); }

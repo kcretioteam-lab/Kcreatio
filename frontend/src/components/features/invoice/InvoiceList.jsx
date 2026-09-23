@@ -20,12 +20,11 @@ const COLS = [
   { key: 'actions',        label: 'Actions',   sortable: false },
 ];
 
-export default function InvoiceList({ invoices, loading, onDownload, onExportJson, onDelete, onRefresh, onMarkPaid, sortCol, sortDir, onSort }) {
+export default function InvoiceList({ invoices, loading, onDownload, onExportJson, onDelete, onRefresh, onMarkPaid, sortCol, sortDir, onSort, isFiltered }) {
   const navigate = useNavigate();
   const toast = useToast();
   const [viewModalId, setViewModalId] = useState(null);
   const [sendingId, setSendingId] = useState(null);
-  const [copyingId, setCopyingId] = useState(null);
 
   async function handleSend(inv) {
     if (!inv.brand_email) { toast.error('Add a brand email to this invoice before sending'); return; }
@@ -36,16 +35,6 @@ export default function InvoiceList({ invoices, loading, onDownload, onExportJso
       onRefresh?.();
     } catch (err) { toast.error(err?.response?.data?.message || 'Failed to send invoice'); }
     finally { setSendingId(null); }
-  }
-
-  async function handleCopyPaymentLink(inv) {
-    setCopyingId(inv.id);
-    try {
-      const res = await api.post(`/invoices/${inv.id}/payment-confirm-token`);
-      await navigator.clipboard.writeText(res.data.url);
-      toast.success('Payment confirmation link copied to clipboard');
-    } catch (err) { toast.error(err?.response?.data?.message || 'Failed to generate link'); }
-    finally { setCopyingId(null); }
   }
 
   const SortIcon = ({ col }) => {
@@ -61,6 +50,13 @@ export default function InvoiceList({ invoices, loading, onDownload, onExportJso
   }
 
   if (invoices.length === 0) {
+    if (isFiltered) {
+      return (
+        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: 'var(--space-8)', textAlign: 'center', fontSize: 'var(--text-sm)', color: 'var(--text-muted)' }}>
+          No invoices match your search or filter.
+        </div>
+      );
+    }
     return (
       <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: 'var(--space-12)', textAlign: 'center' }}>
         <div style={{ fontSize: 36, marginBottom: 'var(--space-3)' }} aria-hidden="true">📄</div>
@@ -149,14 +145,8 @@ export default function InvoiceList({ invoices, loading, onDownload, onExportJso
                           onClick={e => { e.stopPropagation(); handleSend(inv); }}
                           disabled={sendingId === inv.id || !inv.brand_email} info />
                       )}
-                      {/* PAYMENT CONFIRM LINK — sent or draft */}
-                      {['draft','sent'].includes(inv.status) && (
-                        <ActionBtn icon={<Copy size={13}/>} label="Copy payment confirmation link to send to brand" title="Payment Link"
-                          onClick={e => { e.stopPropagation(); handleCopyPaymentLink(inv); }}
-                          disabled={copyingId === inv.id} />
-                      )}
                       {/* DUPLICATE */}
-                      <ActionBtn icon={<Copy size={13} style={{ opacity: 0.7 }}/>} label="Duplicate invoice" title="Duplicate"
+                      <ActionBtn icon={<Copy size={13}/>} label="Duplicate invoice" title="Duplicate"
                         onClick={e => { e.stopPropagation(); navigate('/invoices/new', { state: { duplicate: inv } }); }} />
                       {/* MARK PAID */}
                       {['draft','sent'].includes(inv.status) && (

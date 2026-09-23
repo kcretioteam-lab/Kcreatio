@@ -6,7 +6,7 @@ const UsageContext = createContext(null);
 
 const DEFAULT_USAGE = {
   plan: 'basic',
-  invoices_this_month: 0, invoices_limit: 5,
+  invoices_this_month: 0, invoices_limit: null, // unlimited on every plan (was 5 on Basic)
   tds_entries_total:   0, tds_limit: 10,
   bank_accounts:       0, bank_limit: 1,
   upi_ids:             0, upi_limit: 1,

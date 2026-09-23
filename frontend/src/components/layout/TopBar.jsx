@@ -284,7 +284,7 @@ export default function TopBar({ pageTitle }) {
                       {user?.name || 'Admin User'}
                     </div>
                     <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {user?.email || 'admin@kcreatio.in'}
+                      {user?.email || 'admin@kcretio.in'}
                     </div>
                   </div>
                 </div>

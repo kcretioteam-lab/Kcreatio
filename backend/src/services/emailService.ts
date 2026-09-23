@@ -2,7 +2,7 @@ import { Resend } from 'resend';
 import { getFrontendUrl } from '../lib/env.js';
 
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
-const FROM = process.env.FROM_EMAIL || 'noreply@kcreatio.com';
+const FROM = process.env.FROM_EMAIL || 'noreply@kcretio.com';
 
 async function send(to: string, subject: string, html: string) {
   if (!resend) {
@@ -52,7 +52,8 @@ export async function sendWelcomeEmail(to: string, name: string) {
     <div style="font-family:Inter,sans-serif;max-width:480px;margin:0 auto;padding:32px;background:#07080F;color:#F0F1F8;border-radius:12px;">
       <div style="font-size:22px;font-weight:700;margin-bottom:8px;color:#E8921A;">Kcretio</div>
       <h2 style="font-size:18px;font-weight:600;margin:0 0 8px;">Welcome, ${name}! 🎉</h2>
-      <p style="color:#94a3b8;margin:0 0 16px;">Your 28-day free trial has started. You have full Pro access.</p>
+      <!-- Auto 28-day trial disabled — premium is now granted on request -->
+      <p style="color:#94a3b8;margin:0 0 16px;">Want Pro features (advance tax calculator, P&amp;L, CA export, Smart Inbox)? Request 28 days of free Pro access from Settings.</p>
       <p style="color:#94a3b8;margin:0 0 24px;">Start by creating your first GST-compliant invoice in under 30 seconds.</p>
       <a href="${getFrontendUrl()}/invoices/new" style="display:inline-block;background:#E8921A;color:#fff;font-weight:700;padding:14px 32px;border-radius:8px;text-decoration:none;">Create First Invoice →</a>
     </div>`;
@@ -119,4 +120,40 @@ export async function sendAdvanceTaxReminder(to: string, opts: {
       <p style="color:#64748b;font-size:12px;">Late payment attracts 1% interest per month under Section 234B/234C.</p>
     </div>`;
   await send(to, `${urgency}Advance Tax ${opts.quarter} due in ${opts.daysLeft} days — ${opts.amount}`, html);
+}
+
+const escHtml = (v: string) => v.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
+
+export async function sendPremiumRequestAdminEmail(opts: {
+  name: string; email: string; features: string[]; platform: string; followerCount: number;
+  approveUrl: string; appUrl: string;
+}) {
+  const admin = process.env.ADMIN_EMAIL;
+  if (!admin) {
+    console.log(`[EMAIL-DEV] ADMIN_EMAIL not set — premium request from ${opts.email} | Approve: ${opts.approveUrl}`);
+    return;
+  }
+  const html = `
+    <div style="font-family:Inter,sans-serif;max-width:480px;margin:0 auto;padding:32px;background:#07080F;color:#F0F1F8;border-radius:12px;">
+      <div style="font-size:22px;font-weight:700;margin-bottom:8px;color:#E8921A;">Kcretio</div>
+      <h2 style="font-size:18px;font-weight:600;margin:0 0 16px;">New premium access request</h2>
+      <p style="color:#94a3b8;margin:0 0 4px;"><strong style="color:#F0F1F8;">${escHtml(opts.name)}</strong> · ${escHtml(opts.email)}</p>
+      <p style="color:#94a3b8;margin:0 0 4px;">Platform: ${escHtml(opts.platform)} · Followers: ${opts.followerCount.toLocaleString('en-IN')}</p>
+      <p style="color:#94a3b8;margin:0 0 24px;">Wants: ${opts.features.map(escHtml).join(', ')}</p>
+      <a href="${opts.approveUrl}" style="display:inline-block;background:#E8921A;color:#fff;font-weight:700;padding:14px 32px;border-radius:8px;text-decoration:none;">Approve 28 days of Pro →</a>
+      <p style="color:#64748b;font-size:12px;margin:16px 0 0;">Link expires in 7 days. Ignore this email to leave the request pending.</p>
+    </div>`;
+  console.log(`[PREMIUM] Request from ${opts.email} | Approve: ${opts.approveUrl}`);
+  await send(admin, `Premium request: ${opts.name} (${opts.platform}, ${opts.followerCount.toLocaleString('en-IN')})`, html);
+}
+
+export async function sendPremiumApprovedEmail(to: string, name: string, endsAt: Date) {
+  const html = `
+    <div style="font-family:Inter,sans-serif;max-width:480px;margin:0 auto;padding:32px;background:#07080F;color:#F0F1F8;border-radius:12px;">
+      <div style="font-size:22px;font-weight:700;margin-bottom:8px;color:#E8921A;">Kcretio</div>
+      <h2 style="font-size:18px;font-weight:600;margin:0 0 8px;">You're on Pro, ${escHtml(name)}! 🎉</h2>
+      <p style="color:#94a3b8;margin:0 0 24px;">Your premium access request was approved. You have full Pro access until ${endsAt.toDateString()}.</p>
+      <a href="${getFrontendUrl()}/dashboard" style="display:inline-block;background:#E8921A;color:#fff;font-weight:700;padding:14px 32px;border-radius:8px;text-decoration:none;">Open Kcretio →</a>
+    </div>`;
+  await send(to, 'Your Kcretio Pro access is live', html);
 }
