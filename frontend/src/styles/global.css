@@ -99,3 +99,22 @@ html {
   .desktop-signin { display: none !important; }
   .mobile-hamburger { display: flex !important; }
 }
+
+/* ── Invoice editor action bar ─────────────────────────────── */
+.inv-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: var(--space-2);
+  height: 34px; padding: 0 var(--space-4);
+  border-radius: var(--radius-md); border: 1px solid transparent;
+  font: inherit; font-size: var(--text-sm); font-weight: 600; white-space: nowrap;
+  cursor: pointer;
+  transition: background var(--duration-fast), border-color var(--duration-fast), color var(--duration-fast);
+}
+.inv-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.inv-btn:disabled { cursor: not-allowed; opacity: .45; }
+.inv-btn--primary { background: var(--accent); color: #fff; }
+.inv-btn--primary:hover:not(:disabled) { background: var(--accent-hover); }
+.inv-btn--secondary { background: var(--surface-2); border-color: var(--border); color: var(--text-primary); }
+.inv-btn--secondary:hover:not(:disabled) { background: var(--surface-3); border-color: var(--border-2); }
+.inv-btn--danger { background: var(--danger-dim); border-color: var(--danger-dim); color: var(--danger-text); }
+.inv-btn--danger:hover:not(:disabled) { border-color: var(--danger); }
+.inv-btn-divider { width: 1px; height: 20px; background: var(--border); flex-shrink: 0; }
