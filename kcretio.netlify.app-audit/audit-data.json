@@ -1,0 +1,25 @@
+{"summary":{"health_score":50,"business_type":"SaaS (B2C fintech, Indian creators)",
+"top_findings":["Client-side rendering only: raw HTML is empty to non-JS crawlers and AI bots","robots.txt and sitemap.xml missing (SPA fallback serves HTML)","Soft 404s: every unknown URL returns 200","No canonical tag; production domain not live","Unverifiable social-proof stats on a pre-launch product"],
+"quick_wins":["Add robots.txt + sitemap.xml to frontend/public","Add canonical + og:image/og:url","Add Organization/SoftwareApplication JSON-LD","noindex /login and /register","aria-labels on icon buttons"]},
+"categories":[
+{"name":"Technical SEO","score":45,"what_works":["HTTPS + HSTS preload","http->https 301"],"findings":[
+{"title":"Client-side rendering only","severity":"Critical","description":"Raw HTML contains only <div id=root>.","recommendation":"Prerender marketing routes at build."},
+{"title":"robots.txt / sitemap.xml missing","severity":"High","description":"Both return text/html due to the /* rewrite.","recommendation":"Add static files in frontend/public."},
+{"title":"Soft 404s","severity":"High","description":"/this-does-not-exist returns 200.","recommendation":"404 route with noindex or real 404 status."},
+{"title":"No canonical","severity":"High","description":"netlify.app and kcretio.com could both be indexed.","recommendation":"Canonical to production domain + 301."}]},
+{"name":"Content Quality","score":55,"what_works":["Specific Indian tax detail","Useful FAQ"],"findings":[
+{"title":"Unverifiable stats","severity":"High","description":"'2,400+ creators / Rs 42Cr+' on a pre-launch product.","recommendation":"Use real data or remove."},
+{"title":"No company identity","severity":"Medium","description":"No About page for a finance product.","recommendation":"Add an About page."}]},
+{"name":"On-Page SEO","score":60,"what_works":["Good title and meta description"],"findings":[
+{"title":"H1 has no keyword","severity":"Medium","description":"'Create. Everything else flows.'","recommendation":"Add a keyword phrase to the H1."},
+{"title":"Missing og:image","severity":"Medium","description":"Shares show no preview image.","recommendation":"Add a 1200x630 image."}]},
+{"name":"Schema / Structured Data","score":10,"what_works":[],"findings":[{"title":"No JSON-LD","severity":"Medium","description":"0 blocks detected.","recommendation":"Organization, WebSite, SoftwareApplication."}]},
+{"name":"Performance (CWV)","score":65,"what_works":["~105KB brotli JS","No console errors"],"findings":[{"title":"LCP gated on JS","severity":"Medium","description":"H1 renders only after JS boot (~5.9s headless).","recommendation":"Prerender; preload the hero font."}]},
+{"name":"AI Search Readiness","score":35,"what_works":["Citable FAQ content"],"findings":[{"title":"Invisible to AI crawlers","severity":"High","description":"No SSR/prerender; no llms.txt; no robots policy.","recommendation":"Prerender; add robots.txt and llms.txt."}]},
+{"name":"Images","score":80,"what_works":["Logo has alt text and dimensions"],"findings":[{"title":"Icon buttons without accessible names","severity":"Low","description":"2 svg-only buttons.","recommendation":"Add aria-label."}]}],
+"action_plan":{"phases":[
+{"name":"Phase 1: Critical Fixes","timeframe":"Week 1","items":["Prerender marketing routes","robots.txt"]},
+{"name":"Phase 2: High-Impact Improvements","timeframe":"Weeks 2-3","items":["sitemap.xml","canonical + domain launch","real 404","fix unverified stats","og:image"]},
+{"name":"Phase 3: Content & Authority","timeframe":"Month 2","items":["JSON-LD","About page","tax guides hub","public calculator page"]},
+{"name":"Phase 4: Monitoring & Iteration","timeframe":"Ongoing","items":["Search Console","re-audit","drift baseline"]}]},
+"artifacts":{"findings_dir":"findings/","screenshots_dir":"screenshots/"}}
