@@ -74,7 +74,8 @@ export default function AppShell({ children }) {
             paddingBottom: isMobile ? 64 : 0,
           }}
         >
-          <TopBar pageTitle={pageTitle} />
+          {/* Invoice editor has its own header (Back, number, template, preview) — skip global search/notifications there */}
+          {!location.pathname.startsWith('/invoices/') && <TopBar pageTitle={pageTitle} />}
           <main style={{
             flex: 1,
             overflowX: 'hidden',

@@ -1,12 +1,13 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { format, addDays } from 'date-fns';
-import { Plus, FileText, Check, AlertCircle, Eye, Download, X, HelpCircle, ChevronUp, ChevronDown, ChevronsUpDown, Lock, Save, Mail } from 'lucide-react';
+import { Plus, FileText, Check, AlertCircle, Eye, Download, X, HelpCircle, ChevronUp, ChevronDown, ChevronsUpDown, Lock, Save, Mail, Trash2, Sun, Moon } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth.jsx';
 import { useToast } from '../hooks/useToast.jsx';
 import UsageBar from '../components/ui/UsageBar.jsx';
 import { useUsage } from '../hooks/useUsage.jsx';
 import { isTemplateLocked } from '../utils/planConfig.js';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
+import { useTheme } from '../App.jsx';
 import api from '../utils/api.js';
 import { formatINR, amountInWords } from '../utils/formatINR.js';
 import Input from '../components/ui/Input.jsx';
@@ -855,6 +856,7 @@ const SIG_FONTS = [
 ];
 
 function CompliancePanel({ form }) {
+  const [open, setOpen] = useState(false);
   const errors = getErrors(form);
   const hasAnyInput = form.brandName.trim() || form.baseAmount || form.serviceDescription.trim();
   if (!hasAnyInput) return null;
@@ -871,20 +873,39 @@ function CompliancePanel({ form }) {
   const passed = checks.filter(c => !errors[c.key]).length;
   const allPass = passed === checks.length;
 
+  // Compact pill; full checklist opens in a popover above the action bar
   return (
-    <div style={{
-      marginBottom: 'var(--space-2)',
-      padding: 'var(--space-2) var(--space-3)',
-      background: allPass ? 'rgba(72,187,120,.08)' : 'rgba(237,137,54,.06)',
-      border: `1px solid ${allPass ? 'rgba(72,187,120,.25)' : 'rgba(237,137,54,.2)'}`,
-      borderRadius: 'var(--radius)',
-      maxWidth: 1200,
-      margin: '0 auto var(--space-2)',
-    }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
-        <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.06em', color: allPass ? '#48bb78' : 'var(--warning-text)', textTransform: 'uppercase', flexShrink: 0 }}>
-          Rule 46 {allPass ? '✓ Compliant' : `${passed}/${checks.length}`}
-        </span>
+    <div style={{ position: 'relative', flexShrink: 0 }}>
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        aria-expanded={open}
+        title="Rule 46 compliance checklist"
+        style={{
+          display: 'flex', alignItems: 'center', gap: 6,
+          padding: '6px 10px',
+          background: allPass ? 'rgba(72,187,120,.10)' : 'rgba(237,137,54,.08)',
+          border: `1px solid ${allPass ? 'rgba(72,187,120,.3)' : 'rgba(237,137,54,.3)'}`,
+          borderRadius: 999,
+          fontSize: 11, fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase',
+          color: allPass ? '#48bb78' : 'var(--warning-text)',
+          cursor: 'pointer', fontFamily: 'inherit',
+        }}
+      >
+        Rule 46 {allPass ? '✓ Compliant' : `${passed}/${checks.length}`}
+        {open ? <ChevronDown size={12} aria-hidden="true" /> : <ChevronUp size={12} aria-hidden="true" />}
+      </button>
+      {open && (
+      <div style={{
+        position: 'absolute', bottom: 'calc(100% + 8px)', left: 0, zIndex: 30,
+        width: 320,
+        padding: 'var(--space-3)',
+        background: 'var(--surface)',
+        border: '1px solid var(--border)',
+        borderRadius: 'var(--radius-md)',
+        boxShadow: '0 8px 24px rgba(0,0,0,.35)',
+        display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'flex-start',
+      }}>
         {checks.map(c => {
           const ok = !errors[c.key];
           return (
@@ -902,11 +923,12 @@ function CompliancePanel({ form }) {
           );
         })}
         {allPass && (
-          <span style={{ fontSize: 10, color: '#48bb78', marginLeft: 'auto', fontWeight: 600, flexShrink: 0 }}>
+          <span style={{ fontSize: 10, color: '#48bb78', fontWeight: 600 }}>
             Brand finance teams will accept this invoice
           </span>
         )}
       </div>
+      )}
     </div>
   );
 }
@@ -999,6 +1021,7 @@ export default function InvoicePage({ initialView }) {
   const sigCanvasRef = useRef(null);
   const typePreviewRef = useRef(null);
   const [lastDraftSaved, setLastDraftSaved] = useState(null);
+  const { theme, toggleTheme } = useTheme();
   const [showBrandPicker, setShowBrandPicker] = useState(false);
   const [sigTab, setSigTab] = useState('draw');
   const [sigInkColor, setSigInkColor] = useState('#000000');
@@ -1383,6 +1406,15 @@ export default function InvoicePage({ initialView }) {
     }, 300);
   }
 
+  function handleDiscardDraft() {
+    if (!window.confirm('Discard this draft? Everything you entered will be lost.')) return;
+    clearTimeout(autosaveTimer.current);
+    try { localStorage.removeItem(draftKey()); } catch {}
+    setLastDraftSaved(null);
+    toast.success('Draft discarded');
+    resetAndGoList();
+  }
+
   function resetAndGoList() {
     setForm({ ...EMPTY_FORM });
     setTouched({});
@@ -1477,7 +1509,8 @@ export default function InvoicePage({ initialView }) {
         <div style={{
           position: 'sticky', top: 0, zIndex: 30,
           background: 'var(--bg)', borderBottom: '1px solid var(--border)',
-          padding: 'var(--space-3) var(--space-5)',
+          minHeight: 60, // matches sidebar logo row so the borders line up
+          padding: '0 var(--space-5)',
           display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 'var(--space-3)',
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)' }}>
@@ -1494,6 +1527,12 @@ export default function InvoicePage({ initialView }) {
                 <Eye size={13} aria-hidden="true" /> Preview
               </button>
             )}
+            <button type="button" className="inv-btn inv-btn--secondary" onClick={toggleTheme}
+              aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+              title={theme === 'dark' ? 'Light mode' : 'Dark mode'}
+              style={{ width: 34, padding: 0 }}>
+              {theme === 'dark' ? <Sun size={15} aria-hidden="true" /> : <Moon size={15} aria-hidden="true" />}
+            </button>
           </div>
         </div>
 
@@ -1593,10 +1632,10 @@ export default function InvoicePage({ initialView }) {
                             <label style={{ fontSize: 'var(--text-sm)', fontWeight: 500, color: 'var(--text-body)' }}>Amount ₹ <span style={{ color: 'var(--danger-text)', fontWeight: 700 }} aria-hidden="true">*</span></label>
                             <Tooltip text="Taxable value before GST for this service line." />
                           </div>
-                          <input type="number" min="0" step="0.01" value={line.amount}
-                            onChange={e => { const lines=[...form.serviceLines]; lines[idx]={...lines[idx],amount:e.target.value}; update('serviceLines',lines); if(idx===0) update('baseAmount',e.target.value); }}
+                          <input type="text" inputMode="decimal" value={line.amount} onBlur={() => touch('baseAmount')}
+                            onChange={e => { const v=e.target.value.replace(/[^0-9.]/g,'').replace(/(\..*)\./g,'$1'); const lines=[...form.serviceLines]; lines[idx]={...lines[idx],amount:v}; update('serviceLines',lines); if(idx===0) update('baseAmount',v); }}
                             placeholder="45000"
-                            style={{ padding: 'var(--space-2)', background: 'var(--surface)', border: (!line.amount ? '1px solid var(--danger)' : '1px solid var(--border)'), borderRadius: 'var(--radius-md)', color: 'var(--text-primary)', fontSize: 'var(--text-sm)', fontFamily: 'inherit', fontVariantNumeric: 'tabular-nums', outline: 'none' }}
+                            style={{ padding: 'var(--space-2)', background: 'var(--surface)', border: (!line.amount && touched.baseAmount ? '1px solid var(--danger)' : '1px solid var(--border)'), borderRadius: 'var(--radius-md)', color: 'var(--text-primary)', fontSize: 'var(--text-sm)', fontFamily: 'inherit', fontVariantNumeric: 'tabular-nums', outline: 'none' }}
                           />
                         </div>
                         {/* GST% second */}
@@ -2014,79 +2053,43 @@ export default function InvoicePage({ initialView }) {
           ...(isMobile ? { left: 0, right: 0, zIndex: 25 } : {}),
           background: 'var(--bg)',
           borderTop: '1px solid var(--border)',
-          padding: isMobile ? 'var(--space-2) var(--space-3)' : 'var(--space-3) var(--space-5)',
+          padding: isMobile ? 'var(--space-2) var(--space-3)' : 'var(--space-1) var(--space-5)',
           flexShrink: 0,
         }}>
-          {/* Validation hint — only shown after user has touched fields */}
-          {!isMobile && <CompliancePanel form={form} />}
-          {!complete && Object.keys(touched).length > 0 && (
-            <p style={{ fontSize: 'var(--text-xs)', color: 'var(--warning-text)', marginBottom: 'var(--space-2)', textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
-              <AlertCircle size={12} aria-hidden="true" />
-              Fill all required (<span style={{ color: 'var(--danger-text)', fontWeight: 700 }}>*</span>) fields above to enable invoice creation
-            </p>
-          )}
-          {lastDraftSaved && (
-            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 'var(--space-2)' }}>
-              <AutosaveIndicator lastSaved={lastDraftSaved} />
+          {/* Single compact row: status (compliance, hint, autosave) left · actions right */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', maxWidth: 1200, margin: '0 auto', width: '100%', flexWrap: isMobile ? 'wrap' : 'nowrap' }}>
+          {!isMobile && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', flex: '1 1 auto', minWidth: 0 }}>
+              <CompliancePanel form={form} />
+              {!complete && Object.keys(touched).length > 0 ? (
+                <span title="Fill all required (*) fields to enable invoice creation" style={{ fontSize: 'var(--text-xs)', color: 'var(--warning-text)', display: 'flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  <AlertCircle size={12} aria-hidden="true" />
+                  Fill required (<span style={{ color: 'var(--danger-text)', fontWeight: 700 }}>*</span>) fields
+                </span>
+              ) : lastDraftSaved && <AutosaveIndicator lastSaved={lastDraftSaved} />}
             </div>
           )}
-          <div style={{ display: 'flex', gap: 'var(--space-2)', maxWidth: 1200, margin: '0 auto', width: '100%', flexWrap: isMobile ? 'wrap' : 'nowrap' }}>
-            {/* Primary CTA — Save & Download */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', flex: isMobile ? '1 1 100%' : '0 0 auto', flexWrap: isMobile ? 'wrap' : 'nowrap' }}>
+            {/* Leave editor — draft is autosaved, so Close is safe; Discard is the explicit destructive path */}
+            {!editingId && lastDraftSaved && (
+              <button type="button" className="inv-btn inv-btn--danger" onClick={handleDiscardDraft} title="Delete this draft and go back to the invoice list">
+                <Trash2 size={14} aria-hidden="true" /> {isMobile ? 'Discard' : 'Discard draft'}
+              </button>
+            )}
             <button
               type="button"
-              onClick={handleSaveAndDownload}
-              disabled={!complete || submitting}
-              title={!complete ? 'Fill all required (*) fields to enable this button' : 'Save invoice and download as PDF'}
-              style={{
-                flex: isMobile ? '1 1 100%' : 2,
-                padding: 'var(--space-3) var(--space-4)',
-                background: complete && !submitting ? 'var(--accent)' : 'var(--border-2)',
-                color: complete && !submitting ? '#fff' : 'var(--text-disabled)',
-                border: 'none',
-                borderRadius: 'var(--radius-md)',
-                fontWeight: 700,
-                fontSize: 'var(--text-sm)',
-                cursor: complete && !submitting ? 'pointer' : 'not-allowed',
-                fontFamily: 'inherit',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 'var(--space-2)',
-                transition: 'background var(--duration-standard)',
-                boxShadow: complete && !submitting ? '0 2px 8px rgba(232,146,26,0.25)' : 'none',
-              }}
-              onMouseEnter={e => { if (complete && !submitting) e.currentTarget.style.background = 'var(--accent-hover, #d97e10)'; }}
-              onMouseLeave={e => { if (complete && !submitting) e.currentTarget.style.background = 'var(--accent)'; }}
+              className="inv-btn inv-btn--secondary"
+              onClick={() => navigate('/invoices')}
+              title={editingId ? 'Close without saving changes' : 'Close — your draft is saved and will be restored next time'}
             >
-              <Download size={14} aria-hidden="true" />
-              {submitting ? 'Saving…' : 'Save & Download PDF'}
+              <X size={14} aria-hidden="true" /> Close
             </button>
 
-            {/* Secondary — Save only */}
-            <button
-              type="button"
-              onClick={handleSave}
-              disabled={!complete || submitting}
-              title={!complete ? 'Fill all required (*) fields to enable this button' : 'Save invoice without downloading'}
-              style={{
-                flex: 1,
-                padding: 'var(--space-3) var(--space-4)',
-                background: 'var(--surface-2)',
-                color: complete && !submitting ? 'var(--text-primary)' : 'var(--text-disabled)',
-                border: complete ? '1px solid var(--border)' : '1px solid var(--border)',
-                borderRadius: 'var(--radius-md)',
-                fontWeight: 600,
-                fontSize: 'var(--text-sm)',
-                cursor: complete && !submitting ? 'pointer' : 'not-allowed',
-                fontFamily: 'inherit',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 'var(--space-2)',
-                opacity: complete && !submitting ? 1 : 0.55,
-              }}
-            >
-              <Check size={14} aria-hidden="true" />
-              {submitting ? 'Saving…' : 'Save Only'}
-            </button>
+            {!isMobile && <span className="inv-btn-divider" aria-hidden="true" />}
 
-            {/* Email share */}
             <button
               type="button"
+              className="inv-btn inv-btn--secondary"
               disabled={!complete || submitting}
               title={!complete ? 'Fill all required (*) fields to enable sharing' : `Share invoice via email${form.brandEmail ? ` to ${form.brandEmail}` : ''}`}
               onClick={() => {
@@ -2098,49 +2101,32 @@ export default function InvoicePage({ initialView }) {
                 const to = form.brandEmail ? encodeURIComponent(form.brandEmail) : '';
                 window.open(`mailto:${to}?subject=${subject}&body=${body}`, '_blank');
               }}
-              style={{
-                flex: 1,
-                padding: 'var(--space-3) var(--space-4)',
-                background: 'var(--surface-2)',
-                color: complete && !submitting ? 'var(--text-primary)' : 'var(--text-disabled)',
-                border: '1px solid var(--border)',
-                borderRadius: 'var(--radius-md)',
-                fontWeight: 600,
-                fontSize: 'var(--text-sm)',
-                cursor: complete && !submitting ? 'pointer' : 'not-allowed',
-                fontFamily: 'inherit',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 'var(--space-2)',
-                opacity: complete && !submitting ? 1 : 0.55,
-              }}
             >
-              <Mail size={14} aria-hidden="true" />
-              {isMobile ? 'Email' : 'Share via Email'}
+              <Mail size={14} aria-hidden="true" /> Email
             </button>
 
-            {/* Discard & Close — tertiary, visually de-emphasised */}
             <button
               type="button"
-              onClick={() => navigate('/invoices')}
-              title="Discard changes and go back to invoice list"
-              style={{
-                flex: isMobile ? '1 1 auto' : '0 0 auto',
-                padding: 'var(--space-3) var(--space-4)',
-                background: 'transparent',
-                border: '1px solid var(--border)',
-                borderRadius: 'var(--radius-md)',
-                color: 'var(--text-muted)',
-                fontSize: 'var(--text-sm)',
-                fontWeight: 500,
-                cursor: 'pointer',
-                fontFamily: 'inherit',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 'var(--space-2)',
-                transition: 'color var(--duration-fast), border-color var(--duration-fast)',
-              }}
-              onMouseEnter={e => { e.currentTarget.style.color = 'var(--danger-text)'; e.currentTarget.style.borderColor = 'var(--danger)'; }}
-              onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-muted)'; e.currentTarget.style.borderColor = 'var(--border)'; }}
+              className="inv-btn inv-btn--secondary"
+              onClick={handleSave}
+              disabled={!complete || submitting}
+              title={!complete ? 'Fill all required (*) fields to enable this button' : 'Save invoice without downloading'}
             >
-              <X size={13} aria-hidden="true" /> {isMobile ? 'Close' : 'Discard & Close'}
+              <Save size={14} aria-hidden="true" /> {submitting ? 'Saving…' : 'Save'}
             </button>
+
+            {/* Primary CTA — rightmost, the natural end of the flow */}
+            <button
+              type="button"
+              className="inv-btn inv-btn--primary"
+              onClick={handleSaveAndDownload}
+              disabled={!complete || submitting}
+              title={!complete ? 'Fill all required (*) fields to enable this button' : 'Save invoice and download as PDF'}
+              style={isMobile ? { flex: '1 1 100%' } : undefined}
+            >
+              <Download size={14} aria-hidden="true" /> {submitting ? 'Saving…' : 'Save & Download PDF'}
+            </button>
+          </div>
           </div>
         </div>
 
