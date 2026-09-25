@@ -9,6 +9,9 @@ import api from '../utils/api.js';
 // import { openSubscriptionCheckout } from '../utils/razorpay.js'; // Payments disabled — premium is granted on request
 import { usePremiumRequest } from '../hooks/usePremiumRequest.jsx';
 import { PLAN_DISPLAY, PLAN_HIERARCHY } from '../utils/planConfig.js';
+import { CURRENT_FY, PREVIOUS_FY } from '../utils/financialYear.js';
+import { taxYearLabel } from '../utils/taxLabels.js';
+import { INDIAN_STATES, gstinError, panFromGstin, stateLabel } from '../utils/gst.js';
 
 const SECTIONS = ['Profile', 'Tax Profile', 'Invoice Settings', 'Billing', 'Notifications', 'Security', 'Export', 'Integrations', 'Danger Zone'];
 
@@ -1189,8 +1192,8 @@ function SecuritySection() {
 function ExportSection({ user }) {
   const toast = useToast();
   const [downloading, setDownloading] = useState(false);
-  const currentFY = (() => { const n = new Date(), y = n.getFullYear(), m = n.getMonth()+1; return m>=4?`${y}-${String(y+1).slice(-2)}`:`${y-1}-${String(y).slice(-2)}`; })();
-  const prevFY = (() => { const n = new Date(), y = n.getFullYear(), m = n.getMonth()+1; const b = m>=4?y:y-1; return `${b-1}-${String(b).slice(-2)}`; })();
+  const currentFY = CURRENT_FY;
+  const prevFY = PREVIOUS_FY;
   const [selectedFY, setSelectedFY] = useState(currentFY);
 
   const isPro = user && ['pro', 'business', 'trial'].includes(user.plan);
@@ -1224,8 +1227,8 @@ function ExportSection({ user }) {
       )}
       <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
         <select value={selectedFY} onChange={e => setSelectedFY(e.target.value)} style={{ padding: 'var(--space-2) var(--space-3)', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', color: 'var(--text-body)', fontSize: 'var(--text-sm)', fontFamily: 'inherit' }}>
-          <option value={currentFY}>FY {currentFY}</option>
-          <option value={prevFY}>FY {prevFY}</option>
+          <option value={currentFY}>{taxYearLabel(currentFY)}</option>
+          <option value={prevFY}>{taxYearLabel(prevFY)}</option>
         </select>
         <button onClick={download} disabled={downloading || !isPro} style={{ padding: 'var(--space-2) var(--space-4)', background: isPro && !downloading ? 'var(--accent)' : 'var(--border-2)', color: '#fff', border: 'none', borderRadius: 'var(--radius-md)', fontWeight: 600, fontSize: 'var(--text-sm)', cursor: isPro && !downloading ? 'pointer' : 'not-allowed', fontFamily: 'inherit' }}>
           {downloading ? 'Downloading…' : '↓ Download Annual Summary'}
@@ -1451,6 +1454,51 @@ function IntegrationsSection({ user, onRefresh }) {
 }
 
 // ── Main Settings Page ────────────────────────────────────────────────────────
+const SELECT_STYLE = { padding: 'var(--space-2) var(--space-3)', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', color: 'var(--text-primary)', fontFamily: 'inherit', fontSize: 'var(--text-sm)' };
+
+function profileToForm(user) {
+  return {
+    business_name: user?.business_name || '',
+    gstin: user?.gstin || '',
+    pan: user?.pan || '',
+    business_address: user?.business_address || '',
+    state_code: user?.state_code || '',
+    invoice_prefix: user?.invoice_prefix || 'INV',
+    gst_registered: user?.gst_registered ?? true,
+    legal_name: user?.legal_name || '',
+    trade_name: user?.trade_name || '',
+    tax_regime: user?.tax_regime || 'new',
+    presumptive: user?.presumptive || 'none',
+    lut_number: user?.lut_number || '',
+  };
+}
+
+function StateSelect({ id, value, onChange, lockedByGstin }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
+      <label htmlFor={id} style={{ fontSize: 'var(--text-sm)', fontWeight: 500, color: 'var(--text-body)' }}>State</label>
+      <select id={id} value={value} disabled={lockedByGstin} onChange={e => onChange(e.target.value)} style={SELECT_STYLE}>
+        <option value="">Select your state</option>
+        {INDIAN_STATES.map(st => <option key={st.code} value={st.code}>{st.code} — {st.name}</option>)}
+      </select>
+      {lockedByGstin && <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>Set by your GSTIN</span>}
+    </div>
+  );
+}
+
+function ToggleRow({ id, label, hint, checked, onChange }) {
+  return (
+    <label htmlFor={id} style={{ display: 'flex', alignItems: 'flex-start', gap: 'var(--space-3)', cursor: 'pointer' }}>
+      <input id={id} type="checkbox" checked={checked} onChange={e => onChange(e.target.checked)} style={{ marginTop: 3, width: 16, height: 16, accentColor: 'var(--accent)' }} />
+      <span style={{ fontSize: 'var(--text-sm)', color: 'var(--text-primary)' }}>
+        {label}
+        {hint && <span style={{ display: 'block', fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>{hint}</span>}
+      </span>
+    </label>
+  );
+}
+
+
 export default function SettingsPage() {
   const { user, fetchUser } = useAuth();
   const toast = useToast();
@@ -1467,13 +1515,14 @@ export default function SettingsPage() {
 
   // Business card state
   const [editingBusiness, setEditingBusiness] = useState(false);
-  const [businessForm, setBusinessForm] = useState({
-    business_name: user?.business_name || '',
-    gstin: user?.gstin || '',
-    pan: user?.pan || '',
-    business_address: user?.business_address || '',
-    state_code: user?.state_code || '',
-    invoice_prefix: user?.invoice_prefix || 'INV',
+  const [businessForm, setBusinessForm] = useState(() => profileToForm(user));
+  const gstinProblem = businessForm.gstin ? gstinError(businessForm.gstin) : null;
+  // A GSTIN fixes the state and PAN, so fill them in as soon as it checks out.
+  const setGstin = (value) => setBusinessForm(p => {
+    const gstin = value.toUpperCase().replace(/\s/g, '').slice(0, 15);
+    return gstin.length === 15 && !gstinError(gstin)
+      ? { ...p, gstin, state_code: gstin.slice(0, 2), pan: panFromGstin(gstin) }
+      : { ...p, gstin };
   });
   const [savingBusiness, setSavingBusiness] = useState(false);
 
@@ -1488,14 +1537,7 @@ export default function SettingsPage() {
   useEffect(() => {
     if (user) {
       setPersonalForm({ name: user.name || '', phone: user.phone || '' });
-      setBusinessForm({
-        business_name: user.business_name || '',
-        gstin: user.gstin || '',
-        pan: user.pan || '',
-        business_address: user.business_address || '',
-        state_code: user.state_code || '',
-        invoice_prefix: user.invoice_prefix || 'INV',
-      });
+      setBusinessForm(profileToForm(user));
     }
   }, [user]);
 
@@ -1511,13 +1553,16 @@ export default function SettingsPage() {
   };
 
   const saveBusiness = async () => {
+    if (businessForm.gst_registered && gstinProblem) { toast.error(gstinProblem); return; }
     setSavingBusiness(true);
     try {
-      await api.put('/auth/profile', businessForm);
+      const body = { ...businessForm };
+      if (!body.gst_registered) { body.gstin = ''; body.lut_number = ''; }
+      await api.put('/auth/profile', body);
       await fetchUser();
-      toast.success('Business info updated');
+      toast.success('Tax profile saved');
       setEditingBusiness(false);
-    } catch { toast.error('Failed to save'); }
+    } catch (err) { toast.error(err?.response?.data?.message || 'Couldn’t save. Please try again.'); }
     finally { setSavingBusiness(false); }
   };
 
@@ -1709,19 +1754,19 @@ export default function SettingsPage() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
                   <Input id="b-bname" label="Business / Channel Name" value={businessForm.business_name} onChange={e => setBusinessForm(p => ({...p, business_name: e.target.value}))} />
                   <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 'var(--space-3)' }}>
-                    <Input id="b-gstin" label="GSTIN" value={businessForm.gstin} onChange={e => setBusinessForm(p => ({...p, gstin: e.target.value.toUpperCase()}))} placeholder="29ABCDE1234F1Z5" maxLength={15} hint="15-character GST ID" />
+                    <Input id="b-gstin" label="GSTIN" value={businessForm.gstin} onChange={e => setGstin(e.target.value)} placeholder="29ABCDE1234F1ZW" maxLength={15} error={businessForm.gstin.length === 15 ? gstinProblem : undefined} hint="Fills in your state and PAN" />
                     <Input id="b-pan" label="PAN" value={businessForm.pan} onChange={e => setBusinessForm(p => ({...p, pan: e.target.value.toUpperCase()}))} placeholder="ABCDE1234F" maxLength={10} />
                   </div>
                   <Input id="b-addr" label="Business Address" value={businessForm.business_address} onChange={e => setBusinessForm(p => ({...p, business_address: e.target.value}))} />
                   <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 'var(--space-3)' }}>
                     <Input id="b-prefix" label="Invoice Prefix" value={businessForm.invoice_prefix} onChange={e => setBusinessForm(p => ({...p, invoice_prefix: e.target.value.toUpperCase()}))} placeholder="INV" maxLength={5} hint="2–5 chars, used in invoice numbers" />
-                    <Input id="b-state" label="State Code" value={businessForm.state_code} onChange={e => setBusinessForm(p => ({...p, state_code: e.target.value}))} placeholder="29" maxLength={2} />
+                    <StateSelect id="b-state" value={businessForm.state_code} lockedByGstin={Boolean(businessForm.gstin) && !gstinProblem} onChange={v => setBusinessForm(p => ({...p, state_code: v}))} />
                   </div>
                   <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-2)' }}>
                     <button onClick={saveBusiness} disabled={savingBusiness} style={{ padding: 'var(--space-2) var(--space-4)', background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 'var(--radius-md)', fontWeight: 600, fontSize: 'var(--text-sm)', cursor: 'pointer', fontFamily: 'inherit' }}>
                       {savingBusiness ? 'Saving…' : 'Save'}
                     </button>
-                    <button onClick={() => { setEditingBusiness(false); setBusinessForm({ business_name: user?.business_name||'', gstin: user?.gstin||'', pan: user?.pan||'', business_address: user?.business_address||'', state_code: user?.state_code||'', invoice_prefix: user?.invoice_prefix||'INV' }); }} style={{ padding: 'var(--space-2) var(--space-4)', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', color: 'var(--text-body)', cursor: 'pointer', fontSize: 'var(--text-sm)', fontFamily: 'inherit' }}>
+                    <button onClick={() => { setEditingBusiness(false); setBusinessForm(profileToForm(user)); }} style={{ padding: 'var(--space-2) var(--space-4)', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', color: 'var(--text-body)', cursor: 'pointer', fontSize: 'var(--text-sm)', fontFamily: 'inherit' }}>
                       Cancel
                     </button>
                   </div>
@@ -1732,7 +1777,7 @@ export default function SettingsPage() {
                   <FieldRow label="GSTIN" value={user?.gstin} />
                   <FieldRow label="PAN" value={user?.pan} />
                   <FieldRow label="Business Address" value={user?.business_address} />
-                  <FieldRow label="State Code" value={user?.state_code} />
+                  <FieldRow label="State" value={user?.state_code ? stateLabel(user.state_code) : ''} />
                   <FieldRow label="Invoice Prefix" value={user?.invoice_prefix} />
                 </div>
               )}
@@ -1749,9 +1794,57 @@ export default function SettingsPage() {
         {activeSection === 'Tax Profile' && (
           <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: 'var(--space-6)', display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
             <h2 style={{ fontSize: 'var(--text-md)', fontWeight: 700, color: 'var(--text-primary)' }}>Tax Profile</h2>
-            <Input id="gstin" label="GSTIN" value={businessForm.gstin} onChange={(e) => setBusinessForm(p => ({...p, gstin: e.target.value.toUpperCase()}))} hint="15-character GST identification number" maxLength={15} placeholder="29ABCDE1234F1Z5" />
-            <Input id="pan" label="PAN" value={businessForm.pan} onChange={(e) => setBusinessForm(p => ({...p, pan: e.target.value.toUpperCase()}))} maxLength={10} placeholder="ABCDE1234F" />
+            <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)', marginTop: 'calc(-1 * var(--space-2))' }}>
+              Every GST and tax calculation in Kcretio uses these settings.
+            </p>
+
+            <ToggleRow
+              id="gst_registered"
+              label="I’m registered for GST"
+              hint="Turn off if you don’t have a GSTIN yet. You must register once your turnover crosses ₹20 lakh."
+              checked={businessForm.gst_registered}
+              onChange={v => setBusinessForm(p => ({ ...p, gst_registered: v }))}
+            />
+            {businessForm.gst_registered && (
+              <Input id="gstin" label="GSTIN" value={businessForm.gstin} onChange={(e) => setGstin(e.target.value)} maxLength={15} placeholder="29ABCDE1234F1ZW"
+                error={businessForm.gstin.length === 15 ? gstinProblem : undefined}
+                hint={businessForm.gstin && !gstinProblem ? `✓ ${stateLabel(businessForm.gstin.slice(0, 2))}` : 'Your state and PAN are filled in from it'} />
+            )}
+            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 'var(--space-3)' }}>
+              <Input id="legal_name" label="Legal name (as on PAN)" value={businessForm.legal_name} onChange={(e) => setBusinessForm(p => ({...p, legal_name: e.target.value}))} />
+              <Input id="trade_name" label="Trade name (optional)" value={businessForm.trade_name} onChange={(e) => setBusinessForm(p => ({...p, trade_name: e.target.value}))} hint="Your channel or brand name, if different" />
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 'var(--space-3)' }}>
+              <Input id="pan" label="PAN" value={businessForm.pan} onChange={(e) => setBusinessForm(p => ({...p, pan: e.target.value.toUpperCase()}))} maxLength={10} placeholder="ABCDE1234F" disabled={Boolean(businessForm.gst_registered && businessForm.gstin && !gstinProblem)} />
+              <StateSelect id="state_code" value={businessForm.state_code} lockedByGstin={Boolean(businessForm.gst_registered && businessForm.gstin && !gstinProblem)} onChange={v => setBusinessForm(p => ({...p, state_code: v}))} />
+            </div>
             <Input id="business_address" label="Business address" value={businessForm.business_address} onChange={(e) => setBusinessForm(p => ({...p, business_address: e.target.value}))} />
+
+            <fieldset style={{ border: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+              <legend style={{ fontSize: 'var(--text-sm)', fontWeight: 500, color: 'var(--text-body)', marginBottom: 'var(--space-2)' }}>Income-tax regime</legend>
+              {[['new', 'New regime (default)', 'Lower slab rates, few deductions'], ['old', 'Old regime', 'Keeps deductions like 80C and HRA']].map(([v, label, hint]) => (
+                <label key={v} style={{ display: 'flex', alignItems: 'flex-start', gap: 'var(--space-2)', fontSize: 'var(--text-sm)', color: 'var(--text-primary)', cursor: 'pointer' }}>
+                  <input type="radio" name="tax_regime" value={v} checked={businessForm.tax_regime === v} onChange={() => setBusinessForm(p => ({ ...p, tax_regime: v }))} style={{ marginTop: 3 }} />
+                  <span>{label}<span style={{ display: 'block', color: 'var(--text-muted)', fontSize: 'var(--text-xs)' }}>{hint}</span></span>
+                </label>
+              ))}
+            </fieldset>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
+              <label htmlFor="presumptive" style={{ fontSize: 'var(--text-sm)', fontWeight: 500, color: 'var(--text-body)' }}>How your income is taxed</label>
+              <select id="presumptive" value={businessForm.presumptive} onChange={(e) => setBusinessForm(p => ({ ...p, presumptive: e.target.value }))} style={SELECT_STYLE}>
+                <option value="none">Regular books — tax on receipts minus expenses</option>
+                <option value="44ADA">Presumptive, professional (formerly 44ADA) — tax on 50% of receipts</option>
+                <option value="44AD">Presumptive, business (formerly 44AD) — tax on 6% of digital receipts</option>
+              </select>
+              <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>
+                Presumptive users pay all advance tax in one instalment by 15 March. Ask your CA which applies to you.
+              </span>
+            </div>
+
+            {businessForm.gst_registered && (
+              <Input id="lut_number" label="LUT reference (optional)" value={businessForm.lut_number} onChange={(e) => setBusinessForm(p => ({...p, lut_number: e.target.value}))} hint="Needed to invoice foreign clients without charging IGST" />
+            )}
             <Input id="invoice_prefix" label="Invoice prefix" value={businessForm.invoice_prefix} onChange={(e) => setBusinessForm(p => ({...p, invoice_prefix: e.target.value.toUpperCase()}))} hint="2–5 characters. Used in invoice numbers." maxLength={5} placeholder="INV" />
             <button onClick={saveBusiness} disabled={savingBusiness} style={{ alignSelf: 'flex-start', padding: 'var(--space-2) var(--space-4)', background: 'var(--accent)', color: '#fff', borderRadius: 'var(--radius-md)', fontWeight: 600, fontSize: 'var(--text-sm)', cursor: 'pointer', border: 'none', fontFamily: 'inherit' }}>
               {savingBusiness ? 'Saving…' : 'Save changes'}

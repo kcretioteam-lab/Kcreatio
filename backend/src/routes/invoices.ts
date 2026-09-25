@@ -310,6 +310,12 @@ router.post('/', validateBody(CreateInvoiceSchema), async (req: AuthRequest, res
     return d.toISOString().split('T')[0];
   })();
 
+  // Only link deals that belong to this user
+  if (body.dealId) {
+    const { data: deal } = await supabase.from('deals').select('id').eq('id', body.dealId).eq('user_id', req.userId!).maybeSingle();
+    if (!deal) body.dealId = null;
+  }
+
   const insertInvoice = () => supabase
     .from('invoices')
     .insert({
@@ -382,6 +388,11 @@ router.post('/', validateBody(CreateInvoiceSchema), async (req: AuthRequest, res
   if (error || !invoice) {
     res.status(500).json({ error: 'INTERNAL_ERROR', message: error?.message || 'Failed to create invoice' });
     return;
+  }
+
+  if (body.dealId) {
+    await supabase.from('deals').update({ status: 'invoiced', updated_at: new Date().toISOString() })
+      .eq('id', body.dealId).eq('user_id', req.userId!).in('status', ['inquiry', 'negotiating', 'active', 'delivered']);
   }
 
   res.status(201).json({

@@ -11,7 +11,7 @@ const MOCK_USER = {
   name: 'Admin User',
   email: 'admin@kcretio.in',
   business_name: 'Test Creator Channel',
-  gstin: '29ABCDE1234F1Z5',
+  gstin: '29ABCDE1234F1ZW',
   pan: 'ABCDE1234F',
   business_address: '123 Creator Street, Bengaluru, Karnataka - 560001',
   state_code: '29',
