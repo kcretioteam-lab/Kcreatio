@@ -5,6 +5,7 @@ import { formatINRDecimal } from '../../../utils/formatINR.js';
 import { tdsSectionLabel } from '../../../utils/taxLabels.js';
 import { getFinancialYear } from '../../../utils/financialYear.js';
 import { getErrorMessage } from '../../../utils/api.js';
+import InfoTip from '../../ui/InfoTip.jsx';
 
 // Common TDS rates on creator income. The user can always type the exact amount the brand deducted.
 const TDS_OPTIONS = [
@@ -99,7 +100,7 @@ export default function MarkPaidDialog({ isOpen, onClose, title, brandName, taxa
         <Input id="mp-date" label="Date you were paid *" type="date" value={paymentDate} max={today()} onChange={e => setPaymentDate(e.target.value)} />
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
-          <label htmlFor="mp-section" style={{ fontSize: 'var(--text-sm)', fontWeight: 500, color: 'var(--text-body)' }}>TDS the brand deducted</label>
+          <label htmlFor="mp-section" style={{ fontSize: 'var(--text-sm)', fontWeight: 500, color: 'var(--text-body)' }}>TDS the brand deducted <InfoTip term="tds" /></label>
           <select id="mp-section" value={section} onChange={e => pickSection(e.target.value)}
             style={{ padding: 'var(--space-2) var(--space-3)', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', color: 'var(--text-primary)', fontFamily: 'inherit', fontSize: 'var(--text-sm)' }}>
             {TDS_OPTIONS.map(o => (

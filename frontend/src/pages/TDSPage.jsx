@@ -18,6 +18,7 @@ import { CURRENT_FY, PREVIOUS_FY as PREV_FY, getFinancialYear } from '../utils/f
 import { taxYearLabel, tdsSectionLabel } from '../utils/taxLabels.js';
 import { readCache, writeCache } from '../utils/listCache.js';
 import { uploadDocument, openDocument } from '../utils/documents.js';
+import InfoTip from '../components/ui/InfoTip.jsx';
 
 const FORM_16A_VARIANT = {
   received: 'success',
@@ -199,7 +200,7 @@ export default function TDSPage() {
       {/* Before filing: every deduction should appear in Form 26AS / AIS */}
       {!loading && summary?.ais && records.length > 0 && (
         <div style={{ background: 'var(--surface)', border: `1px solid ${summary.ais.missing > 0 ? 'var(--danger)' : 'var(--border)'}`, borderRadius: 'var(--radius-lg)', padding: 'var(--space-4) var(--space-5)', marginBottom: 'var(--space-5)', display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-          <div style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: 'var(--text-sm)' }}>Before you file: match against Form 26AS / AIS</div>
+          <div style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: 'var(--text-sm)' }}>Before you file: match against Form 26AS / AIS <InfoTip term="ais" /></div>
           <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)', margin: 0 }}>
             Download your Annual Information Statement from the income-tax portal (Services → AIS) and tick each entry below that appears there.
             TDS that isn’t in AIS can’t be claimed until the brand files its TDS return — chase them early.

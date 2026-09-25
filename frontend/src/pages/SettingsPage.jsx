@@ -14,6 +14,7 @@ import { taxYearLabel } from '../utils/taxLabels.js';
 import { INDIAN_STATES, gstinError, panFromGstin, stateLabel } from '../utils/gst.js';
 import TwoFactorCard from '../components/settings/TwoFactorCard.jsx';
 import SessionsCard from '../components/settings/SessionsCard.jsx';
+import InfoTip from '../components/ui/InfoTip.jsx';
 
 const SECTIONS = ['Profile', 'Tax Profile', 'Invoice Settings', 'Billing', 'Notifications', 'Security', 'Export', 'Integrations', 'Danger Zone'];
 
@@ -1830,7 +1831,7 @@ export default function SettingsPage() {
             <Input id="business_address" label="Business address" value={businessForm.business_address} onChange={(e) => setBusinessForm(p => ({...p, business_address: e.target.value}))} />
 
             <fieldset style={{ border: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-              <legend style={{ fontSize: 'var(--text-sm)', fontWeight: 500, color: 'var(--text-body)', marginBottom: 'var(--space-2)' }}>Income-tax regime</legend>
+              <legend style={{ fontSize: 'var(--text-sm)', fontWeight: 500, color: 'var(--text-body)', marginBottom: 'var(--space-2)' }}>Income-tax regime <InfoTip term="rebate87a" /></legend>
               {[['new', 'New regime (default)', 'Lower slab rates, few deductions'], ['old', 'Old regime', 'Keeps deductions like 80C and HRA']].map(([v, label, hint]) => (
                 <label key={v} style={{ display: 'flex', alignItems: 'flex-start', gap: 'var(--space-2)', fontSize: 'var(--text-sm)', color: 'var(--text-primary)', cursor: 'pointer' }}>
                   <input type="radio" name="tax_regime" value={v} checked={businessForm.tax_regime === v} onChange={() => setBusinessForm(p => ({ ...p, tax_regime: v }))} style={{ marginTop: 3 }} />
@@ -1840,7 +1841,7 @@ export default function SettingsPage() {
             </fieldset>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
-              <label htmlFor="presumptive" style={{ fontSize: 'var(--text-sm)', fontWeight: 500, color: 'var(--text-body)' }}>How your income is taxed</label>
+              <label htmlFor="presumptive" style={{ fontSize: 'var(--text-sm)', fontWeight: 500, color: 'var(--text-body)' }}>How your income is taxed <InfoTip term="presumptive" /></label>
               <select id="presumptive" value={businessForm.presumptive} onChange={(e) => setBusinessForm(p => ({ ...p, presumptive: e.target.value }))} style={SELECT_STYLE}>
                 <option value="none">Regular books — tax on receipts minus expenses</option>
                 <option value="44ADA">Presumptive, professional (formerly 44ADA) — tax on 50% of receipts</option>

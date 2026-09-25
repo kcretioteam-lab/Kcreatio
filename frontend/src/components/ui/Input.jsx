@@ -2,7 +2,7 @@ import { useState, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { HelpCircle } from 'lucide-react';
 
-function InlineTooltip({ text }) {
+export function InlineTooltip({ text }) {
   const [pos, setPos] = useState(null);
   const btnRef = useRef(null);
   const show = () => {

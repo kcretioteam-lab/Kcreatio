@@ -45,6 +45,7 @@ cd backend && node -r dotenv/config dist/server.js   # http://localhost:4000
 - 004: UPI setting type, scanner_image_url, brand_email, brand_phone, include_upi
 - 005: users.phone, show_phone_on_invoice, invoice_phone, invoice_email, avatar_url
 - 006–015: see SETUP.md
+- 018: barter/foreign income/export invoices, invoice_payments + record_invoice_payment(), credit_notes, reminders, recurring
 - 017: users.totp_* (2FA), user_sessions, invoice_audit_log
 - 016: mark_invoice_paid / mark_deal_paid functions, Tax Profile fields (tax_regime, presumptive, gst_registered, LUT), invoices.line_items
 
