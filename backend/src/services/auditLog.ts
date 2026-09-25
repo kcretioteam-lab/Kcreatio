@@ -2,7 +2,7 @@ import { Request } from 'express';
 import { supabase } from '../lib/supabase.js';
 import { currentSessionId } from './sessionService.js';
 
-export type InvoiceAction = 'created' | 'updated' | 'sent' | 'paid' | 'deleted' | 'brand_confirmed';
+export type InvoiceAction = 'created' | 'updated' | 'sent' | 'paid' | 'part_paid' | 'deleted' | 'brand_confirmed' | 'credit_note' | 'reminder_sent' | 'recurring_created';
 
 // Records who changed an invoice and how. Never throws — an audit write must not fail the request.
 export async function logInvoiceEvent(

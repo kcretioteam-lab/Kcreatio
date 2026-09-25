@@ -2,6 +2,7 @@ import { Router, Response } from 'express';
 import { z } from 'zod';
 import { supabase } from '../lib/supabase.js';
 import { authenticate, AuthRequest, checkPlan } from '../middleware/auth.js';
+import { partialWithoutDefaults } from '../lib/zodUtils.js';
 import { validateBody } from '../middleware/validateBody.js';
 import { getFinancialYear } from '../services/invoiceService.js';
 
@@ -100,7 +101,7 @@ router.delete('/:id', async (req: AuthRequest, res: Response): Promise<void> => 
 export default router;
 
 // PUT /expenses/:id — edit expense entry
-router.put('/:id', validateBody(CreateExpenseSchema.partial()), async (req: AuthRequest, res: Response): Promise<void> => {
+router.put('/:id', validateBody(partialWithoutDefaults(CreateExpenseSchema)), async (req: AuthRequest, res: Response): Promise<void> => {
   const updates: Record<string, unknown> = {};
   if (req.body.category !== undefined) updates.category = req.body.category;
   if (req.body.amount !== undefined) updates.amount = req.body.amount; // rupees, same as POST

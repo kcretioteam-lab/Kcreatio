@@ -2,6 +2,7 @@ import { Router, Response } from 'express';
 import { z } from 'zod';
 import { supabase } from '../lib/supabase.js';
 import { authenticate, AuthRequest } from '../middleware/auth.js';
+import { partialWithoutDefaults } from '../lib/zodUtils.js';
 import { validateBody } from '../middleware/validateBody.js';
 import { PLAN_LIMITS, Plan } from '../config/plans.js';
 
@@ -45,10 +46,10 @@ const UpiSchema = z.object({
 });
 
 // Partial versions for PUT (all fields optional except settingType for routing)
-const UpdateBankSchema = BankAccountSchema.partial().extend({ settingType: z.literal('bank_account') });
-const UpdateTermsSchema = TermsSchema.partial().extend({ settingType: z.literal('terms') });
-const UpdateSignatorySchema = SignatorySchema.partial().extend({ settingType: z.literal('signatory') });
-const UpdateUpiSchema = UpiSchema.partial().extend({ settingType: z.literal('upi') });
+const UpdateBankSchema = partialWithoutDefaults(BankAccountSchema).extend({ settingType: z.literal('bank_account') });
+const UpdateTermsSchema = partialWithoutDefaults(TermsSchema).extend({ settingType: z.literal('terms') });
+const UpdateSignatorySchema = partialWithoutDefaults(SignatorySchema).extend({ settingType: z.literal('signatory') });
+const UpdateUpiSchema = partialWithoutDefaults(UpiSchema).extend({ settingType: z.literal('upi') });
 
 const CreateSchema = z.discriminatedUnion('settingType', [
   BankAccountSchema,

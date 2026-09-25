@@ -3,6 +3,7 @@ import { z } from 'zod';
 import rateLimit from 'express-rate-limit';
 import { supabase } from '../lib/supabase.js';
 import { authenticate, AuthRequest } from '../middleware/auth.js';
+import { partialWithoutDefaults } from '../lib/zodUtils.js';
 import { validateBody } from '../middleware/validateBody.js';
 import { getFrontendUrl } from '../lib/env.js';
 import { markPaid, MarkPaidSchema } from '../services/paymentService.js';
@@ -216,7 +217,7 @@ router.get('/', async (req: AuthRequest, res: Response): Promise<void> => {
     .order('created_at', { ascending: false })
     .range(offset, offset + lim - 1);
 
-  if (status && ['draft', 'sent', 'paid', 'overdue'].includes(status)) query = query.eq('status', status);
+  if (status && ['draft', 'sent', 'partially_paid', 'paid', 'overdue', 'cancelled'].includes(status)) query = query.eq('status', status);
   if (fy) query = query.eq('financial_year', fy);
   if (search && search.trim()) {
     // Strip characters that would break PostgREST's or() filter syntax
@@ -502,7 +503,7 @@ router.get('/:id/export', async (req: AuthRequest, res: Response): Promise<void>
 });
 
 // PUT /invoices/:id
-router.put('/:id', validateBody(CreateInvoiceSchema.partial()), async (req: AuthRequest, res: Response): Promise<void> => {
+router.put('/:id', validateBody(partialWithoutDefaults(CreateInvoiceSchema)), async (req: AuthRequest, res: Response): Promise<void> => {
   const { data: existing } = await supabase
     .from('invoices')
     .select('id, status')
@@ -731,8 +732,8 @@ router.post('/:id/send', async (req: AuthRequest, res: Response): Promise<void> 
 router.post('/:id/mark-paid', validateBody(MarkPaidSchema), async (req: AuthRequest, res: Response): Promise<void> => {
   const result = await markPaid('invoice', req.userId!, String(req.params.id), req.body);
   if (!result.ok) { res.status(result.status).json({ error: result.error, message: result.message }); return; }
-  const { data } = await supabase.from('invoices').select('*').eq('id', result.id).eq('user_id', req.userId!).single();
-  await logInvoiceEvent(req, req.userId!, data || { id: result.id }, 'paid', {
+  const { data } = await supabase.from('invoices').select('*').eq('id', String(req.params.id)).eq('user_id', req.userId!).single();
+  await logInvoiceEvent(req, req.userId!, data || { id: String(req.params.id) }, data?.status === 'paid' ? 'paid' : 'part_paid', {
     payment_date: req.body.paymentDate, amount_received: req.body.amountReceived, tds: req.body.tdsDeducted,
   });
   res.json(data);

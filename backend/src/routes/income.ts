@@ -2,6 +2,7 @@ import { Router, Response } from 'express';
 import { z } from 'zod';
 import { supabase } from '../lib/supabase.js';
 import { authenticate, AuthRequest, checkPlan } from '../middleware/auth.js';
+import { partialWithoutDefaults } from '../lib/zodUtils.js';
 import { validateBody } from '../middleware/validateBody.js';
 import { getFinancialYear, getAdvanceTaxQuarter } from '../services/invoiceService.js';
 
@@ -9,15 +10,20 @@ const router = Router();
 router.use(authenticate);
 router.use(checkPlan('pro'));
 
-const INCOME_SOURCES = ['brand_deal', 'adsense', 'instagram_bonus', 'affiliate', 'consulting', 'other'] as const;
+const INCOME_SOURCES = ['brand_deal', 'barter', 'adsense', 'instagram_bonus', 'affiliate', 'consulting', 'foreign_brand', 'other'] as const;
 
 const CreateIncomeSchema = z.object({
   source: z.enum(INCOME_SOURCES),
-  amount: z.number().positive().max(9999999),
+  amount: z.number().positive().max(9999999),              // always in rupees
   description: z.string().max(500).optional(),
   incomeDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   dealId: z.string().uuid().optional(),
   invoiceId: z.string().uuid().optional(),
+  // Foreign income (AdSense, foreign brands): the original amount and the rate used to convert it
+  currency: z.string().length(3).toUpperCase().default('INR'),
+  foreignAmount: z.number().positive().max(999999999).optional(),
+  fxRate: z.number().positive().max(100000).optional(),
+  firaReceived: z.boolean().optional(),
 });
 
 // GET /income
@@ -82,8 +88,12 @@ router.post('/', validateBody(CreateIncomeSchema), async (req: AuthRequest, res:
       deal_id: body.dealId || null,
       invoice_id: body.invoiceId || null,
       source: body.source,
-      amount: body.amount,
-      currency: 'INR',
+      // For foreign income the rupee amount is the converted value on the day it was received
+      amount: body.currency !== 'INR' && body.foreignAmount && body.fxRate ? Math.round(body.foreignAmount * body.fxRate * 100) / 100 : body.amount,
+      currency: body.currency || 'INR',
+      foreign_amount: body.currency !== 'INR' ? body.foreignAmount ?? null : null,
+      fx_rate: body.currency !== 'INR' ? body.fxRate ?? null : null,
+      fira_received: body.firaReceived ?? false,
       description: body.description || null,
       income_date: body.incomeDate,
       financial_year: fy,
@@ -115,11 +125,12 @@ router.delete('/:id', async (req: AuthRequest, res: Response): Promise<void> => 
 export default router;
 
 // PUT /income/:id — edit income entry
-router.put('/:id', validateBody(CreateIncomeSchema.partial()), async (req: AuthRequest, res: Response): Promise<void> => {
+router.put('/:id', validateBody(partialWithoutDefaults(CreateIncomeSchema)), async (req: AuthRequest, res: Response): Promise<void> => {
   const updates: Record<string, unknown> = {};
   if (req.body.source !== undefined) updates.source = req.body.source;
   if (req.body.amount !== undefined) updates.amount = req.body.amount; // rupees, same as POST
   if (req.body.description !== undefined) updates.description = req.body.description || null;
+  if (req.body.firaReceived !== undefined) updates.fira_received = req.body.firaReceived;
   if (req.body.incomeDate !== undefined) {
     updates.income_date = req.body.incomeDate;
     const date = new Date(req.body.incomeDate + 'T00:00:00');
