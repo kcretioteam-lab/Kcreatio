@@ -186,7 +186,7 @@ export default function IncomePage() {
                   <td style={{ padding: 'var(--space-3) var(--space-4)', fontSize: 'var(--text-sm)', fontWeight: 700, fontVariantNumeric: 'tabular-nums', color: 'var(--text-primary)' }}>{formatINR(e.amount)}</td>
                   <td style={{ padding: 'var(--space-3) var(--space-4)', fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>{e.quarter}</td>
                   <td style={{ padding: 'var(--space-3) var(--space-4)' }}>
-                    <button onClick={() => { setEditingEntry(e); setForm({ source: e.source, amount: String(e.amount/100), description: e.description || '', incomeDate: e.income_date }); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 4, display: 'flex', alignItems: 'center' }} title="Edit">
+                    <button onClick={() => { setEditingEntry(e); setForm({ source: e.source, amount: String(e.amount), description: e.description || '', incomeDate: e.income_date }); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 4, display: 'flex', alignItems: 'center' }} title="Edit">
                       <Pencil size={13} aria-hidden="true" />
                     </button>
                   </td>

@@ -137,7 +137,7 @@ export default function ExpensesPage() {
                   <td style={{ padding: 'var(--space-3) var(--space-4)', fontSize: 'var(--text-sm)', color: 'var(--text-body)' }}>{e.description || '—'}</td>
                   <td style={{ padding: 'var(--space-3) var(--space-4)', fontSize: 'var(--text-sm)', fontWeight: 700, fontVariantNumeric: 'tabular-nums', color: 'var(--danger-text)' }}>{formatINR(e.amount)}</td>
                   <td style={{ padding: 'var(--space-3) var(--space-4)' }}>
-                    <button onClick={() => { setEditingEntry(e); setForm({ category: e.category, amount: String(e.amount/100), description: e.description || '', expenseDate: e.expense_date }); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 4, display: 'flex', alignItems: 'center' }} title="Edit">
+                    <button onClick={() => { setEditingEntry(e); setForm({ category: e.category, amount: String(e.amount), description: e.description || '', expenseDate: e.expense_date }); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 4, display: 'flex', alignItems: 'center' }} title="Edit">
                       <Pencil size={13} aria-hidden="true" />
                     </button>
                   </td>
