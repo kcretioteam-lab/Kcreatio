@@ -11,6 +11,7 @@ const TDS_OPTIONS = [
   { value: '194J', rate: 10, label: 'Professional fees — 10%' },
   { value: '194C-2', rate: 2, label: 'Contract work (company) — 2%' },
   { value: '194C-1', rate: 1, label: 'Contract work (individual) — 1%' },
+  { value: '194R', rate: 10, label: 'Gifted products over ₹20,000 — 10%' },
   { value: 'none', rate: 0, label: 'No TDS deducted' },
 ];
 
@@ -23,7 +24,7 @@ const round2 = (n) => Math.round(n * 100) / 100;
  * total: what the brand owes in full (incl. GST).
  * onSubmit({ paymentDate, amountReceived, tdsDeducted, tdsSection }) must return a promise.
  */
-export default function MarkPaidDialog({ isOpen, onClose, title, brandName, taxableValue, total, defaultSection = '194J', onSubmit }) {
+export default function MarkPaidDialog({ isOpen, onClose, title, brandName, taxableValue, total, defaultSection = '194J', barter = false, onSubmit }) {
   const [paymentDate, setPaymentDate] = useState(today());
   const [section, setSection] = useState(defaultSection);
   const [tds, setTds] = useState('');
@@ -40,21 +41,22 @@ export default function MarkPaidDialog({ isOpen, onClose, title, brandName, taxa
     setPaymentDate(today());
     setSection(defaultSection);
     setTds(String(t));
-    setReceived(String(round2(total - t)));
+    // Barter: no money arrives — the products are the payment
+    setReceived(String(barter ? 0 : round2(total - t)));
     setError('');
-  }, [isOpen, taxableValue, total, defaultSection]);
+  }, [isOpen, taxableValue, total, defaultSection, barter]);
 
   function pickSection(s) {
     setSection(s);
     const t = round2(taxableValue * rateFor(s) / 100);
     setTds(String(t));
-    setReceived(String(round2(total - t)));
+    if (!barter) setReceived(String(round2(total - t)));
   }
 
   function changeTds(v) {
     setTds(v);
     const n = parseFloat(v);
-    if (Number.isFinite(n)) setReceived(String(round2(total - n)));
+    if (Number.isFinite(n) && !barter) setReceived(String(round2(total - n)));
   }
 
   async function submit(e) {
@@ -111,7 +113,8 @@ export default function MarkPaidDialog({ isOpen, onClose, title, brandName, taxa
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 'var(--space-3)' }}>
           <Input id="mp-tds" label="TDS amount (₹)" type="number" inputMode="decimal" min="0" step="0.01" value={tds} onChange={e => changeTds(e.target.value)}
             hint="Check the brand’s payment advice — brands often deduct odd amounts." style={{ fontVariantNumeric: 'tabular-nums' }} />
-          <Input id="mp-received" label="Amount received (₹) *" type="number" inputMode="decimal" min="0" step="0.01" value={received} onChange={e => setReceived(e.target.value)}
+          <Input id="mp-received" label={barter ? 'Cash received, if any (₹)' : 'Amount received (₹) *'} type="number" inputMode="decimal" min="0" step="0.01" value={received} onChange={e => setReceived(e.target.value)}
+            hint={barter ? undefined : 'Got less than the full amount? Enter what arrived — the rest stays outstanding as a part payment.'}
             style={{ fontVariantNumeric: 'tabular-nums' }} />
         </div>
 

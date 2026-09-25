@@ -18,7 +18,7 @@ const STATUS_LABELS = { inquiry: 'Inquiry', negotiating: 'Negotiating', active: 
 const STATUS_COLORS = { inquiry: 'var(--status-inquiry)', negotiating: 'var(--status-negotiate)', active: 'var(--status-active)', delivered: 'var(--status-completed)', invoiced: 'var(--info)', paid: 'var(--status-paid)', rejected: 'var(--status-rejected)' };
 const STATUS_VARIANT = { inquiry: 'info', negotiating: 'warning', active: 'info', delivered: 'success', invoiced: 'info', paid: 'success', rejected: 'muted' };
 
-const EMPTY_FORM = { brandName: '', brandContactEmail: '', dealValue: '', status: 'inquiry', niche: '', deliverables: '', deadline: '', paymentDueDate: '', notes: '' };
+const EMPTY_FORM = { brandName: '', brandContactEmail: '', dealValue: '', dealType: 'cash', status: 'inquiry', niche: '', deliverables: '', deadline: '', paymentDueDate: '', notes: '' };
 
 export default function DealsPage() {
   const toast = useToast();
@@ -61,6 +61,8 @@ export default function DealsPage() {
         brandName: form.brandName,
         brandContactEmail: form.brandContactEmail || undefined,
         dealValue: parseFloat(form.dealValue),
+        dealType: form.dealType,
+        ...(form.dealType === 'barter' ? { marketValue: parseFloat(form.dealValue) } : {}),
         status: form.status,
         niche: form.niche || undefined,
         deliverables: form.deliverables || undefined,
@@ -196,7 +198,16 @@ export default function DealsPage() {
         <form onSubmit={handleCreate} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }} noValidate>
           <Input id="deal-brand" label="Brand Name *" value={form.brandName} onChange={e => setForm(p => ({...p, brandName: e.target.value}))} placeholder="Glowleaf Naturals Pvt Ltd" maxLength={120} />
           <Input id="deal-email" label="Brand Contact Email" type="email" value={form.brandContactEmail} onChange={e => setForm(p => ({...p, brandContactEmail: e.target.value}))} />
-          <Input id="deal-value" label="Deal value before GST (₹) *" type="number" value={form.dealValue} onChange={e => setForm(p => ({...p, dealValue: e.target.value}))} style={{ fontVariantNumeric: 'tabular-nums' }} />
+          <fieldset style={{ border: 'none', padding: 0, margin: 0, display: 'flex', gap: 'var(--space-4)', flexWrap: 'wrap' }}>
+            <legend style={{ fontSize: 'var(--text-sm)', fontWeight: 500, color: 'var(--text-body)', marginBottom: 'var(--space-2)' }}>Paid in</legend>
+            {[['cash', 'Money'], ['barter', 'Products (barter / gifted)']].map(([v, l]) => (
+              <label key={v} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', fontSize: 'var(--text-sm)', color: 'var(--text-primary)', cursor: 'pointer' }}>
+                <input type="radio" name="deal-type" value={v} checked={form.dealType === v} onChange={() => setForm(p => ({ ...p, dealType: v }))} /> {l}
+              </label>
+            ))}
+          </fieldset>
+          <Input id="deal-value" label={form.dealType === 'barter' ? 'Market value of the products (₹) *' : 'Deal value before GST (₹) *'} type="number" value={form.dealValue} onChange={e => setForm(p => ({...p, dealValue: e.target.value}))} style={{ fontVariantNumeric: 'tabular-nums' }}
+            hint={form.dealType === 'barter' ? 'Gifted products are taxable income at what they sell for. Brands deduct TDS on gifts over ₹20,000 a year.' : undefined} />
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
             <label htmlFor="deal-status" style={{ fontSize: 'var(--text-sm)', fontWeight: 500, color: 'var(--text-body)' }}>Status</label>
             <select id="deal-status" value={form.status} onChange={e => setForm(p => ({...p, status: e.target.value}))} style={{ padding: 'var(--space-2) var(--space-3)', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', color: 'var(--text-primary)', fontFamily: 'inherit' }}>
@@ -224,8 +235,10 @@ export default function DealsPage() {
         onClose={() => setPayingDeal(null)}
         title={payingDeal ? `Mark ${payingDeal.brand_name} deal as paid` : ''}
         brandName={payingDeal?.brand_name}
-        taxableValue={Number(payingDeal?.invoice?.base_amount ?? payingDeal?.deal_value ?? 0)}
-        total={Number(payingDeal?.invoice?.total_amount ?? payingDeal?.deal_value ?? 0)}
+        taxableValue={Number(payingDeal?.invoice?.base_amount ?? (payingDeal?.deal_type === 'barter' ? payingDeal?.market_value : null) ?? payingDeal?.deal_value ?? 0)}
+        total={Number(payingDeal?.invoice?.total_amount ?? (payingDeal?.deal_type === 'barter' ? payingDeal?.market_value : null) ?? payingDeal?.deal_value ?? 0)}
+        defaultSection={payingDeal?.deal_type === 'barter' ? '194R' : '194J'}
+        barter={payingDeal?.deal_type === 'barter'}
         onSubmit={recordDealPayment}
       />
     </div>
@@ -241,6 +254,7 @@ function DealCard({ deal, onClick }) {
     >
       <div style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: 'var(--text-sm)', marginBottom: 'var(--space-1)', overflowWrap: 'anywhere', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }} title={deal.brand_name}>{deal.brand_name}</div>
       <div style={{ fontSize: 'var(--text-lg)', fontWeight: 700, color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums', marginBottom: 'var(--space-2)', overflowWrap: 'anywhere' }}>{formatINR(deal.deal_value)}</div>
+      {deal.deal_type === 'barter' && <Badge variant="muted" style={{ marginBottom: 'var(--space-2)' }}>Barter</Badge>}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         {deal.deadline ? <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{format(new Date(deal.deadline + 'T00:00:00'), 'd MMM')}</span> : <span />}
         {daysInStage > 14 && <span style={{ fontSize: 10, color: 'var(--warning-text)', fontWeight: 600 }}>{daysInStage}d in stage</span>}
@@ -265,7 +279,10 @@ function DealDetail({ deal, onClose, onMove, onMarkPaid, onCreateInvoice, onDele
 
         <div>
           <div style={{ fontSize: 'var(--text-2xl)', fontWeight: 700, color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>{formatINR(deal.deal_value)}</div>
-          <Badge variant={STATUS_VARIANT[deal.status]} style={{ marginTop: 'var(--space-2)' }}>{STATUS_LABELS[deal.status]}</Badge>
+          <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-2)', flexWrap: 'wrap' }}>
+            <Badge variant={STATUS_VARIANT[deal.status]}>{STATUS_LABELS[deal.status]}</Badge>
+            {deal.deal_type === 'barter' && <Badge variant="muted">Barter · products worth {formatINR(deal.market_value ?? deal.deal_value)}</Badge>}
+          </div>
         </div>
 
         {deal.brand_contact_email && <div style={{ fontSize: 'var(--text-sm)', color: 'var(--text-body)' }}><span style={{ color: 'var(--text-muted)' }}>Contact: </span>{deal.brand_contact_email}</div>}
@@ -286,7 +303,7 @@ function DealDetail({ deal, onClose, onMove, onMarkPaid, onCreateInvoice, onDele
               Move to {STATUS_LABELS[next]} →
             </button>
           )}
-          {!invoice && !['paid', 'rejected'].includes(deal.status) && (
+          {!invoice && deal.deal_type !== 'barter' && !['paid', 'rejected'].includes(deal.status) && (
             <button onClick={() => onCreateInvoice(deal)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 'var(--space-2)', padding: 'var(--space-2) var(--space-4)', background: 'var(--surface-2)', color: 'var(--text-primary)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', fontWeight: 600, fontSize: 'var(--text-sm)', cursor: 'pointer' }}>
               <FileText size={14} aria-hidden="true" /> Create invoice
             </button>
