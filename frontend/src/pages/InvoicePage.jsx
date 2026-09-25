@@ -9,43 +9,26 @@ import { isTemplateLocked } from '../utils/planConfig.js';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { useTheme } from '../App.jsx';
 import api from '../utils/api.js';
-import { formatINR, amountInWords } from '../utils/formatINR.js';
+import { formatINR, formatINRDecimal, amountInWords } from '../utils/formatINR.js';
+import { STATE_CODES, INDIAN_STATES, GST_RATES, gstinError, supplierStateCode } from '../utils/gst.js';
+import { tdsSectionLabel } from '../utils/taxLabels.js';
+import { CURRENT_FY } from '../utils/financialYear.js';
+import MarkPaidDialog from '../components/features/payment/MarkPaidDialog.jsx';
 import Input from '../components/ui/Input.jsx';
 import Badge from '../components/ui/Badge.jsx';
 import Modal from '../components/ui/Modal.jsx';
 import InvoiceList from '../components/features/invoice/InvoiceList.jsx';
 import SignatureCanvas from 'react-signature-canvas';
 
-// ── Indian states ─────────────────────────────────────────────────────────────
-const INDIAN_STATES = [
-  { code: '01', name: 'Jammu & Kashmir' }, { code: '02', name: 'Himachal Pradesh' },
-  { code: '03', name: 'Punjab' }, { code: '04', name: 'Chandigarh' },
-  { code: '05', name: 'Uttarakhand' }, { code: '06', name: 'Haryana' },
-  { code: '07', name: 'Delhi' }, { code: '08', name: 'Rajasthan' },
-  { code: '09', name: 'Uttar Pradesh' }, { code: '10', name: 'Bihar' },
-  { code: '11', name: 'Sikkim' }, { code: '12', name: 'Arunachal Pradesh' },
-  { code: '13', name: 'Nagaland' }, { code: '14', name: 'Manipur' },
-  { code: '15', name: 'Mizoram' }, { code: '16', name: 'Tripura' },
-  { code: '17', name: 'Meghalaya' }, { code: '18', name: 'Assam' },
-  { code: '19', name: 'West Bengal' }, { code: '20', name: 'Jharkhand' },
-  { code: '21', name: 'Odisha' }, { code: '22', name: 'Chhattisgarh' },
-  { code: '23', name: 'Madhya Pradesh' }, { code: '24', name: 'Gujarat' },
-  { code: '26', name: 'Dadra & Nagar Haveli and Daman & Diu' },
-  { code: '27', name: 'Maharashtra' }, { code: '28', name: 'Andhra Pradesh (old)' },
-  { code: '29', name: 'Karnataka' }, { code: '30', name: 'Goa' },
-  { code: '31', name: 'Lakshadweep' }, { code: '32', name: 'Kerala' },
-  { code: '33', name: 'Tamil Nadu' }, { code: '34', name: 'Puducherry' },
-  { code: '35', name: 'Andaman & Nicobar Islands' }, { code: '36', name: 'Telangana' },
-  { code: '37', name: 'Andhra Pradesh' }, { code: '38', name: 'Ladakh' },
-];
-const STATE_MAP = Object.fromEntries(INDIAN_STATES.map(s => [s.code, s.name]));
-
-const GSTIN_REGEX = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
+const STATE_MAP = STATE_CODES;
 
 // ── GST calc — works with serviceLines array ─────────────────────────────────
-function calcGSTMulti(form, userStateCode) {
+// supplierState comes from the creator's GSTIN (see supplierStateCode). Intrastate = supplier state
+// equals place of supply. Mirrors calculateInvoiceTotals in backend/src/services/invoiceService.ts.
+function calcGSTMulti(form, supplierState) {
   const lines = form.serviceLines || [{ amount: form.baseAmount, gstRate: form.gstRate }];
-  const isIntra = form.brandStateCode && userStateCode && form.brandStateCode === userStateCode;
+  const pos = form.placeOfSupply || form.brandStateCode;
+  const isIntra = Boolean(supplierState && pos && supplierState === pos);
 
   let subtotalPaise = 0;
   let totalGstPaise = 0;
@@ -79,24 +62,43 @@ function calcGSTMulti(form, userStateCode) {
     });
   }
 
+  const cgstPaise = Math.floor(totalGstPaise / 2);
   return {
     base: totalBasePaise / 100,
-    gstRate: parseInt(form.gstRate || 18),
+    gstRate: lineCalcs.length ? Math.max(...lineCalcs.map(l => l.gstRate)) : parseInt(form.gstRate || 18),
+    mixedRates: new Set(lineCalcs.map(l => l.gstRate)).size > 1,
     gstAmount: totalGstPaise / 100,
     total: (totalBasePaise + totalGstPaise) / 100,
     subtotal: subtotalPaise / 100,
     discountAmount: discountPaise / 100,
     supplyType: isIntra ? 'intrastate' : 'interstate',
-    cgst: isIntra ? totalGstPaise / 2 / 100 : 0,
-    sgst: isIntra ? totalGstPaise / 2 / 100 : 0,
+    cgst: isIntra ? cgstPaise / 100 : 0,
+    sgst: isIntra ? (totalGstPaise - cgstPaise) / 100 : 0,
     igst: !isIntra ? totalGstPaise / 100 : 0,
     lines: lineCalcs,
   };
 }
 
 // Keep old single-line calc for backward compat
-function calcGST(form, userStateCode) {
-  return calcGSTMulti(form, userStateCode);
+function gstRows(calc) {
+  const byRate = {};
+  for (const l of calc.lines || []) {
+    byRate[l.gstRate] = (byRate[l.gstRate] || 0) + Math.round(l.gstAmount * 100);
+  }
+  const rates = Object.keys(byRate).map(Number).sort((a, b) => a - b);
+  if (!rates.length) rates.push(calc.gstRate);
+  return rates.flatMap(r => {
+    const gst = rates.length === 1 ? Math.round(calc.gstAmount * 100) : byRate[r];
+    if (calc.supplyType === 'intrastate') {
+      const half = Math.floor(gst / 2);
+      return [[`Add: CGST @ ${r / 2}%`, formatINRDecimal(half / 100)], [`Add: SGST @ ${r / 2}%`, formatINRDecimal((gst - half) / 100)]];
+    }
+    return [[`Add: IGST @ ${r}%`, formatINRDecimal(gst / 100)]];
+  });
+}
+
+function calcGST(form, user) {
+  return calcGSTMulti(form, supplierStateCode(user));
 }
 
 // ── Invoice templates (7 styles inspired by Swipe) ───────────────────────────
@@ -105,7 +107,7 @@ const TEMPLATES = [
     id: 'classic',
     name: 'Classic',
     desc: 'Traditional professional layout — most widely accepted for Indian GST invoices',
-    tag: 'Most Popular',
+    tag: 'Standard',
     headerColor: '#1a1a2e', accentColor: '#E8921A',
     headerStyle: 'Dark navy with gold accent',
     layout: 'classic',
@@ -171,6 +173,7 @@ const ACCENT_PRESETS = ['#E8921A','#2563EB','#16A34A','#D97706','#0D9488','#6B72
 const EMPTY_FORM = {
   brandName: '', brandGstin: '', brandAddress: '', brandStateCode: '', brandPan: '',
   brandEmail: '', brandPhone: '',
+  dealId: null,
   // Multiple service lines
   serviceLines: [{ description: 'Content Creation and Influencer Marketing Services', sacCode: '998399', amount: '', gstRate: '18' }],
   // Legacy single fields kept for backward compat
@@ -200,28 +203,30 @@ const EMPTY_FORM = {
 };
 
 // ── Validation (Rule 46 CGST Rules) ──────────────────────────────────────────
-function getErrors(form) {
+function getErrors(form, user) {
   const e = {};
+  if (user && !supplierStateCode(user))                    e.supplierState = 'Add your GSTIN (or state) in Settings → Tax Profile';
   if (!form.brandName.trim())                              e.brandName = 'Brand name is required';
   if (!form.brandAddress.trim())                           e.brandAddress = 'Brand address is mandatory on GST invoice';
   if (!form.brandStateCode)                                e.brandStateCode = 'Brand state is required';
   if (!form.placeOfSupply)                                 e.placeOfSupply = 'Place of supply is mandatory per GST law (Rule 46)';
-  if (form.brandGstin && !GSTIN_REGEX.test(form.brandGstin)) e.brandGstin = 'Invalid GSTIN (format: 22AAAAA0000A1Z5)';
-  if (form.brandGstin && GSTIN_REGEX.test(form.brandGstin) && form.brandStateCode && form.brandGstin.slice(0, 2) !== form.brandStateCode) {
+  if (form.brandGstin && gstinError(form.brandGstin))    e.brandGstin = gstinError(form.brandGstin);
+  if (form.brandGstin && !gstinError(form.brandGstin) && form.brandStateCode && form.brandGstin.slice(0, 2) !== form.brandStateCode) {
     e.brandGstin = `GSTIN state code (${form.brandGstin.slice(0, 2)}) does not match selected brand state (${form.brandStateCode})`;
   }
-  if (form.brandPan && !/^[A-Z]{5}[0-9]{4}[A-Z]$/.test(form.brandPan)) e.brandPan = 'Invalid PAN (format: AAACM9517F)';
+  if (form.brandPan && !/^[A-Z]{5}[0-9]{4}[A-Z]$/.test(form.brandPan)) e.brandPan = 'PAN should look like ABCDE1234F';
   if (!form.serviceDescription.trim() || form.serviceDescription.trim().length < 5)
                                                            e.serviceDescription = 'Description of services is mandatory';
   if (!form.sacCode.trim())                                e.sacCode = 'SAC/HSN code is mandatory for service invoices';
-  if (!form.baseAmount || parseFloat(form.baseAmount) <= 0)  e.baseAmount = 'Taxable value must be > ₹0';
-  if (parseFloat(form.baseAmount) > 9999999)               e.baseAmount = 'Amount exceeds ₹99,99,999';
+  const lines = form.serviceLines?.length ? form.serviceLines : [{ amount: form.baseAmount, description: form.serviceDescription }];
+  if (lines.some(l => !(parseFloat(l.amount) > 0)))        e.baseAmount = 'Every service line needs an amount above ₹0';
+  if (lines.some(l => parseFloat(l.amount) > 9999999))     e.baseAmount = 'Amount exceeds ₹99,99,999';
   if (!form.invoiceDate)                                   e.invoiceDate = 'Invoice date is required';
   return e;
 }
 
-function isComplete(form) {
-  const e = getErrors(form);
+function isComplete(form, user) {
+  const e = getErrors(form, user);
   return Object.keys(e).length === 0;
 }
 
@@ -229,22 +234,9 @@ function isComplete(form) {
 // ── localStorage helpers — works without backend ──────────────────────────────
 // Keys are scoped per user so a different account on the same browser never sees another user's data
 let lsUserId = 'anon';
-const lsKey = () => `creator_tax_invoices:${lsUserId}`;
 const draftKey = () => `kcretio:invoice_draft:${lsUserId}`;
 // One-time cleanup of the old browser-wide draft (pre per-user keys) so it can't leak between accounts
 try { localStorage.removeItem('kcretio:invoice_draft'); } catch {}
-function lsLoad() { try { return JSON.parse(localStorage.getItem(lsKey()) || '[]'); } catch { return []; } }
-function lsSave(arr) { localStorage.setItem(lsKey(), JSON.stringify(arr)); }
-function lsNextNumber(user) {
-  const prefix = user?.invoice_prefix || 'INV';
-  const now = new Date();
-  const y = now.getMonth() >= 3 ? now.getFullYear() : now.getFullYear() - 1;
-  const fyCode = `${String(y).slice(-2)}${String(y+1).slice(-2)}`;
-  const maxSeq = lsLoad()
-    .filter(i => i.invoice_number?.startsWith(`${prefix}/${fyCode}/`))
-    .reduce((max, i) => Math.max(max, parseInt(i.invoice_number.split('/').pop(), 10) || 0), 0);
-  return `${prefix}/${fyCode}/${String(maxSeq+1).padStart(4,'0')}`;
-}
 
 // base64-embedded logo for PDF watermark — avoids external URL resolution in Blob docs
 const _WMARK_B64 = 'PD94bWwgdmVyc2lvbj0iMS4wIiBzdGFuZGFsb25lPSJ5ZXMiPz4KPHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjMxMy45MTUwMDAwMDAwMDAxIDIxOC41ODEgNDI5LjM0OCA0MjkuMzQ4Ij4KPHBhdGggc3R5bGU9ImZpbGw6IzU0NWM2Nzsgc3Ryb2tlOm5vbmU7IiBkPSJNNjI5IDI5NkM2MzUuNjc4IDI5OC44MDIgNjQ1Ljc4NCAyOTcgNjUzIDI5N0w3MDYgMjk3QzY5OS4zMjIgMjk0LjE5OCA2ODkuMjE2IDI5NiA2ODIgMjk2TDYyOSAyOTZ6Ii8+CjxwYXRoIHN0eWxlPSJmaWxsOiMyOTQxZGI7IHN0cm9rZTpub25lOyIgZD0iTTQ3OSAyOTdDNDgwLjc2OSAyOTcuNzc5IDQ4Mi4wMzYgMjk3LjkxMiA0ODQgMjk4TDQ3MSAzMDNMNDczIDMwNkw0NjUgMzA3QzQ2MC4wODIgMzE4LjA3NSA0NjEgMzI5LjA5OSA0NjEgMzQxQzQ2MSAzNTYuMzA4IDQ2MC40OTggMzcxLjcwNCA0NjAuODU5IDM4N0M0NjEuMDA4IDM5My4zMzEgNDY0LjI0NiAzOTcuMjY3IDQ2MyA0MDRDNDY1Ljk2NyA0MDQgNDY1LjY3NCA0MDYuMzY0IDQ2Ni4zMzMgNDA5QzQ2Ny43NzggNDE0Ljc3NyA0NzAuOTgzIDQxOS41MjUgNDczIDQyNUM0NzguOTE1IDQyMi40MzQgNDc5LjQ3OCA0MTcuNjYzIDQ4My41MjkgNDEzLjI3NEM0ODcuNjI2IDQwOC44MzQgNDkyLjkzMyA0MDUuMjkgNDk3LjIxNSA0MDAuOTZDNTAyLjY4MyAzOTUuNDMxIDUwNy41NzkgMzg5LjE1NyA1MTQuMDE1IDM4NC41NDJDNTIwLjE3NCAzODAuMTI0IDUzMS4xMjggMzgxLjA1IDUzNC44NTYgMzc0LjE2NEM1MzYuNzI3IDM3MC43MSA1MzYgMzY1Ljc3OSA1MzYgMzYyQzUzNi4wMDEgMzUzLjM1NiA1MzUuNjYxIDM0NC42MzUgNTM2LjAzOSAzMzZDNTM2LjM3NyAzMjguMjk2IDUzNy4wMzcgMzIwLjc1NCA1MzYuOTk5IDMxM0M1MzYuOTc2IDMwOC4xNzEgNTM2LjY5OCAzMDIuODY4IDUzMi43NzUgMjk5LjQzNEM1MjguNjkgMjk1Ljg1NiA1MjIuMDE5IDI5NyA1MTcgMjk3TDQ3OSAyOTd6Ii8+CjxwYXRoIHN0eWxlPSJmaWxsOiM0OGFlZmQ7IHN0cm9rZTpub25lOyIgZD0iTTQ5MyA0MThDNDk2Ljg3OCA0MTYuNjQzIDUwMC45MDMgNDE2LjE3NCA1MDUgNDE2QzUwMi4yMzcgNDIxLjQ0NSA1MTAuNTE4IDQyNC45MTYgNTEzLjAwMiA0MjkuMjg1QzUxNS44MjggNDM0LjI1OCA1MTMuMTE2IDQ0MC4wMSA1MTUuMDYzIDQ0NC42NTVDNTE2LjkyIDQ0OS4wODQgNTMwLjI5MSA0NDcuMDMxIDUzNCA0NDUuNjMzQzU0NC4yMDEgNDQxLjc5IDU1NC4yNDQgNDM2LjEyNSA1NjQgNDMxLjI0N0M1NzUuMzE4IDQyNS41ODggNTg2Ljg4NyA0MjAuMjE4IDU5NyA0MTIuNDk3QzYyMi40NzcgMzkzLjA0NyA2NDQuMjc5IDM2OC42MzMgNjY4IDM0Ny4xN0M2NzguMTE1IDMzOC4wMTcgNjg3Ljc3NCAzMjguMzA1IDY5OCAzMTkuMjg2QzcwMi4yMyAzMTUuNTU1IDcwOS4zMyAzMTAuOTI0IDcxMC41MTIgMzA1LjAwMUM3MTIuNTI0IDI5NC45MDcgNjk3Ljc3NCAyOTcgNjkyIDI5N0w2NDggMjk3QzY0MC4yNTYgMjk3IDYzMS41MzcgMjk1Ljg5OCA2MjQgMjk3LjkyN0M2MDkuOTQgMzAxLjcxNCA2MDAuMzkgMzEzLjQzMyA1OTAgMzIyLjgzQzU2OC4zMTUgMzQyLjQ0MyA1NDcuNjc3IDM2My4yMTYgNTI2IDM4Mi44M0M1MTguNzg0IDM4OS4zNTkgNTExLjg4MyAzOTYuMTE0IDUwNSA0MDNDNTAwLjQxNyA0MDcuNTg0IDQ5NS41NjEgNDExLjk1MSA0OTMgNDE4eiIvPgo8cGF0aCBzdHlsZT0iZmlsbDojNTQ1YzY3OyBzdHJva2U6bm9uZTsiIGQ9Ik00NjYgMzA4TDQ3MyAzMDZDNDcyLjMzOSAzMDQuNjAzIDQ3Mi4wMzYgMzA0LjE4NiA0NzEgMzAzQzQ3NS4zNjkgMzAxLjU0NCA0NzkuNDA4IDI5OS42NzkgNDg0IDI5OUM0NzcuMDcxIDI5Ni4xNzUgNDY4LjkyNSAzMDEuODYxIDQ2NiAzMDgiLz4KPHBhdGggc3R5bGU9ImZpbGw6IzI5NDFkYjsgc3Ryb2tlOm5vbmU7IiBkPSJNMzkyIDM4NUMzOTcuNzA3IDM4Ny4zOTUgNDA1Ljg0NiAzODYgNDEyIDM4Nkw0NTMgMzg2QzQ0Ny4yOTMgMzgzLjYwNSA0MzkuMTU0IDM4NSA0MzMgMzg1TDM5MiAzODV6Ii8+CjxwYXRoIHN0eWxlPSJmaWxsOiM0OGFlZmQ7IHN0cm9rZTpub25lOyIgZD0iTTQwNCA0MTFDNDAxLjQ2NyA0MDIuMTYgNDExLjE3NyAzOTEuNDY2IDQxOCAzODdDNDE1LjEwOSAzODUuNzg3IDQxMi4xMzEgMzg2LjAwMSA0MDkgMzg2QzQwMi4wMjQgMzg1Ljk5OCAzOTIuMDA1IDM4NC4xNTMgMzg2LjEwNSAzODguNjUzQzM3OC4zNzkgMzk0LjU0NSAzNzkuOTkgNDA4LjI3NiAzOTAuMDA0IDQxMC42MDZDMzk0LjQyIDQxMS42MzMgMzk5LjQ4OSA0MTEgNDA0IDQxMXoiLz4KPHBhdGggc3R5bGU9ImZpbGw6IzIxYThmYzsgc3Ryb2tlOm5vbmU7IiBkPSJNNDA0IDQxMEMzOTkuNzM5IDQxMS4yNTkgMzk1LjQyMyA0MTEgMzkxIDQxMUMzOTYuMjE3IDQxMy4xODkgNDAzLjM4MSA0MTIgNDA5IDQxMkw0MzkgNDEyQzQ0NC4xNDIgNDEyIDQ1MC4wMzMgNDEyLjc2MSA0NTQuOTk5IDQxMS4xOTZDNDY0LjYwMiA0MDguMTY5IDQ2Ny4xOTUgMzk0LjY4NiA0NTguOTU2IDM4OC42NTNDNDUxLjAzOSAzODIuODU1IDQzNC4zOTkgMzg1Ljk0IDQyNSAzODYuMDAxQzQyMS4wOCAzODYuMDI2IDQxNy40NDUgMzg2LjM1OSA0MTQuMjYzIDM4OC45MkM0MTAuMzIxIDM5Mi4wOTMgMzk5LjYgNDA1LjAxNyA0MDQgNDEweiIvPgo8cGF0aCBzdHlsZT0iZmlsbDojNzg0OGY5OyBzdHJva2U6bm9uZTsiIGQ9Ik00ODAgNDQyQzQ4Ni44MDEgNDQxLjk5IDQ5My45MzIgNDQ0LjIzMSA1MDAgNDQ3QzQ5OC43MDQgNDQ4LjU5NCA0OTguNDY1IDQ0OS4wMTggNDk4IDQ1MUM1MDAuNzE1IDQ1Mi41IDUwMi45MjggNDUzLjU2IDUwNiA0NTRMNTA1IDQ1N0w1MDggNDU5TDUwMiA0NjJDNTA1LjczMSA0NjIuOTkxIDUwOC44MjUgNDYwLjQ5OSA1MTIgNDU4LjZDNTE4LjIxOCA0NTQuODgyIDUyNC4zMDMgNDUwLjgwMyA1MzEgNDQ4QzUyNi4zNzggNDQ0LjYzMyA1MjAuNTkxIDQ0OS4yMjYgNTE2Ljc3OCA0NDYuMDE2QzUxNC4xMTggNDQzLjc3NyA1MTUuNjUyIDQzOS4wNiA1MTUuMDk3IDQzNkM1MTMuOTQgNDI5LjYxNSA1MTEuNjA5IDQyNi4zMzEgNTA2Ljk2OCA0MjEuODY1QzUwNS4zMTggNDIwLjI3NyA1MDMuNzM4IDQxOS4wNDkgNTA1IDQxN0M0OTEuMzc4IDQxMS40MzEgNDgxLjg0NSA0MzEuMzE4IDQ4MCA0NDJ6Ii8+CjxwYXRoIHN0eWxlPSJmaWxsOiMyOTQxZGI7IHN0cm9rZTpub25lOyIgZD0iTTYwMSA0MTlDNjAxLjE5NSA0MjYuMjYzIDU5Ni40MDkgNDI3LjgzNSA1OTIuMTc0IDQzMi43MDRDNTg3Ljk0MSA0MzcuNTcxIDU4NC41NDcgNDQyLjgzMiA1NzkuNTYxIDQ0Ny4wNzZDNTc2LjM3NSA0NDkuNzg5IDU3Mi40NDcgNDUxLjMyNCA1NjkuMTc0IDQ1My45MTNDNTY2LjQxMiA0NTYuMDk3IDU2NC40NTYgNDU5LjI1NiA1NjEuNjI1IDQ2MS4yOThDNTU5LjgyNSA0NjIuNTk2IDU1Ny40MTQgNDYyLjY1OCA1NTUuNjk5IDQ2NC4wMTJDNTUxLjQ4MyA0NjcuMzQ0IDU1MC44MTYgNDczLjQ5OSA1NDYgNDc3TDU0NiA0NzlDNTUxLjgxNyA0ODMuMTA1IDU1Ni41MDQgNDg4LjcxNCA1NjEuNDI0IDQ5My44MzFDNTcwLjIwMiA1MDIuOTU5IDU3OS4wMzUgNTEyLjAzNSA1ODggNTIxQzU5MS4yMzcgNTE5LjgyOCA1OTIuMzg1IDUxOS43MzcgNTk1IDUyMkw2MDIgNTE3QzYwMS41OTQgNTE0LjkwNyA2MDEuNzgzIDUxNC45OCA2MDAgNTE0TDYwOSA1MDhDNjA0LjY1IDUwMC4yMjMgNjA2LjkxOSA0OTMuNjA1IDYxNSA0OTBDNjE1LjkyMSA0ODYuNjU3IDYxOC40MjUgNDg0LjQ2OCA2MTkgNDgxTDYyMyA0ODBMNjIyIDQ3NkM2MjIuNjEgNDc2IDYyNS42MSA0NzYuMzkgNjI2IDQ3NkM2MjcuNjE2IDQ3NC4zODQgNjI2LjA3IDQ3My41NDkgNjI3IDQ3MkM2MjcuNjgyIDQ3MC44NjMgNjI4Ljk4OSA0NzAuMDExIDYzMCA0NjlMNjMxIDQ3MEM2MzEuNDI5IDQ2Ni43MjMgNjM0LjEwOCA0NTguMjA4IDYzOC42MTQgNDU4Ljc2NUM2NDAuNzgxIDQ1OS4wMzQgNjQzLjI2NSA0NjEuNzg5IDY0NSA0NjNDNjM3LjE3NyA0NTEuODk0IDYyNS41OTkgNDQyLjYwMyA2MTYgNDMzQzYxMS4zMTIgNDI4LjMxIDYwNy4wMjEgNDIxLjg2NyA2MDEgNDE5eiIvPgo8cGF0aCBzdHlsZT0iZmlsbDojMjFhOGZjOyBzdHJva2U6bm9uZTsiIGQ9Ik0zNDMgNDI4QzM0NC4yNDggNDI4LjY4NSAzNDQuNTQ4IDQyOC43NDkgMzQ2IDQyOUMzNDIuODQ3IDQzMC41NzcgMzM5LjM0NCA0MzEuNDg0IDMzNyA0MzVDMzM2LjA0IDQzNi40NDEgMzM1Ljk0MyA0MzguNDI5IDMzNSA0NDBMMzM0IDQzOUMzMzQuMDEgNDQyLjczNSAzMzMuOTE1IDQ0Ni41NDQgMzM1LjU3MyA0NDkuOTk5QzMzNi42MTcgNDUyLjE3NiAzMzguMTU5IDQ1NC4wNzQgMzQwLjA0NCA0NTUuNTgxQzM1OC4wMDggNDY5Ljk0NyAzNzYuMzUzIDQzNi4yNjYgMzU0Ljk4NSA0MjguODU0QzM1MS4yMjUgNDI3LjU1IDM0Ni45MTcgNDI4IDM0MyA0Mjh6Ii8+CjxwYXRoIHN0eWxlPSJmaWxsOiM0OGFlZmQ7IHN0cm9rZTpub25lOyIgZD0iTTMzNSA0NDBDMzM4LjE2NyA0MzUuNTE1IDM0MC41ODggNDMxLjg0MSAzNDYgNDMwQzMzOS42ODYgNDI3Ljg0MSAzMzUuNjEgNDM0LjUyIDMzNSA0NDB6Ii8+CjxwYXRoIHN0eWxlPSJmaWxsOiMyMWE4ZmM7IHN0cm9rZTpub25lOyIgZD0iTTM4NiA0MzJDMzg2LjU5OCA0MzMuMTk1IDM4Ni40NjYgNDMyLjk3NyAzODggNDM0TDM4MCA0MzdDMzc3LjE0OCA0NDQuODI2IDM3Ny44ODkgNDU0Ljc1OCAzODcuMDAxIDQ1OC4yNThDMzkxLjE0OSA0NTkuODUxIDM5Ni42MzMgNDU5IDQwMSA0NTlMNDI4IDQ1OUM0MjcuMDIgNDU3LjIxNyA0MjcuMDkyIDQ1Ny40MDYgNDI1IDQ1N0M0MjYuNjMyIDQ1NS4wNzQgNDI2Ljk2NiA0NTQuNDg5IDQyNyA0NTJDNDI5LjIwNyA0NTAuNDI4IDQyOS4zMDMgNDQ5LjY4MiA0MjkgNDQ3QzQzNC4yMTMgNDQ1LjA0NyA0MzYuNzkgNDQwLjY4NCA0NDEuNDMxIDQzOC4wNjVDNDQ0LjM5NSA0MzYuMzkyIDQ0Ny41NiA0MzYuNjQ4IDQ0OCA0MzNMNDUyIDQzM0M0NDUuODA2IDQzMC40MDEgNDM2LjY4NiA0MzIgNDMwIDQzMkM0MTUuNDggNDMyIDQwMC4zNTcgNDI5LjMzNSAzODYgNDMyeiIvPgo8cGF0aCBzdHlsZT0iZmlsbDojMjk0MWRiOyBzdHJva2U6bm9uZTsiIGQ9Ik00MTAgNDMxQzQxNC4yMTUgNDMyLjc2OSA0MTkuNDY0IDQzMiA0MjQgNDMyTDQ1MiA0MzJDNDQ3Ljc4NSA0MzAuMjMxIDQ0Mi41MzYgNDMxIDQzOCA0MzFMNDEwIDQzMSIvPgo8cGF0aCBzdHlsZT0iZmlsbDojMjk0MWRiOyBzdHJva2U6bm9uZTsiIGQ9Ik00NDggNDMzQzQ0Ny41MzkgNDM2LjU1MSA0NDQuMjQ2IDQzNi4xNTUgNDQxLjM4OSA0MzcuNTgzQzQzNi44MDggNDM5Ljg3NCA0MzMuNjQgNDQ0LjQ2MiA0MjkgNDQ3QzQyOC44MTcgNDQ5LjQyOCA0MjguNTc3IDQ1MC4xNyA0MjcgNDUyQzQyNi44MDEgNDU0LjEwNiA0MjYuNTQ0IDQ1NC41NDMgNDI1IDQ1Nkw0MjggNDU5TDM4OSA0NTlDMzkzLjk2OSA0NjEuMDg1IDQwMC42NSA0NjAgNDA2IDQ2MEw0NDAgNDYwQzQ0Ni41NzkgNDYwIDQ1My4zMzYgNDYwLjU4MSA0NTguODkyIDQ1Ni4zMTJDNDY2LjE5MiA0NTAuNzAyIDQ2NS41MjUgNDM3LjM4MSA0NTYuOTg1IDQzMy4xOTRDNDU0LjEzNiA0MzEuNzk3IDQ1MC45ODcgNDMyLjYzMSA0NDggNDMzIi8+CjxwYXRoIHN0eWxlPSJmaWxsOiM0OGFlZmQ7IHN0cm9rZTpub25lOyIgZD0iTTM4MSA0MzhMMzg4IDQzNEMzODQuNDUyIDQzMy4wNjYgMzgyLjYwMiA0MzQuOTQ1IDM4MSA0Mzh6Ii8+CjxwYXRoIHN0eWxlPSJmaWxsOiMyOTQxZGI7IHN0cm9rZTpub25lOyIgZD0iTTQ3OSA0NDFDNDc0LjczMiA0NTQuNDM3IDQ3MS4xNCA0NjguMjYyIDQ2OCA0ODJDNDY5LjMgNDgxLjM1IDQ2OSA0ODEuODUzIDQ2OSA0ODBDNDcwLjc1MyA0ODIuNTc4IDQ3Mi4xMTYgNDgzLjgxNSA0NzUgNDg1QzQ3MS40MDIgNDg5LjIzMSA0NjguMTMzIDQ5My44NiA0NjYgNDk5QzQ2NS4wMTQgNDk3LjUyMiA0NjUgNDk3Ljc5NyA0NjUgNDk2QzQ1My44MzUgNTIxLjg4MiA0ODYuNjQyIDU0Mi40MzUgNTAzIDU1NS43MzlDNTEwLjM1MyA1NjEuNzIgNTIwLjQ1NiA1NzIuMzEyIDUzMC45ODEgNTY2LjgyMUM1MzkuMjk4IDU2Mi40ODIgNTM3IDU0OS43MiA1MzcgNTQyTDUzNyA0NzBDNTIxLjY3MSA0NzEuMzc1IDUwNi4yMjkgNDc0LjIwOCA0OTEgNDc0QzQ5NC40OTQgNDY5LjcwOCA0OTkuMTg2IDQ2Ni42ODMgNTA0IDQ2NEM1MDMuNDAyIDQ2Mi44MDUgNTAzLjUzNCA0NjMuMDIzIDUwMiA0NjJDNTA0LjIyMiA0NjEuMTkgNTA1Ljk5IDQ2MC4yNjEgNTA4IDQ1OUM1MDYuODYxIDQ1Ny45ODUgNTA2LjM4OCA0NTcuNjkxIDUwNSA0NTdDNTA1Ljk4NiA0NTUuNTIxIDUwNiA0NTUuNzk3IDUwNiA0NTRDNTAzLjE4OSA0NTMuMjk5IDUwMC42OTYgNDUyLjA1OSA0OTggNDUxTDUwMCA0NDdDNDkzLjg4IDQ0My4wMDMgNDg2LjE5NiA0NDIuMzI1IDQ3OSA0NDEiLz4KPHBhdGggc3R5bGU9ImZpbGw6Izc4NDhmOTsgc3Ryb2tlOm5vbmU7IiBkPSJNNjMxIDQ3MEM2MjcuMTI5IDQ3MC40NzggNjI1Ljk2OCA0NzQuODEyIDYyMiA0NzZMNjIzIDQ4MEw2MTkgNDgxQzYxOC4wNzkgNDg0LjM0NCA2MTUuNTc1IDQ4Ni41MzIgNjE1IDQ5MEM2MDcuOTcxIDQ5MS45MTYgNjAyLjIyNiA1MDEuMTY1IDYwOSA1MDdDNjA2LjEyNSA1MDkuMzk5IDYwMy40NTYgNTExLjUzNCA2MDAgNTEzTDYwMiA1MTdDNTk5LjA5MyA1MTcuOTU5IDU5Ny40MjUgNTIwLjE3IDU5NSA1MjJDNTkzLjE0MiA1MTkuNDI4IDU5Mi4wNjUgNTE5LjI3MiA1ODkgNTIwQzU5MS42MTQgNTI1LjYwNSA1OTYuNjY4IDUyOS42NjggNjAxIDUzNEM2MDcuNDU4IDU0MC40NTggNjEzLjU2OSA1NDcuNzU1IDYyMiA1NTEuNjc2QzYzMC4zMzQgNTU1LjU1MiA2MzkuMDUxIDU1NSA2NDggNTU1TDY4MyA1NTVDNjkzLjUyIDU1NSA3MDUuNjUxIDU1Ni42ODMgNzE1Ljk5NiA1NTQuNzcyQzcyMC4yODIgNTUzLjk3OSA3MjMuMjYzIDU1MC40NjYgNzIyLjcyOCA1NDZDNzIxLjg0NiA1MzguNjQ5IDcxMC45NjUgNTMwLjEwNSA3MDUuOTg1IDUyNUM2OTAuMzYxIDUwOC45ODMgNjc0LjgwOCA0OTIuODA4IDY1OSA0NzdMNjQ2IDQ2NC4wMDFDNjQ0LjA4MiA0NjIuMDk5IDY0MS44MDQgNDU5LjEyMSA2MzkuMDQgNDU4LjQ2MUM2MzMuNzU3IDQ1Ny4yMDEgNjMxLjI0OSA0NjYuMjkyIDYzMSA0NzB6Ii8+CjxwYXRoIHN0eWxlPSJmaWxsOiM3ODQ4Zjk7IHN0cm9rZTpub25lOyIgZD0iTTQ2OSA0ODBDNDY3LjAxNiA0ODYuMjA2IDQ2NS4yODIgNDkyLjQ2MSA0NjUgNDk5QzQ2OS4wMzEgNDk1LjAwNCA0NzIuMDI3IDQ4OS44MjMgNDc1IDQ4NUM0NzIuNjM2IDQ4My41NjMgNDcwLjg4MiA0ODIuMDIgNDY5IDQ4MHoiLz4KPC9zdmc+Cg==';
@@ -274,7 +266,8 @@ function AutosaveIndicator({ lastSaved }) {
 }
 
 function buildClassicHTML(inv, user, t, plan) {
-  const stateMap = Object.fromEntries(INDIAN_STATES.map(s => [s.code, s.name]));
+  const stateMap = STATE_CODES;
+  const supState = supplierStateCode(user);
   const fmt = (d) => {
     if (!d) return '—';
     try { return format(new Date(d.includes('T') ? d : d + 'T00:00:00'), 'dd MMM yyyy'); }
@@ -345,7 +338,7 @@ function buildClassicHTML(inv, user, t, plan) {
       ${displayEmail ? `<div class="party-detail">Email: ${displayEmail}</div>` : ''}
       ${displayPhone ? `<div class="party-detail">Ph: ${displayPhone}</div>` : ''}
       ${user?.business_address ? `<div class="party-detail" style="margin-top:4px;line-height:1.4">${user.business_address}</div>` : ''}
-      ${user?.state_code ? `<div class="party-detail">State: ${stateMap[user.state_code] || ''} | Code: ${user.state_code}</div>` : ''}
+      ${supState ? `<div class="party-detail">State: ${stateMap[supState] || ''} | Code: ${supState}</div>` : ''}
     </div>
     <div>
       <div class="party-label">Recipient (Bill To)</div>
@@ -425,7 +418,8 @@ function buildClassicHTML(inv, user, t, plan) {
 }
 
 function buildCorporateHTML(inv, user, t, plan) {
-  const stateMap = Object.fromEntries(INDIAN_STATES.map(s => [s.code, s.name]));
+  const stateMap = STATE_CODES;
+  const supState = supplierStateCode(user);
   const fmt = (d) => { if (!d) return '—'; try { return format(new Date(d.includes('T') ? d : d + 'T00:00:00'), 'dd MMM yyyy'); } catch { return d; } };
   const inr = (n) => `₹${Number(n || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   const words = amountInWords(inv.total_amount || 0);
@@ -482,7 +476,7 @@ function buildCorporateHTML(inv, user, t, plan) {
     <div class="co-name">${user?.business_name || user?.name || '—'}</div>
     ${user?.gstin ? `<div class="co-gstin">GSTIN: ${user.gstin}</div>` : ''}
     ${user?.business_address ? `<div style="font-size:10px;opacity:.8;margin-top:4px">${user.business_address}</div>` : ''}
-    ${user?.state_code ? `<div style="font-size:10px;opacity:.75;margin-top:2px">State: ${stateMap[user.state_code] || ''} | Code: ${user.state_code}</div>` : ''}
+    ${supState ? `<div style="font-size:10px;opacity:.75;margin-top:2px">State: ${stateMap[supState] || ''} | Code: ${supState}</div>` : ''}
     ${displayEmail ? `<div style="font-size:10px;opacity:.75;margin-top:2px">Email: ${displayEmail}</div>` : ''}
   </div>
   <div class="hdr-right">
@@ -586,7 +580,8 @@ ${inv.include_terms && inv.terms_text ? `
 }
 
 function buildMinimalHTML(inv, user, t, plan) {
-  const stateMap = Object.fromEntries(INDIAN_STATES.map(s => [s.code, s.name]));
+  const stateMap = STATE_CODES;
+  const supState = supplierStateCode(user);
   const fmt = (d) => { if (!d) return '—'; try { return format(new Date(d.includes('T') ? d : d + 'T00:00:00'), 'dd MMM yyyy'); } catch { return d; } };
   const inr = (n) => `₹${Number(n || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   const words = amountInWords(inv.total_amount || 0);
@@ -642,7 +637,7 @@ function buildMinimalHTML(inv, user, t, plan) {
       ${user?.pan ? ` · PAN: ${user.pan}` : ''}
     </div>
     ${user?.business_address ? `<div class="co-sub">${user.business_address}</div>` : ''}
-    ${user?.state_code ? `<div class="co-sub">State: ${stateMap[user.state_code] || ''} | Code: ${user.state_code}</div>` : ''}
+    ${supState ? `<div class="co-sub">State: ${stateMap[supState] || ''} | Code: ${supState}</div>` : ''}
     ${displayEmail ? `<div class="co-sub">Email: ${displayEmail}</div>` : ''}
     ${displayPhone ? `<div class="co-sub">Ph: ${displayPhone}</div>` : ''}
   </div>
@@ -665,7 +660,7 @@ function buildMinimalHTML(inv, user, t, plan) {
     <div class="party-lbl">Bill From</div>
     <div class="party-name">${user?.business_name || user?.name || '—'}</div>
     ${user?.gstin ? `<div class="party-d">GSTIN: ${user.gstin}</div>` : ''}
-    ${user?.state_code ? `<div class="party-d">State: ${stateMap[user.state_code] || ''} | Code: ${user.state_code}</div>` : ''}
+    ${supState ? `<div class="party-d">State: ${stateMap[supState] || ''} | Code: ${supState}</div>` : ''}
   </div>
   <div>
     <div class="party-lbl">Bill To</div>
@@ -855,13 +850,14 @@ const SIG_FONTS = [
   { label: 'Times', preview: "'Times New Roman', serif", css: "italic 40px 'Times New Roman', serif" },
 ];
 
-function CompliancePanel({ form }) {
+function CompliancePanel({ form, user }) {
   const [open, setOpen] = useState(false);
-  const errors = getErrors(form);
+  const errors = getErrors(form, user);
   const hasAnyInput = form.brandName.trim() || form.baseAmount || form.serviceDescription.trim();
   if (!hasAnyInput) return null;
 
   const checks = [
+    { key: 'supplierState',      label: 'Your GSTIN / state set' },
     { key: 'sacCode',            label: 'SAC code present' },
     { key: 'brandGstin',         label: 'GSTIN valid + state match' },
     { key: 'placeOfSupply',      label: 'Place of supply declared' },
@@ -870,6 +866,7 @@ function CompliancePanel({ form }) {
     { key: 'brandStateCode',     label: 'Brand state declared' },
     { key: 'baseAmount',         label: 'Taxable value > ₹0' },
   ];
+  // Always printed by Kcretio: amount in words, reverse charge line, state codes next to addresses.
   const passed = checks.filter(c => !errors[c.key]).length;
   const allPass = passed === checks.length;
 
@@ -934,8 +931,10 @@ function CompliancePanel({ form }) {
 }
 
 function NetInHandPanel({ calc }) {
+  const [rate, setRate] = useState(10);
   if (!calc || !calc.total || calc.total <= 0) return null;
-  const tdsDeducted = Math.round(calc.total * 0.10);
+  // TDS is worked out on the taxable value — GST is excluded.
+  const tdsDeducted = Math.round(calc.base * rate) / 100;
   const netReceived = calc.total - tdsDeducted;
 
   return (
@@ -948,23 +947,32 @@ function NetInHandPanel({ calc }) {
       fontSize: 'var(--text-sm)',
     }}>
       <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 'var(--space-2)' }}>
-        Net-in-Hand Estimate (194J TDS @ 10%)
+        Net-in-hand estimate
       </div>
+      <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-2)', marginBottom: 'var(--space-2)', fontSize: 'var(--text-xs)', color: 'var(--text-secondary)' }}>
+        TDS this brand deducts
+        <select value={rate} onChange={e => setRate(Number(e.target.value))} style={{ padding: '2px 6px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', color: 'var(--text-primary)', fontFamily: 'inherit', fontSize: 'var(--text-xs)' }}>
+          <option value={10}>{tdsSectionLabel('194J', CURRENT_FY)} · 10%</option>
+          <option value={2}>{tdsSectionLabel('194C', CURRENT_FY)} · 2%</option>
+          <option value={1}>{tdsSectionLabel('194C', CURRENT_FY)} · 1%</option>
+          <option value={0}>No TDS</option>
+        </select>
+      </label>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
           <span style={{ color: 'var(--text-secondary)' }}>Brand pays</span>
           <span style={{ fontWeight: 600 }}>{formatINR(calc.total)}</span>
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-          <span style={{ color: 'var(--text-secondary)' }}>TDS deducted (10%)</span>
-          <span style={{ color: '#e53e3e', fontWeight: 600 }}>−{formatINR(tdsDeducted)}</span>
+          <span style={{ color: 'var(--text-secondary)' }}>TDS deducted ({rate}% of {formatINR(calc.base)})</span>
+          <span style={{ color: 'var(--danger)', fontWeight: 600 }}>−{formatINRDecimal(tdsDeducted)}</span>
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid var(--border)', paddingTop: 'var(--space-1)', marginTop: 'var(--space-1)' }}>
           <span style={{ fontWeight: 700 }}>You receive</span>
-          <span style={{ fontWeight: 700, color: 'var(--accent)' }}>{formatINR(netReceived)}</span>
+          <span style={{ fontWeight: 700, color: 'var(--accent)' }}>{formatINRDecimal(netReceived)}</span>
         </div>
         <div style={{ fontSize: 11, color: '#48bb78', marginTop: 2 }}>
-          TDS credit at ITR: +{formatINR(tdsDeducted)} — not lost, claimable when you file
+          TDS credit at ITR: +{formatINRDecimal(tdsDeducted)} — not lost, claimable when you file
         </div>
       </div>
     </div>
@@ -1028,9 +1036,10 @@ export default function InvoicePage({ initialView }) {
   const [typedSig, setTypedSig] = useState('');
   const [typedSigFont, setTypedSigFont] = useState(0);
 
-  const calc = calcGST(form, user?.state_code);
-  const formErrors = getErrors(form);
-  const complete = isComplete(form);
+  const calc = calcGST(form, user);
+  const formErrors = getErrors(form, user);
+  const complete = isComplete(form, user);
+  const [payingInvoice, setPayingInvoice] = useState(null);
   const selectedTemplate = TEMPLATES.find(t => t.id === form.templateId) || TEMPLATES[0];
   const effectiveTemplate = { ...selectedTemplate, accentColor: form.invoiceAccentColor || selectedTemplate.accentColor };
   const customColorBg = (form.invoiceAccentColor && !ACCENT_PRESETS.includes(form.invoiceAccentColor)) ? form.invoiceAccentColor : 'var(--border-2)';
@@ -1104,7 +1113,7 @@ export default function InvoicePage({ initialView }) {
         });
         setTouched({});
         setEditingId(null);
-        setNextNumber(lsNextNumber(user));
+        setNextNumber('');
         api.get('/invoices/next-number').then(r => setNextNumber(r.data.invoiceNumber)).catch(() => {});
         return;
       }
@@ -1126,7 +1135,7 @@ export default function InvoicePage({ initialView }) {
           }
         } catch {}
       }
-      setNextNumber(lsNextNumber(user));
+      setNextNumber('');
       api.get('/invoices/next-number').then(r => setNextNumber(r.data.invoiceNumber)).catch(() => {});
       api.get('/invoices/warm').catch(() => {});
 
@@ -1138,12 +1147,13 @@ export default function InvoicePage({ initialView }) {
           if (!deal) return;
           setForm(prev => ({
             ...prev,
+            dealId: deal.id,
             brandName: deal.brand_name || '',
             brandEmail: deal.brand_contact_email || '',
             serviceLines: [{
               description: deal.deliverables || prev.serviceLines[0]?.description || '',
               sacCode: '998399',
-              amount: deal.deal_value ? String(Math.round(deal.deal_value)) : '',
+              amount: deal.deal_value ? String(Number(deal.deal_value)) : '',
               gstRate: '18',
             }],
             notes: deal.notes || '',
@@ -1227,10 +1237,7 @@ export default function InvoicePage({ initialView }) {
     });
     api.get(`/invoices/${editId}`)
       .then(res => { setForm(buildForm(res.data)); setNextNumber(res.data.invoice_number || ''); })
-      .catch(() => {
-        const inv = lsLoad().find(i => i.id === editId);
-        if (inv) { setForm(buildForm(inv)); setNextNumber(inv.invoice_number || ''); }
-      });
+      .catch(() => toast.error('Couldn’t load this invoice. Check your connection and try again.'));
   }, [editId]);
 
   useEffect(() => {
@@ -1247,7 +1254,7 @@ export default function InvoicePage({ initialView }) {
     if (filterStatus !== 'all') params.status = filterStatus;
     api.get('/invoices', { params })
       .then(res => { setInvoices(res.data.invoices || []); setTotalCount(res.data.total || 0); })
-      .catch(() => setInvoices(lsLoad()))
+      .catch(() => toast.error('Couldn’t load invoices. Check your connection and try again.'))
       .finally(() => setListLoading(false));
   }
 
@@ -1265,8 +1272,8 @@ export default function InvoicePage({ initialView }) {
     if (!complete) { toast.error('Please fill all required fields'); return null; }
     setSubmitting(true);
 
-    const c = calcGST(form, user?.state_code);
-    const invNum = nextNumber || lsNextNumber(user);
+    const c = calcGST(form, user);
+    const invNum = nextNumber;
     const payload = {
       invoice_number: invNum, brand_name: form.brandName.trim(),
       brand_gstin: form.brandGstin.trim()||null, brand_address: form.brandAddress.trim(),
@@ -1320,13 +1327,21 @@ export default function InvoicePage({ initialView }) {
 
     let saved = null;
     try {
-      const isRemoteEdit = editingId && !String(editingId).startsWith('local-');
+      const isRemoteEdit = Boolean(editingId);
       const body = {
         brandName: payload.brand_name, brandGstin: payload.brand_gstin,
         brandAddress: payload.brand_address, brandStateCode: payload.brand_state_code,
         brandPan: payload.brand_pan,
         brandEmail: payload.brand_email, brandPhone: payload.brand_phone,
-        serviceDescription: payload.service_description, baseAmount: payload.base_amount,
+        serviceDescription: payload.service_description,
+        // Line amounts are before discount; the server applies the discount and computes GST per line.
+        lineItems: (form.serviceLines || []).map(l => ({
+          description: (l.description || '').trim() || payload.service_description,
+          sacCode: l.sacCode || payload.sac_code,
+          amount: parseFloat(l.amount),
+          gstRate: parseInt(l.gstRate || form.gstRate || 18, 10),
+        })),
+        dealId: form.dealId || undefined,
         gstRate: payload.gst_rate, invoiceDate: payload.invoice_date, dueDate: payload.due_date,
         notes: payload.notes, sacCode: payload.sac_code, placeOfSupply: payload.place_of_supply,
         reverseCharge: payload.reverse_charge, templateId: payload.template_id,
@@ -1353,16 +1368,10 @@ export default function InvoicePage({ initialView }) {
         : await api.post('/invoices', body);
       saved = { ...payload, ...res.data, id: res.data.id };
     } catch (err) {
-      // Server answered with an error — show it instead of silently saving to this browser only
-      if (err?.response) {
-        toast.error(err.response.data?.message || 'Could not save invoice');
-        setSubmitting(false);
-        return null;
-      }
-      const existing = lsLoad();
-      const id = editingId || `local-${Date.now()}`;
-      saved = { ...payload, id };
-      lsSave(editingId ? existing.map(i => i.id===editingId ? saved : i) : [saved, ...existing]);
+      // Never save only to this browser — an invoice number must come from the server.
+      toast.error(err?.response?.data?.message || 'Couldn’t save the invoice — check your connection and try again.');
+      setSubmitting(false);
+      return null;
     }
     setSubmitting(false);
     refreshUsage();
@@ -1391,7 +1400,7 @@ export default function InvoicePage({ initialView }) {
       pdfAbortRef.current?.abort();
       pdfAbortRef.current = new AbortController();
       const signal = pdfAbortRef.current.signal;
-      if (inv.id && !String(inv.id).startsWith('local-')) {
+      {
         try {
           const res = await api.get(`/invoices/${inv.id}/pdf`, { responseType: 'blob', signal, timeout: 90000 });
           await savePdfBlob(new Blob([res.data], { type: 'application/pdf' }), `${(inv.invoice_number || 'invoice').replace(/\//g, '-')}.pdf`);
@@ -1400,8 +1409,6 @@ export default function InvoicePage({ initialView }) {
             downloadInvoicePDF(inv, user, TEMPLATES.find(t => t.id === inv.template_id) || TEMPLATES[0], user?.plan);
           }
         }
-      } else {
-        downloadInvoicePDF(inv, user, TEMPLATES.find(t => t.id === inv.template_id) || TEMPLATES[0], user?.plan);
       }
     }, 300);
   }
@@ -1451,45 +1458,20 @@ export default function InvoicePage({ initialView }) {
   async function handleDelete(inv) {
     if (!window.confirm(`Delete invoice ${inv.invoice_number}? This cannot be undone.`)) return;
     try { await api.delete(`/invoices/${inv.id}`); }
-    catch { lsSave(lsLoad().filter(i => i.id !== inv.id)); }
+    catch (err) { toast.error(err?.response?.data?.message || 'Couldn’t delete the invoice. Please try again.'); return; }
     toast.success('Invoice deleted');
     loadInvoices();
   }
 
-  async function handleMarkPaid(inv) {
-    if (!window.confirm(`Mark ${inv.invoice_number} as PAID?\n\nThis will:\n• Change invoice status to Paid\n• Auto-log ₹${Number(inv.total_amount).toLocaleString('en-IN')} as income\n• Log ₹${Math.round(Number(inv.total_amount) * 0.1).toLocaleString('en-IN')} as TDS deducted (10%)`)) return;
+  function handleMarkPaid(inv) {
+    setPayingInvoice(inv);
+  }
 
-    const paymentDate = new Date().toISOString().split('T')[0];
-    const fyStart = paymentDate.slice(0,4);
-    const month = parseInt(paymentDate.slice(5,7));
-    const fy = month >= 4 ? `${fyStart}-${String(parseInt(fyStart)+1).slice(-2)}` : `${parseInt(fyStart)-1}-${String(parseInt(fyStart)).slice(-2)}`;
-
-    // Update invoice status
-    try { await api.patch(`/invoices/${inv.id}/mark-paid`); }
-    catch (err) {
-      if (err?.response) { toast.error(err.response.data?.message || 'Could not mark invoice as paid'); return; }
-      lsSave(lsLoad().map(i => i.id === inv.id ? { ...i, status: 'paid' } : i));
-    }
-
-    // Try backend for income + TDS logging
-    try {
-      await api.post('/income', {
-        source: 'brand_deal', amount: inv.total_amount,
-        description: `Payment for invoice ${inv.invoice_number} — ${inv.brand_name}`,
-        incomeDate: paymentDate,
-      });
-      await api.post('/tds', {
-        brandName: inv.brand_name,
-        brandTan: inv.brand_tan || undefined,
-        invoiceAmount: inv.total_amount,
-        tdsRate: 10,
-        paymentDate,
-      });
-    } catch {
-      // Silently log locally — backend not available
-    }
-
-    toast.success(`Invoice marked as Paid · Income + TDS logged for FY ${fy}`);
+  async function recordInvoicePayment(body) {
+    await api.post(`/invoices/${payingInvoice.id}/mark-paid`, body);
+    const fy = CURRENT_FY;
+    toast.success(`${payingInvoice.invoice_number} marked paid · income${body.tdsDeducted > 0 ? ' and TDS' : ''} logged for ${fy}`);
+    setPayingInvoice(null);
     loadInvoices();
   }
 
@@ -1565,9 +1547,9 @@ export default function InvoicePage({ initialView }) {
                   <FileText size={12} aria-hidden="true" /> Load Saved Brand
                 </button>
               </div>
-              <Input id="brandName" label="Brand / Company Name *" value={form.brandName} onChange={e => update('brandName', e.target.value)} onBlur={() => touch('brandName')} error={showErr('brandName')} placeholder="Mamaearth Pvt Ltd" tooltip="Legal name of the brand or company you are billing. Must match their GST registration exactly for B2B invoices." />
-              <Input id="brandGstin" label="Brand GSTIN" value={form.brandGstin} onChange={e => update('brandGstin', e.target.value.toUpperCase().slice(0,15))} onBlur={() => touch('brandGstin')} error={showErr('brandGstin')} placeholder="27AAACM9517F1ZW" hint={form.brandGstin.length === 15 && GSTIN_REGEX.test(form.brandGstin) ? '✓ Valid GSTIN format' : 'Mandatory for B2B input tax credit'} maxLength={15} tooltip="15-digit GST Identification Number of the brand. Format: 2 digits state code + 10 digit PAN + 1 digit entity number + Z + 1 check digit. Required for B2B input tax credit." style={form.brandGstin.length === 15 && GSTIN_REGEX.test(form.brandGstin) ? { borderColor: 'var(--success)', boxShadow: '0 0 0 3px var(--success-dim)' } : {}} />
-              <Input id="brandPan" label="Brand PAN" value={form.brandPan} onChange={e => update('brandPan', e.target.value.toUpperCase().slice(0,10))} onBlur={() => touch('brandPan')} error={showErr('brandPan')} placeholder="AAACM9517F" maxLength={10} tooltip="10-character Permanent Account Number of the brand. Optional but useful for TDS reconciliation and Form 26AS." />
+              <Input id="brandName" label="Brand / Company Name *" value={form.brandName} onChange={e => update('brandName', e.target.value)} onBlur={() => touch('brandName')} error={showErr('brandName')} placeholder="Glowleaf Naturals Pvt Ltd" tooltip="Legal name of the brand or company you are billing. Must match their GST registration exactly for B2B invoices." />
+              <Input id="brandGstin" label="Brand GSTIN" value={form.brandGstin} onChange={e => update('brandGstin', e.target.value.toUpperCase().slice(0,15))} onBlur={() => touch('brandGstin')} error={showErr('brandGstin')} placeholder="27ABCDE1234F1Z0" hint={form.brandGstin.length === 15 && !gstinError(form.brandGstin) ? '✓ GSTIN checks out' : 'Mandatory for B2B input tax credit'} maxLength={15} tooltip="15-digit GST Identification Number of the brand. Format: 2 digits state code + 10 digit PAN + 1 digit entity number + Z + 1 check digit. Required for B2B input tax credit." style={form.brandGstin.length === 15 && !gstinError(form.brandGstin) ? { borderColor: 'var(--success)', boxShadow: '0 0 0 3px var(--success-dim)' } : {}} />
+              <Input id="brandPan" label="Brand PAN" value={form.brandPan} onChange={e => update('brandPan', e.target.value.toUpperCase().slice(0,10))} onBlur={() => touch('brandPan')} error={showErr('brandPan')} placeholder="ABCDE1234F" maxLength={10} tooltip="10-character Permanent Account Number of the brand. Optional but useful for TDS reconciliation and Form 26AS." />
               <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 'var(--space-3)' }}>
                 <Input id="brandEmail" label="Brand Email (optional)" type="email" value={form.brandEmail} onChange={e => update('brandEmail', e.target.value)} placeholder="accounts@brand.com" tooltip="Brand's billing or accounts email address. Optional — appears on invoice for reference." />
                 <Input id="brandPhone" label="Brand Contact No. (optional)" type="tel" value={form.brandPhone} onChange={e => update('brandPhone', e.target.value)} placeholder="+91 98765 43210" tooltip="Brand contact number. Optional — appears on invoice for reference." />
@@ -1643,7 +1625,9 @@ export default function InvoicePage({ initialView }) {
                           <label style={{ fontSize: 'var(--text-sm)', fontWeight: 500, color: 'var(--text-body)' }}>GST %</label>
                           <select value={line.gstRate || '18'} onChange={e => { const lines=[...form.serviceLines]; lines[idx]={...lines[idx],gstRate:e.target.value}; update('serviceLines',lines); if(idx===0) update('gstRate',e.target.value); }}
                             style={{ padding: 'var(--space-2)', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', color: 'var(--text-primary)', fontSize: 'var(--text-sm)', fontFamily: 'inherit' }}>
-                            {[0,5,12,18,28].map(r => <option key={r} value={r}>{r}%</option>)}
+                            {[...new Set([...GST_RATES, Number(line.gstRate || 18)])].sort((a, b) => a - b).map(r => (
+                              <option key={r} value={r} disabled={!GST_RATES.includes(r)}>{r}%{GST_RATES.includes(r) ? '' : ' (no longer valid)'}</option>
+                            ))}
                           </select>
                         </div>
                         {/* SAC Code last */}
@@ -1685,12 +1669,12 @@ export default function InvoicePage({ initialView }) {
               {calc.base > 0 ? (
                 <div style={{ padding: 'var(--space-4)', background: 'var(--surface-2)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
                   <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 'var(--space-3)' }}>
-                    {calc.supplyType==='intrastate' ? ('Intrastate — CGST ' + (calc.gstRate/2) + '% + SGST ' + (calc.gstRate/2) + '%') : ('Interstate — IGST ' + calc.gstRate + '%')}
+                    {calc.supplyType==='intrastate' ? 'Intrastate — CGST + SGST' : 'Interstate — IGST'}
                   </div>
                   {[
-                    ...(showDiscount ? [['Subtotal', formatINR(calc.subtotal)], ['Discount', ('−' + formatINR(calc.discountAmount))]] : []),
-                    ['Taxable Value', formatINR(calc.base)],
-                    ...(calc.supplyType==='intrastate'?[['CGST @ ' + (calc.gstRate/2) + '%',formatINR(calc.cgst)],['SGST @ ' + (calc.gstRate/2) + '%',formatINR(calc.sgst)]]:[['IGST @ ' + calc.gstRate + '%',formatINR(calc.igst)]]),
+                    ...(showDiscount ? [['Subtotal', formatINRDecimal(calc.subtotal)], ['Less: Discount', ('−' + formatINRDecimal(calc.discountAmount))]] : []),
+                    ['Taxable Value', formatINRDecimal(calc.base)],
+                    ...gstRows(calc),
                   ].map(([l,v]) => (
                     <div key={l} style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0', fontSize: 'var(--text-sm)' }}>
                       <span style={{ color: 'var(--text-body)' }}>{l}</span>
@@ -2035,7 +2019,7 @@ export default function InvoicePage({ initialView }) {
           </form>
 
           {/* Mobile: compliance checklist sits at the end of the form, keeping the pinned bar compact */}
-          {isMobile && <CompliancePanel form={form} />}
+          {isMobile && <CompliancePanel form={form} user={user} />}
 
           {/* Desktop: sticky right-side preview */}
           {!isMobile && (
@@ -2060,7 +2044,7 @@ export default function InvoicePage({ initialView }) {
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', maxWidth: 1200, margin: '0 auto', width: '100%', flexWrap: isMobile ? 'wrap' : 'nowrap' }}>
           {!isMobile && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', flex: '1 1 auto', minWidth: 0 }}>
-              <CompliancePanel form={form} />
+              <CompliancePanel form={form} user={user} />
               {!complete && Object.keys(touched).length > 0 ? (
                 <span title="Fill all required (*) fields to enable invoice creation" style={{ fontSize: 'var(--text-xs)', color: 'var(--warning-text)', display: 'flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                   <AlertCircle size={12} aria-hidden="true" />
@@ -2195,7 +2179,7 @@ export default function InvoicePage({ initialView }) {
                       <div style={{ flex: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px' }}>
                         <div>
                           <div style={{ fontSize: 9, fontWeight: 800, color: '#fff' }}>Company</div>
-                          <div style={{ fontSize: 6, color: 'rgba(255,255,255,.7)', marginTop: 1 }}>GSTIN: 29ABCDE1234F</div>
+                          <div style={{ fontSize: 6, color: 'rgba(255,255,255,.7)', marginTop: 1 }}>GSTIN: 29ABCDE1234F1ZW</div>
                         </div>
                         <div style={{ textAlign: 'right' }}>
                           <div style={{ fontSize: 6, letterSpacing: '.08em', color: 'rgba(255,255,255,.7)', textTransform: 'uppercase' }}>TAX INVOICE</div>
@@ -2400,6 +2384,16 @@ export default function InvoicePage({ initialView }) {
           <option value="overdue">Overdue</option>
         </select>
       </div>
+
+      <MarkPaidDialog
+        isOpen={Boolean(payingInvoice)}
+        onClose={() => setPayingInvoice(null)}
+        title={payingInvoice ? `Mark ${payingInvoice.invoice_number} as paid` : ''}
+        brandName={payingInvoice?.brand_name}
+        taxableValue={Number(payingInvoice?.base_amount || 0)}
+        total={Number(payingInvoice?.total_amount || 0)}
+        onSubmit={recordInvoicePayment}
+      />
 
       <InvoiceList
         invoices={invoices} loading={listLoading}
@@ -2648,11 +2642,8 @@ function ClassicPreview({ form, calc, invoiceNumber, user, template }) {
         {calc.base > 0 && (
           <div style={{ marginLeft: 'auto', maxWidth: 210 }}>
             {[
-              ['Taxable Value', formatINR(calc.base)],
-              ...(calc.supplyType === 'intrastate'
-                ? [[`CGST (${calc.gstRate/2}%)`, formatINR(calc.cgst)], [`SGST (${calc.gstRate/2}%)`, formatINR(calc.sgst)]]
-                : [[`IGST (${calc.gstRate}%)`, formatINR(calc.igst)]]
-              ),
+              ['Taxable Value', formatINRDecimal(calc.base)],
+              ...gstRows(calc),
             ].map(([l, v]) => (
               <div key={l} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, padding: '3px 0', borderBottom: '1px solid #f0f0f0' }}>
                 <span style={{ color: '#666' }}>{l}</span>
@@ -2822,10 +2813,7 @@ function CorporatePreview({ form, calc, invoiceNumber, user, template }) {
           <div style={{ marginLeft: 'auto', maxWidth: 220, border: '1px solid #e5e5e5', borderRadius: 4, overflow: 'hidden' }}>
             {[
               ['Taxable Amount', formatINR(calc.base)],
-              ...(calc.supplyType === 'intrastate'
-                ? [[`CGST (${calc.gstRate/2}%)`, formatINR(calc.cgst)], [`SGST (${calc.gstRate/2}%)`, formatINR(calc.sgst)]]
-                : [[`IGST (${calc.gstRate}%)`, formatINR(calc.igst)]]
-              ),
+              ...gstRows(calc),
             ].map(([l, v]) => (
               <div key={l} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, padding: '4px 10px', borderBottom: '1px solid #f5f5f5' }}>
                 <span style={{ color: '#666' }}>{l}</span>
@@ -2915,11 +2903,8 @@ function MinimalPreview({ form, calc, invoiceNumber, user, template }) {
       {calc.base > 0 && (
         <div style={{ marginLeft: 'auto', maxWidth: 200 }}>
           {[
-            ['Taxable Value', formatINR(calc.base)],
-            ...(calc.supplyType === 'intrastate'
-              ? [[`CGST (${calc.gstRate/2}%)`, formatINR(calc.cgst)], [`SGST (${calc.gstRate/2}%)`, formatINR(calc.sgst)]]
-              : [[`IGST (${calc.gstRate}%)`, formatINR(calc.igst)]]
-            ),
+            ['Taxable Value', formatINRDecimal(calc.base)],
+            ...gstRows(calc),
           ].map(([l, v]) => (
             <div key={l} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, padding: '3px 0', borderBottom: '1px solid #f5f5f5' }}>
               <span style={{ color: '#666' }}>{l}</span>
