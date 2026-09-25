@@ -1019,12 +1019,14 @@ function SocialLinksSection({ user, onSave }) {
     { key: 'youtube',   label: 'YouTube',   placeholder: 'https://youtube.com/@yourchannel' },
     { key: 'facebook',  label: 'Facebook',  placeholder: 'https://facebook.com/yourpage' },
     { key: 'x',         label: 'X (Twitter)', placeholder: 'https://x.com/yourhandle' },
-    { key: 'tiktok',    label: 'TikTok',    placeholder: 'https://tiktok.com/@yourhandle' },
+    { key: 'moj',       label: 'Moj',       placeholder: 'https://mojapp.in/@yourhandle' },
+    { key: 'josh',      label: 'Josh',      placeholder: 'https://share.myjosh.in/profile/yourhandle' },
+    { key: 'spotify',   label: 'Spotify (podcast)', placeholder: 'https://open.spotify.com/show/yourshow' },
     { key: 'snapchat',  label: 'Snapchat',  placeholder: 'https://snapchat.com/add/yourhandle' },
     { key: 'linkedin',  label: 'LinkedIn',  placeholder: 'https://linkedin.com/in/yourprofile' },
     { key: 'website',   label: 'Website',   placeholder: 'https://yourwebsite.com' },
   ];
-  const [links, setLinks] = useState(user?.social_links || {});
+  const [links, setLinks] = useState(() => { const { tiktok, ...rest } = user?.social_links || {}; return rest; });
   const [saving, setSaving] = useState(false);
   const toast = useToast();
 
