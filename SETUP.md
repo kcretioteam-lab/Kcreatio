@@ -33,6 +33,7 @@ npm run install:all
    - `backend/migrations/011_notification_prefs_auto_apply.sql` — gmail_auto_apply, threshold, deal_followup_alerts columns
    - `backend/migrations/012_purchase_order_number.sql`, `013_invoice_discount.sql`, `014_invoice_accent_color.sql` — invoice extras
    - `backend/migrations/015_premium_requests.sql` — premium_requests table (request-based Pro access)
+   - `backend/migrations/016_payment_integrity_tax_profile.sql` — atomic mark-paid functions, Tax Profile fields, invoice line items. **Run before deploying the backend** — `/auth/me` reads the new columns.
 
 3. Create a Storage bucket named **`invoice-signatures`** (public read):
    - Go to Storage → New bucket → Name: `invoice-signatures` → Public: ON
@@ -155,7 +156,7 @@ kcretio/
 │   │   ├── services/  # invoiceService (GST calc), puppeteerPdfService (PDF + watermark)
 │   │   ├── middleware/ # authenticate, validateBody
 │   │   └── lib/       # supabase client
-│   └── migrations/    # 001–011 SQL files, run in Supabase SQL Editor
+│   └── migrations/    # 001–016 SQL files, run in Supabase SQL Editor
 └── SETUP.md           # This file
 ```
 

@@ -26,7 +26,10 @@ cd backend && node -r dotenv/config dist/server.js   # http://localhost:4000
 
 ## Critical rules
 - JWT in httpOnly cookies — NEVER localStorage
-- All monetary values in paise internally; `numeric(12,2)` in DB
+- Money is stored and sent over the API in rupees (`numeric(12,2)`); do arithmetic in paise (integers) and convert back. Never divide DB amounts by 100
+- Tax maths lives in `backend/src/services/taxEngine.ts`, mirrored in `frontend/src/utils/taxCalc.js`; both are tested against `backend/src/services/__tests__/taxCases.json`
+- GST helpers live in `backend/src/lib/gst.ts`, mirrored in `frontend/src/utils/gst.js`. Supplier state comes from the creator's GSTIN
+- Marking an invoice/deal paid goes through `markPaid()` (DB function, one transaction) — income is the taxable value, never incl. GST
 - Plans: Basic (free, unlimited watermarked invoices) / Starter ₹299 / Pro ₹599. Business plan is paused (commented out)
 - Payments disabled: signup = Basic; users request 28 days of Pro via `usePremiumRequest().openRequest()` → `premium_requests` table + admin email with Approve link (sets plan='trial'). Never link to Razorpay checkout until payments are re-enabled
 - All API inputs validated with Zod before touching DB
@@ -41,6 +44,8 @@ cd backend && node -r dotenv/config dist/server.js   # http://localhost:4000
 - 003: invoice_settings table + 18 new invoice columns (bank, T&C, signatory, etc.)
 - 004: UPI setting type, scanner_image_url, brand_email, brand_phone, include_upi
 - 005: users.phone, show_phone_on_invoice, invoice_phone, invoice_email, avatar_url
+- 006–015: see SETUP.md
+- 016: mark_invoice_paid / mark_deal_paid functions, Tax Profile fields (tax_regime, presumptive, gst_registered, LUT), invoices.line_items
 
 ## GST compliance (Rule 46 CGST Rules 2017)
 - CGST+SGST for intrastate (same state supplier+brand), IGST for interstate

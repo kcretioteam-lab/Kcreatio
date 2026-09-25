@@ -109,11 +109,11 @@ function FlowCanvas({ active, style: sx }) {
 const FLOATING_DOCS = [
   // Kept in the side gutters (x ≤ 12 / ≥ 82) so no tile sits behind the hero copy or CTAs
   { icon: FileText,     label: 'Invoice #42',    color: '#4ade80', x: 6,  y: 20, rot: -8 },
-  { icon: TrendingDown, label: 'TDS ₹11,800',    color: '#60a5fa', x: 84, y: 18, rot:  6 },
+  { icon: TrendingDown, label: 'TDS ₹10,000',    color: '#60a5fa', x: 84, y: 18, rot:  6 },
   { icon: IndianRupee,  label: '₹1,18,000 paid', color: '#f59e0b', x: 3,  y: 44, rot: -5 },
   { icon: Calendar,     label: 'Advance Tax',     color: '#a78bfa', x: 86, y: 42, rot:  9 },
   { icon: BarChart2,    label: 'P&L Summary',     color: '#f87171', x: 9,  y: 66, rot: -3 },
-  { icon: Briefcase,    label: 'Mamaearth Deal',  color: '#34d399', x: 4,  y: 84, rot:  7 },
+  { icon: Briefcase,    label: 'Glowleaf Deal',   color: '#34d399', x: 4,  y: 84, rot:  7 },
   { icon: Download,     label: 'ITR-Ready ZIP',   color: '#fb923c', x: 83, y: 66, rot: -6 },
   { icon: Shield,       label: 'Rule 46 GST',     color: '#e879f9', x: 86, y: 84, rot:  4 },
 ];
@@ -271,7 +271,7 @@ function Act1Hero() {
         </div>
 
         <ul className="v2-proof" aria-label="What you get">
-          {['Rule 46 compliant invoices', 'FY 2025-26 tax slabs', 'Free forever plan'].map(t => (
+          {['Rule 46 compliant invoices', 'Tax year 2026-27 rules', 'Free forever plan'].map(t => (
             <li key={t}><Check size={13} aria-hidden="true" /> {t}</li>
           ))}
         </ul>
@@ -393,14 +393,14 @@ function Navbar() {
 const CHAOS_ITEMS = [
   { label: 'Invoice #38 — overdue 12 days', color: '#f87171', icon: FileText },
   { label: 'GST portal: deadline today',    color: '#fb923c', icon: Shield },
-  { label: 'TDS mismatch — Boat invoice',   color: '#f59e0b', icon: TrendingDown },
+  { label: 'TDS mismatch — Soundwave invoice', color: '#f59e0b', icon: TrendingDown },
   { label: 'Excel sheet: #REF! error',      color: '#f87171', icon: BarChart2 },
   { label: 'CA needs advance tax now',      color: '#fb923c', icon: Calendar },
   { label: 'Brand payment: still pending',  color: '#ef4444', icon: IndianRupee },
   { label: 'GSTR-1: 3 invoices missing',    color: '#f59e0b', icon: FileText },
   { label: 'Form 16A: still not received',  color: '#fb923c', icon: Download },
   { label: '5 spreadsheets. None agree.',   color: '#f87171', icon: BarChart2 },
-  { label: 'Mamaearth PO: wrong GST no.',   color: '#ef4444', icon: Briefcase },
+  { label: 'Glowleaf PO: wrong GST no.',    color: '#ef4444', icon: Briefcase },
 ];
 
 function Act2Reality() {
@@ -479,42 +479,42 @@ const JOURNEY = [
   {
     step: '01', icon: Briefcase, color: '#4ade80',
     title: 'Brand slides into your DMs.',
-    body: 'Mamaearth offers ₹1,18,000 for a YouTube integration. You log the deal in 10 seconds. Pipeline updated. Nothing falls through.',
-    tag: '₹1,18,000 deal logged',
-    detail: 'Brand: Mamaearth · Due: 15 Aug · Platform: YouTube',
+    body: 'Glowleaf Naturals offers ₹1,00,000 for a YouTube integration. You log the deal in 10 seconds. Pipeline updated. Nothing falls through.',
+    tag: '₹1,00,000 deal logged',
+    detail: 'Brand: Glowleaf Naturals · Due: 15 Aug · Platform: YouTube',
   },
   {
     step: '02', icon: FileText, color: '#60a5fa',
     title: 'Invoice sent. In under a minute.',
-    body: 'GST auto-calculated. IGST vs CGST+SGST decided by state code. Rule 46-compliant PDF. Mamaearth gets exactly what their finance team needs.',
+    body: 'GST auto-calculated. IGST vs CGST+SGST decided from your GSTIN and the place of supply. The brand’s finance team gets every field Rule 46 asks for.',
     tag: 'IGST 18% auto-applied',
-    detail: 'Invoice #CF-2024-042 · SAC 998399 · ₹1,39,240 total',
+    detail: 'Invoice INV/2627/0042 · SAC 998399 · ₹1,18,000 total',
   },
   {
     step: '03', icon: TrendingDown, color: '#a78bfa',
-    title: '₹11,800 TDS deducted at source.',
-    body: 'Mamaearth pays ₹1,06,200. Kcretio records the ₹11,800 TDS before you even check your account. Form 16A? Already tracked.',
+    title: '₹10,000 TDS deducted at source.',
+    body: 'Glowleaf pays ₹1,08,000 — the ₹1,18,000 invoice minus 10% TDS on the ₹1,00,000 fee (never on GST). You record it in one tap. Form 16A? Tracked.',
     tag: 'Form 16A: awaiting',
-    detail: 'Net received: ₹1,06,200 · TDS: ₹11,800 · Cert pending',
+    detail: 'Net received: ₹1,08,000 · TDS: ₹10,000 · Cert pending',
   },
   {
     step: '04', icon: IndianRupee, color: '#f59e0b',
     title: 'Income logged. P&L updated.',
-    body: 'Payment hits your account. Kcretio auto-logs it. Running totals stay current. Gross income, net income, deductions — all live.',
+    body: 'Payment hits your account. ₹1,00,000 is logged as income — the ₹18,000 GST is kept separate because it’s owed to the government. Totals stay current.',
     tag: 'No spreadsheet needed',
-    detail: 'FY 2024-25 gross: ₹38,40,000 · Net: ₹33,12,000',
+    detail: 'Tax year 2026-27 gross: ₹38,40,000 · Net: ₹33,12,000',
   },
   {
     step: '05', icon: Calendar, color: '#fb923c',
-    title: 'Sep 15 arrives. You pay zero penalty.',
-    body: 'Kcretio calculates your Q3 advance tax 14 days before the deadline. Reminder sent. ₹18,400 paid. No interest. No CA panic calls.',
+    title: 'Sep 15 arrives. No late interest.',
+    body: 'Kcretio works out your Q2 advance tax and reminds you 14 days before the deadline. ₹18,400 paid on time. No interest. No panic calls.',
     tag: '14-day reminder sent',
-    detail: 'Q3 advance tax: ₹18,400 · Penalty avoided: ₹2,460',
+    detail: 'Q2 advance tax: ₹18,400 · Interest avoided: ₹552',
   },
   {
     step: '06', icon: Download, color: '#34d399',
     title: 'March. Your CA opens the ZIP.',
-    body: "20 minutes later, ITR filed. Your CA calls it the cleanest file of the season. You're already working on your next video.",
+    body: "Every invoice, TDS entry and expense is already there. Your CA starts on your return instead of chasing documents. You're already working on your next video.",
     tag: 'ITR-ready in one click',
     detail: 'All invoices · All TDS · All income · One clean export',
   },
