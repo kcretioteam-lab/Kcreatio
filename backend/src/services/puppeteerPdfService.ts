@@ -349,3 +349,22 @@ export async function generateInvoicePdfWithPuppeteer(
     pageInUse = false;
   }
 }
+
+// Renders any HTML document to an A4 PDF (used for the CA export summary).
+export async function renderHtmlToPdf(html: string): Promise<Buffer> {
+  while (pageInUse) {
+    await new Promise<void>(resolve => setTimeout(resolve, 50));
+  }
+  pageInUse = true;
+  let page = null;
+  try {
+    const browser = await getBrowser();
+    page = await browser.newPage();
+    await page.setContent(html, { waitUntil: 'load', timeout: 30000 });
+    const pdf = await page.pdf({ format: 'A4', printBackground: true, margin: { top: '14mm', right: '12mm', bottom: '14mm', left: '12mm' } });
+    return Buffer.from(pdf);
+  } finally {
+    if (page) await page.close().catch(() => {});
+    pageInUse = false;
+  }
+}

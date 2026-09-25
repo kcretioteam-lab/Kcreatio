@@ -1201,7 +1201,7 @@ function ExportSection({ user }) {
   async function download() {
     setDownloading(true);
     try {
-      const res = await api.get(`/export/annual?fy=${selectedFY}`, { responseType: 'blob', timeout: 120000 });
+      const res = await api.get(`/export/annual?fy=${selectedFY}`, { responseType: 'blob', timeout: 300000 });
       const url = URL.createObjectURL(res.data);
       const a = document.createElement('a');
       a.href = url;
@@ -1218,7 +1218,7 @@ function ExportSection({ user }) {
     <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: 'var(--space-6)' }}>
       <h2 style={{ fontSize: 'var(--text-md)', fontWeight: 700, color: 'var(--text-primary)', marginBottom: 'var(--space-2)' }}>CA Export</h2>
       <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)', marginBottom: 'var(--space-5)', lineHeight: 1.6 }}>
-        Download a ZIP file with all invoices, TDS records, income, expenses, and a P&amp;L summary — formatted for your CA's ITR-3/ITR-4 filing.
+        Download one ZIP for your CA: every invoice as a PDF, an Excel workbook with invoices, income, expenses, TDS and advance tax, and a one-page tax summary. It can take a minute if you have many invoices.
       </p>
       {!isPro && (
         <div style={{ padding: 'var(--space-3) var(--space-4)', background: 'var(--warning-dim)', border: '1px solid var(--warning)', borderRadius: 'var(--radius-md)', fontSize: 'var(--text-sm)', color: 'var(--warning-text)', marginBottom: 'var(--space-4)' }}>
@@ -1235,7 +1235,7 @@ function ExportSection({ user }) {
         </button>
       </div>
       <p style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', marginTop: 'var(--space-3)' }}>
-        Includes: invoices.csv · tds.csv · income.csv · expenses.csv · summary.txt
+        Includes: invoices/*.pdf · kcretio-&lt;year&gt;.xlsx · summary.pdf
       </p>
     </div>
   );
