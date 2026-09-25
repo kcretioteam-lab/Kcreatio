@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { supabase } from '../lib/supabase.js';
 import { authenticate, AuthRequest } from '../middleware/auth.js';
 import { validateBody } from '../middleware/validateBody.js';
-import { getFinancialYear } from '../services/invoiceService.js';
+import { markPaid, MarkPaidSchema } from '../services/paymentService.js';
 
 const router = Router();
 router.use(authenticate);
@@ -37,6 +37,28 @@ router.get('/', async (req: AuthRequest, res: Response): Promise<void> => {
   const { data, error } = await query;
   if (error) { res.status(500).json({ error: 'INTERNAL_ERROR', message: error.message }); return; }
   res.json({ deals: data });
+});
+
+// GET /deals/:id — includes the latest linked invoice, if any
+router.get('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
+  const { data, error } = await supabase
+    .from('deals')
+    .select('*')
+    .eq('id', req.params.id)
+    .eq('user_id', req.userId!)
+    .maybeSingle();
+  if (error) { res.status(500).json({ error: 'INTERNAL_ERROR', message: error.message }); return; }
+  if (!data) { res.status(404).json({ error: 'NOT_FOUND', message: 'Deal not found' }); return; }
+  const { data: invoice } = await supabase
+    .from('invoices')
+    .select('id, invoice_number, status, base_amount, total_amount')
+    .eq('deal_id', data.id)
+    .eq('user_id', req.userId!)
+    .neq('status', 'cancelled')
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  res.json({ ...data, invoice: invoice || null });
 });
 
 // POST /deals
@@ -74,6 +96,10 @@ router.put('/:id', validateBody(UpdateDealSchema), async (req: AuthRequest, res:
   if (body.brandName !== undefined) updates.brand_name = body.brandName;
   if (body.brandContactEmail !== undefined) updates.brand_contact_email = body.brandContactEmail || null;
   if (body.dealValue !== undefined) updates.deal_value = body.dealValue;
+  if (body.status === 'paid') {
+    res.status(422).json({ error: 'USE_MARK_PAID', message: 'Use “Mark paid” so the income and TDS are recorded.' });
+    return;
+  }
   if (body.status !== undefined) updates.status = body.status;
   if (body.niche !== undefined) updates.niche = body.niche;
   if (body.deliverables !== undefined) updates.deliverables = body.deliverables;
@@ -94,8 +120,9 @@ router.put('/:id', validateBody(UpdateDealSchema), async (req: AuthRequest, res:
   res.json(data);
 });
 
-// POST /deals/:id/mark-paid — marks paid + auto-creates income entry
-router.post('/:id/mark-paid', async (req: AuthRequest, res: Response): Promise<void> => {
+// POST /deals/:id/mark-paid — records the payment. If the deal has an invoice, the invoice is
+// marked paid instead so the same payment is never logged twice.
+router.post('/:id/mark-paid', validateBody(MarkPaidSchema), async (req: AuthRequest, res: Response): Promise<void> => {
   const { data: deal } = await supabase
     .from('deals')
     .select('*')
@@ -104,44 +131,22 @@ router.post('/:id/mark-paid', async (req: AuthRequest, res: Response): Promise<v
     .maybeSingle();
 
   if (!deal) { res.status(404).json({ error: 'NOT_FOUND', message: 'Deal not found' }); return; }
+  if (deal.status === 'paid') { res.status(409).json({ error: 'ALREADY_PAID', message: 'This deal is already marked as paid' }); return; }
 
-  const paymentDate = req.body.paidDate || new Date().toISOString().split('T')[0];
-  const fy = getFinancialYear(new Date(paymentDate + 'T00:00:00'));
+  const { data: invoice } = await supabase
+    .from('invoices')
+    .select('id')
+    .eq('deal_id', deal.id)
+    .eq('user_id', req.userId!)
+    .in('status', ['draft', 'sent', 'overdue'])
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
 
-  // Update deal status to paid + auto-create income entry atomically via Supabase RPC
-  // Using sequential ops with rollback on failure
-  const { error: dealUpdateError } = await supabase
-    .from('deals')
-    .update({ status: 'paid', updated_at: new Date().toISOString() })
-    .eq('id', deal.id);
-
-  if (dealUpdateError) {
-    res.status(500).json({ error: 'INTERNAL_ERROR', message: 'Failed to mark deal as paid' });
-    return;
-  }
-
-  // Auto-create income entry
-  const { data: income, error: incomeError } = await supabase
-    .from('income')
-    .insert({
-      user_id: req.userId!,
-      deal_id: deal.id,
-      source: 'brand_deal',
-      amount: deal.deal_value,
-      currency: 'INR',
-      description: `Brand deal payment — ${deal.brand_name}`,
-      income_date: paymentDate,
-      financial_year: fy,
-    })
-    .select()
-    .single();
-
-  if (incomeError) {
-    // Rollback the deal update
-    await supabase.from('deals').update({ status: deal.status }).eq('id', deal.id);
-    res.status(500).json({ error: 'INTERNAL_ERROR', message: 'Deal mark-paid rolled back — income entry failed' });
-    return;
-  }
+  const result = invoice
+    ? await markPaid('invoice', req.userId!, invoice.id, req.body)
+    : await markPaid('deal', req.userId!, deal.id, req.body);
+  if (!result.ok) { res.status(result.status).json({ error: result.error, message: result.message }); return; }
 
   // Send payment confirmation emails (non-blocking)
   try {
@@ -153,7 +158,7 @@ router.post('/:id/mark-paid', async (req: AuthRequest, res: Response): Promise<v
 
     if (user) {
       const { sendPaymentConfirmedEmail } = await import('../services/emailService.js');
-      const amount = `₹${(deal.deal_value / 100).toLocaleString('en-IN')}`;
+      const amount = `₹${Number(req.body.amountReceived).toLocaleString('en-IN')}`;
 
       // Notify creator
       await sendPaymentConfirmedEmail(user.email, {
@@ -177,7 +182,7 @@ router.post('/:id/mark-paid', async (req: AuthRequest, res: Response): Promise<v
     }
   } catch { /* Non-blocking — email failure doesn't fail the request */ }
 
-  res.json({ deal: { ...deal, status: 'paid' }, income });
+  res.json({ deal: { ...deal, status: 'paid' }, viaInvoice: Boolean(invoice) });
 });
 
 // DELETE /deals/:id

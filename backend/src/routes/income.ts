@@ -118,12 +118,13 @@ export default router;
 router.put('/:id', validateBody(CreateIncomeSchema.partial()), async (req: AuthRequest, res: Response): Promise<void> => {
   const updates: Record<string, unknown> = {};
   if (req.body.source !== undefined) updates.source = req.body.source;
-  if (req.body.amount !== undefined) updates.amount = Math.round(req.body.amount * 100);
+  if (req.body.amount !== undefined) updates.amount = req.body.amount; // rupees, same as POST
   if (req.body.description !== undefined) updates.description = req.body.description || null;
   if (req.body.incomeDate !== undefined) {
     updates.income_date = req.body.incomeDate;
-    const { getFinancialYear } = await import('../services/invoiceService.js').catch(() => ({ getFinancialYear: null, getQuarter: null }));
-    if (typeof getFinancialYear === 'function') updates.financial_year = getFinancialYear(new Date(req.body.incomeDate + 'T00:00:00'));
+    const date = new Date(req.body.incomeDate + 'T00:00:00');
+    updates.financial_year = getFinancialYear(date);
+    updates.quarter = getAdvanceTaxQuarter(date);
   }
   updates.updated_at = new Date().toISOString();
 

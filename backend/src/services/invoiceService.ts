@@ -5,8 +5,15 @@ export const CREATOR_GST_CONFIG = {
   defaultGstRate: 18,
 };
 
-export const VALID_GST_RATES = [0, 5, 12, 18, 28] as const;
-export type GstRate = typeof VALID_GST_RATES[number];
+export { GST_RATES as VALID_GST_RATES } from '../lib/gst.js';
+export type GstRate = number;
+
+export interface InvoiceLine {
+  description: string;
+  sacCode?: string | null;
+  amount: number;
+  gstRate: number;
+}
 
 export interface GstCalculation {
   baseAmount: number;
@@ -17,34 +24,64 @@ export interface GstCalculation {
   cgstAmount: number | null;
   sgstAmount: number | null;
   igstAmount: number | null;
+  discountAmount: number;
+  lines: (InvoiceLine & { taxableValue: number; gstAmount: number })[];
 }
 
+// Intrastate (CGST+SGST) only when the supplier's state and the place of supply match.
+// Callers must make sure the supplier state is known — see supplierStateCode().
+export function calculateInvoiceTotals(
+  lines: InvoiceLine[],
+  discount: { value?: number | null; type?: 'flat' | 'percent' | null },
+  supplierState: string,
+  placeOfSupply: string,
+): GstCalculation {
+  // Work in paise to avoid floating point errors
+  const linePaise = lines.map(l => Math.round(l.amount * 100));
+  const subtotalPaise = linePaise.reduce((s, p) => s + p, 0);
+  const dv = Number(discount.value) || 0;
+  const discountPaise = dv > 0
+    ? Math.min(subtotalPaise, discount.type === 'percent' ? Math.round(subtotalPaise * dv / 100) : Math.round(dv * 100))
+    : 0;
+  const ratio = subtotalPaise > 0 ? (subtotalPaise - discountPaise) / subtotalPaise : 0;
+
+  // Discount is spread across lines in proportion to their value, before GST.
+  let basePaise = 0;
+  let gstPaise = 0;
+  const computed = lines.map((l, i) => {
+    const taxable = Math.round(linePaise[i] * ratio);
+    const gst = Math.round(taxable * l.gstRate / 100);
+    basePaise += taxable;
+    gstPaise += gst;
+    return { ...l, taxableValue: taxable / 100, gstAmount: gst / 100 };
+  });
+
+  const supplyType: 'intrastate' | 'interstate' = supplierState === placeOfSupply ? 'intrastate' : 'interstate';
+  const cgstPaise = Math.floor(gstPaise / 2);
+  return {
+    baseAmount: basePaise / 100,
+    gstRate: lines.length ? Math.max(...lines.map(l => l.gstRate)) : 0,
+    gstAmount: gstPaise / 100,
+    totalAmount: (basePaise + gstPaise) / 100,
+    supplyType,
+    cgstAmount: supplyType === 'intrastate' ? cgstPaise / 100 : null,
+    sgstAmount: supplyType === 'intrastate' ? (gstPaise - cgstPaise) / 100 : null,
+    igstAmount: supplyType === 'interstate' ? gstPaise / 100 : null,
+    discountAmount: discountPaise / 100,
+    lines: computed,
+  };
+}
+
+// Single-line convenience wrapper
 export function calculateGst(
   baseAmountRupees: number,
   gstRate: GstRate,
-  creatorStateCode: string,
-  brandStateCode: string
+  supplierState: string,
+  placeOfSupply: string,
 ): GstCalculation {
-  // Calculate in paise to avoid floating point errors
-  const basePaise = Math.round(baseAmountRupees * 100);
-  const gstPaise = Math.round(basePaise * gstRate / 100);
-  const totalPaise = basePaise + gstPaise;
-
-  const supplyType: 'intrastate' | 'interstate' =
-    creatorStateCode && brandStateCode && creatorStateCode === brandStateCode
-      ? 'intrastate'
-      : 'interstate';
-
-  return {
-    baseAmount: basePaise / 100,
-    gstRate,
-    gstAmount: gstPaise / 100,
-    totalAmount: totalPaise / 100,
-    supplyType,
-    cgstAmount: supplyType === 'intrastate' ? gstPaise / 2 / 100 : null,
-    sgstAmount: supplyType === 'intrastate' ? gstPaise / 2 / 100 : null,
-    igstAmount: supplyType === 'interstate' ? gstPaise / 100 : null,
-  };
+  return calculateInvoiceTotals(
+    [{ description: '', amount: baseAmountRupees, gstRate }], {}, supplierState, placeOfSupply,
+  );
 }
 
 export function getFinancialYear(date: Date): string {
