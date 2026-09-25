@@ -8,15 +8,14 @@ import { Link } from 'react-router-dom';
 import {
   FileText, TrendingDown, Calendar, Briefcase,
   Download, IndianRupee, BarChart2, ChevronRight,
-  Zap, Shield, Check, Sun, Moon, Menu, X,
+  Shield, Check, Sun, Moon, Menu, X, ArrowDown,
 } from 'lucide-react';
 import { useTheme } from '../App.jsx';
 import LogoMark from '../components/ui/LogoMark.jsx';
 import {
   reduced, useInView, Reveal,
-  FlowPipeline, Act5Impact, DashboardReveal,
-  Act6Ecosystem, ComparisonTable, Pricing,
-  FAQ, Act7Return, Footer, TaxRiskCalculator,
+  Act5Impact, DashboardReveal, ComparisonTable, Pricing,
+  FAQ, Act7Return, Footer, TaxRiskCalculator, InvoiceShowcase,
 } from './LandingPageActs.jsx';
 
 // ─── CursorGlow ───────────────────────────────────────────────────────────────
@@ -27,7 +26,7 @@ function CursorGlow() {
   const elRef = useRef(null);
 
   useEffect(() => {
-    if (reduced()) return;
+    if (reduced() || window.matchMedia('(hover: none)').matches) return;
     const move = (e) => {
       pos.current = { x: e.clientX, y: e.clientY };
       if (!raf.current) {
@@ -108,14 +107,15 @@ function FlowCanvas({ active, style: sx }) {
 // ─── Floating docs ────────────────────────────────────────────────────────────
 
 const FLOATING_DOCS = [
-  { icon: FileText,     label: 'Invoice #42',    color: '#4ade80', x: 12, y: 22, rot: -8 },
-  { icon: TrendingDown, label: 'TDS ₹11,800',    color: '#60a5fa', x: 78, y: 18, rot:  6 },
-  { icon: IndianRupee,  label: '₹1,18,000 paid', color: '#f59e0b', x: 8,  y: 58, rot: -5 },
-  { icon: Calendar,     label: 'Advance Tax',     color: '#a78bfa', x: 80, y: 55, rot:  9 },
-  { icon: BarChart2,    label: 'P&L Summary',     color: '#f87171', x: 50, y: 16, rot: -3 },
-  { icon: Briefcase,    label: 'Mamaearth Deal',  color: '#34d399', x: 20, y: 74, rot:  7 },
-  { icon: Download,     label: 'ITR-Ready ZIP',   color: '#fb923c', x: 72, y: 74, rot: -6 },
-  { icon: Shield,       label: 'Rule 46 GST',     color: '#e879f9', x: 62, y: 82, rot:  4 },
+  // Kept in the side gutters (x ≤ 12 / ≥ 82) so no tile sits behind the hero copy or CTAs
+  { icon: FileText,     label: 'Invoice #42',    color: '#4ade80', x: 6,  y: 20, rot: -8 },
+  { icon: TrendingDown, label: 'TDS ₹11,800',    color: '#60a5fa', x: 84, y: 18, rot:  6 },
+  { icon: IndianRupee,  label: '₹1,18,000 paid', color: '#f59e0b', x: 3,  y: 44, rot: -5 },
+  { icon: Calendar,     label: 'Advance Tax',     color: '#a78bfa', x: 86, y: 42, rot:  9 },
+  { icon: BarChart2,    label: 'P&L Summary',     color: '#f87171', x: 9,  y: 66, rot: -3 },
+  { icon: Briefcase,    label: 'Mamaearth Deal',  color: '#34d399', x: 4,  y: 84, rot:  7 },
+  { icon: Download,     label: 'ITR-Ready ZIP',   color: '#fb923c', x: 83, y: 66, rot: -6 },
+  { icon: Shield,       label: 'Rule 46 GST',     color: '#e879f9', x: 86, y: 84, rot:  4 },
 ];
 
 function FloatingDoc({ doc, phase, index, convergeProgress }) {
@@ -175,18 +175,23 @@ function Act1Hero() {
   const sectionRef = useRef(null);
 
   useEffect(() => {
-    const fn = () => {
+    let frame = null;
+    const update = () => {
+      frame = null;
       const sy = window.scrollY;
-      setScrollY(sy);
       const vh = window.innerHeight;
+      // Past the hero nothing here is visible — stop re-rendering
+      if (sy > vh * 1.2) return;
+      setScrollY(sy);
       if (sy < vh * 0.3) setPhase('dream');
       else if (sy < vh * 0.6) setPhase('chaos');
       else setPhase('flow');
       // Convergence: starts at 60% vh scroll, completes at 110% vh
       setConvergeProgress(Math.max(0, Math.min(1, (sy - vh * 0.6) / (vh * 0.5))));
     };
+    const fn = () => { if (!frame) frame = requestAnimationFrame(update); };
     window.addEventListener('scroll', fn, { passive: true });
-    return () => window.removeEventListener('scroll', fn);
+    return () => { window.removeEventListener('scroll', fn); cancelAnimationFrame(frame); };
   }, []);
 
   const parallaxY = reduced() ? 0 : scrollY * 0.35;
@@ -225,10 +230,10 @@ function Act1Hero() {
         <div style={{
           display: 'inline-flex', alignItems: 'center', gap: 7,
           padding: '5px 14px', borderRadius: 100,
-          background: 'rgba(232,146,26,0.1)', border: '1px solid rgba(232,146,26,0.3)',
-          marginBottom: 28, fontSize: 12, fontWeight: 600, color: '#E8921A', letterSpacing: '0.08em',
+          background: 'var(--accent-dim)', border: '1px solid var(--accent)',
+          marginBottom: 28, fontSize: 12, fontWeight: 600, color: 'var(--accent)', letterSpacing: '0.08em',
         }}>
-          <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#E8921A', animation: 'v6pulse 2s infinite' }} />
+          <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--accent)', animation: reduced() ? 'none' : 'v6pulse 2s infinite' }} />
           BUILT FOR INDIAN CREATORS
         </div>
 
@@ -251,41 +256,25 @@ function Act1Hero() {
           fontSize: 'clamp(16px, 2vw, 20px)', color: 'var(--text-body)',
           lineHeight: 1.65, maxWidth: 540, margin: '0 auto 40px', fontWeight: 400,
         }}>
-          Invoices. GST. TDS. Advance tax. Client management.<br />
-          All running quietly — so you never have to stop creating.
+          GST invoices in 30 seconds. Never miss a TDS deduction
+          or an advance-tax deadline again.
         </p>
 
         <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
-          <Link to="/register" style={{
-            display: 'inline-flex', alignItems: 'center', gap: 8,
-            padding: '14px 28px',
-            background: 'linear-gradient(135deg, #E8921A, #c8711a)',
-            color: '#fff', borderRadius: 100, fontWeight: 700, fontSize: 16,
-            textDecoration: 'none', boxShadow: '0 8px 24px rgba(232,146,26,0.35)',
-            transition: 'transform 0.2s, box-shadow 0.2s',
-          }}
-            onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px) scale(1.03)'; e.currentTarget.style.boxShadow = '0 12px 32px rgba(232,146,26,0.45)'; }}
-            onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = '0 8px 24px rgba(232,146,26,0.35)'; }}
-          >
-            Start Flowing — It's Free
-            <ChevronRight size={16} />
+          <Link to="/register" className="v2-btn v2-btn--primary">
+            Start free — no card needed
+            <ChevronRight size={16} aria-hidden="true" />
           </Link>
-          <a href="#story" style={{
-            display: 'inline-flex', alignItems: 'center', gap: 8,
-            padding: '14px 28px', borderRadius: 100, fontWeight: 600, fontSize: 16,
-            border: '1px solid var(--border)', color: 'var(--text-body)',
-            textDecoration: 'none', transition: 'background 0.15s, color 0.15s',
-          }}
-            onMouseEnter={e => { e.currentTarget.style.background = 'var(--surface-2)'; e.currentTarget.style.color = 'var(--text-primary)'; }}
-            onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-body)'; }}
-          >
-            See the story ↓
+          <a href="#tax-calculator" className="v2-btn v2-btn--ghost">
+            Check your tax risk <ArrowDown size={16} aria-hidden="true" />
           </a>
         </div>
 
-        <p style={{ marginTop: 36, fontSize: 13, color: 'var(--text-muted)', fontWeight: 500 }}>
-          <span style={{ color: '#E8921A', fontWeight: 700 }}>2,400+</span> creators managing ₹42Cr+ in annual billings
-        </p>
+        <ul className="v2-proof" aria-label="What you get">
+          {['Rule 46 compliant invoices', 'FY 2025-26 tax slabs', 'Free forever plan'].map(t => (
+            <li key={t}><Check size={13} aria-hidden="true" /> {t}</li>
+          ))}
+        </ul>
       </div>
 
       <div aria-hidden="true" style={{
@@ -306,6 +295,8 @@ function Act1Hero() {
 
 // ─── Navbar ───────────────────────────────────────────────────────────────────
 
+const NAV_LINKS = [['#tax-calculator', 'Tax calculator'], ['#invoice', 'Invoice'], ['#how', 'How it works'], ['#pricing', 'Pricing'], ['#faq', 'FAQ']];
+
 function Navbar() {
   const { theme, toggleTheme } = useTheme();
   const [scrolled, setScrolled] = useState(false);
@@ -325,7 +316,7 @@ function Navbar() {
     }}>
       <nav style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        width: '100%', maxWidth: 960, height: 52, padding: '0 16px',
+        width: '100%', maxWidth: 1040, height: 60, padding: '0 8px 0 16px',
         background: scrolled
           ? (theme === 'dark' ? 'rgba(10,11,18,0.94)' : 'rgba(255,255,255,0.94)')
           : (theme === 'dark' ? 'rgba(10,11,18,0.5)'  : 'rgba(255,255,255,0.5)'),
@@ -343,20 +334,14 @@ function Navbar() {
         </Link>
 
         <div className="v6-nav-links" style={{ display: 'flex', gap: 4 }}>
-          {[['#story', 'Story'], ['#how', 'How it Works'], ['#impact', 'Impact'], ['#pricing', 'Pricing'], ['#faq', 'FAQ']].map(([h, l]) => (
-            <a key={h} href={h} style={{
-              padding: '6px 14px', color: 'var(--text-body)', fontSize: 13, fontWeight: 500,
-              borderRadius: 100, textDecoration: 'none', transition: 'background 0.15s, color 0.15s',
-            }}
-              onMouseEnter={e => { e.target.style.background = 'var(--surface-2)'; e.target.style.color = 'var(--text-primary)'; }}
-              onMouseLeave={e => { e.target.style.background = 'transparent'; e.target.style.color = 'var(--text-body)'; }}
-            >{l}</a>
+          {NAV_LINKS.map(([h, l]) => (
+            <a key={h} href={h} className="v2-navlink">{l}</a>
           ))}
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <button onClick={toggleTheme} aria-label="Toggle theme" style={{
-            width: 32, height: 32, borderRadius: '50%', background: 'var(--surface-2)',
+          <button onClick={toggleTheme} aria-label={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'} className="v2-iconbtn" style={{
+            width: 44, height: 44, borderRadius: '50%', background: 'var(--surface-2)',
             border: '1px solid var(--border)', cursor: 'pointer', color: 'var(--text-muted)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}>
@@ -366,18 +351,11 @@ function Navbar() {
             padding: '6px 16px', fontSize: 13, fontWeight: 500,
             color: 'var(--text-body)', textDecoration: 'none',
           }}>Sign in</Link>
-          <Link to="/register" className="v6-nav-cta" style={{
-            padding: '7px 18px', background: '#E8921A', color: '#fff',
-            borderRadius: 100, fontWeight: 600, fontSize: 13, textDecoration: 'none',
-            transition: 'background 0.15s, transform 0.15s',
-          }}
-            onMouseEnter={e => { e.target.style.background = '#d47f16'; e.target.style.transform = 'scale(1.03)'; }}
-            onMouseLeave={e => { e.target.style.background = '#E8921A'; e.target.style.transform = 'scale(1)'; }}
-          >Start free →</Link>
-          <button aria-label="Open menu" className="v6-hamburger"
+          <Link to="/register" className="v6-nav-cta v2-btn v2-btn--primary v2-btn--sm">Start free</Link>
+          <button aria-label={mobileOpen ? 'Close menu' : 'Open menu'} aria-expanded={mobileOpen} className="v6-hamburger v2-iconbtn"
             onClick={() => setMobileOpen(o => !o)}
             style={{
-              display: 'none', width: 32, height: 32, borderRadius: 8,
+              display: 'none', width: 44, height: 44, borderRadius: 12,
               background: 'var(--surface-2)', border: '1px solid var(--border)',
               cursor: 'pointer', color: 'var(--text-primary)',
               alignItems: 'center', justifyContent: 'center',
@@ -390,20 +368,20 @@ function Navbar() {
 
       {mobileOpen && (
         <div style={{
-          position: 'fixed', top: 76, left: 16, right: 16,
+          position: 'fixed', top: 84, left: 16, right: 16,
           background: theme === 'dark' ? 'rgba(10,11,18,0.97)' : 'rgba(255,255,255,0.97)',
           border: '1px solid var(--border)', borderRadius: 16, padding: '12px 8px',
           backdropFilter: 'blur(14px)', zIndex: 301, pointerEvents: 'auto',
         }}>
-          {[['#story', 'Story'], ['#how', 'How it Works'], ['#impact', 'Impact'], ['#pricing', 'Pricing'], ['#faq', 'FAQ']].map(([h, l]) => (
+          {NAV_LINKS.map(([h, l]) => (
             <a key={h} href={h} onClick={() => setMobileOpen(false)} style={{
-              display: 'block', padding: '10px 16px', color: 'var(--text-body)',
+              display: 'block', padding: '12px 16px', color: 'var(--text-body)',
               fontWeight: 500, fontSize: 14, textDecoration: 'none', borderRadius: 10,
             }}>{l}</a>
           ))}
           <div style={{ height: 1, background: 'var(--border)', margin: '8px 0' }} />
           <Link to="/login" onClick={() => setMobileOpen(false)} style={{ display: 'block', padding: '10px 16px', color: 'var(--text-body)', fontSize: 14, textDecoration: 'none', borderRadius: 10 }}>Sign in</Link>
-          <Link to="/register" onClick={() => setMobileOpen(false)} style={{ display: 'block', margin: '8px', padding: '12px', background: '#E8921A', color: '#fff', borderRadius: 10, fontWeight: 600, fontSize: 14, textDecoration: 'none', textAlign: 'center' }}>Start free →</Link>
+          <Link to="/register" onClick={() => setMobileOpen(false)} style={{ display: 'block', margin: '8px', padding: '12px', background: 'var(--accent)', color: '#fff', borderRadius: 10, fontWeight: 600, fontSize: 14, textDecoration: 'none', textAlign: 'center' }}>Start free →</Link>
         </div>
       )}
     </header>
@@ -488,113 +466,6 @@ function Act2Reality() {
             <p style={{ fontSize: 'clamp(20px, 3vw, 30px)', fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1.4, margin: 0, letterSpacing: '-0.02em' }}>
               "What if all of this simply… flowed?"
             </p>
-          </div>
-        </Reveal>
-      </div>
-    </section>
-  );
-}
-
-// ─── ACT 3: Flow ──────────────────────────────────────────────────────────────
-
-const FLOW_TRANSFORMS = [
-  { from: 'Invoice created',  to: 'Sent in 30 sec',     icon: FileText,    color: '#4ade80' },
-  { from: 'GST calculation',  to: 'Auto-calculated',    icon: Shield,      color: '#60a5fa' },
-  { from: 'TDS deducted',     to: 'Instantly recorded', icon: TrendingDown,color: '#a78bfa' },
-  { from: 'Payment received', to: 'Income logged',      icon: IndianRupee, color: '#f59e0b' },
-  { from: 'Advance tax due',  to: 'Pre-calculated',     icon: Calendar,    color: '#fb923c' },
-  { from: 'CA asks for data', to: 'ZIP ready to send',  icon: Download,    color: '#34d399' },
-];
-
-function FlowTransformCard({ item, index }) {
-  const [ref, vis] = useInView(0.2);
-  const [flipped, setFlipped] = useState(false);
-  const Icon = item.icon;
-
-  useEffect(() => {
-    if (vis && !reduced()) {
-      const t = setTimeout(() => setFlipped(true), 300 + index * 200);
-      return () => clearTimeout(t);
-    }
-    if (vis) setFlipped(true);
-  }, [vis, index]);
-
-  return (
-    <div ref={ref} style={{
-      perspective: 800, height: 120,
-      opacity: vis ? 1 : 0,
-      transform: vis ? 'translateY(0)' : 'translateY(24px)',
-      transition: reduced() ? 'none' : `opacity 0.5s ease ${index * 80}ms, transform 0.5s ease ${index * 80}ms`,
-    }}>
-      <div style={{
-        position: 'relative', width: '100%', height: '100%',
-        transformStyle: 'preserve-3d',
-        transform: flipped ? 'rotateY(180deg)' : 'rotateY(0deg)',
-        transition: reduced() ? 'none' : 'transform 0.6s cubic-bezier(.23,1,.32,1)',
-      }}>
-        <div style={{
-          position: 'absolute', inset: 0, backfaceVisibility: 'hidden',
-          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-          gap: 8, padding: 20, borderRadius: 14,
-          background: 'var(--surface-1)', border: '1px solid rgba(248,113,113,0.3)',
-        }}>
-          <Icon size={20} color="#f87171" />
-          <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-muted)', textAlign: 'center' }}>{item.from}</span>
-          <span style={{ fontSize: 11, color: '#f87171', fontWeight: 500 }}>MANUAL</span>
-        </div>
-        <div style={{
-          position: 'absolute', inset: 0, backfaceVisibility: 'hidden',
-          transform: 'rotateY(180deg)',
-          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-          gap: 8, padding: 20, borderRadius: 14,
-          background: `linear-gradient(135deg, ${item.color}18 0%, ${item.color}08 100%)`,
-          border: `1px solid ${item.color}44`,
-        }}>
-          <Icon size={20} color={item.color} />
-          <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', textAlign: 'center' }}>{item.to}</span>
-          <span style={{ fontSize: 11, color: item.color, fontWeight: 600 }}>✓ FLOWS</span>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function Act3Flow() {
-  return (
-    <section style={{
-      padding: 'clamp(48px, 6vw, 80px) 24px',
-      background: 'linear-gradient(180deg, var(--bg-page) 0%, var(--surface-0) 100%)',
-      position: 'relative', overflow: 'hidden',
-    }}>
-      <div aria-hidden="true" style={{
-        position: 'absolute', top: '50%', left: '50%',
-        transform: 'translate(-50%, -50%)',
-        width: '60vw', height: '60vw', maxWidth: 600, maxHeight: 600,
-        borderRadius: '50%',
-        background: 'radial-gradient(circle, rgba(232,146,26,0.06) 0%, transparent 70%)',
-        pointerEvents: 'none',
-      }} />
-      <div style={{ maxWidth: 960, margin: '0 auto', textAlign: 'center' }}>
-        <Reveal>
-          <h2 style={{ fontSize: 'clamp(32px, 5vw, 60px)', fontWeight: 900, lineHeight: 1.1, letterSpacing: '-0.03em', color: 'var(--text-primary)', marginBottom: 16 }}>
-            Chaos becomes clarity.
-            <br />
-            <span style={{ background: 'linear-gradient(135deg, #E8921A, #f59e0b)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Automatically.</span>
-          </h2>
-          <p style={{ fontSize: 'clamp(15px, 1.8vw, 18px)', color: 'var(--text-body)', lineHeight: 1.7, maxWidth: 480, margin: '0 auto 40px' }}>
-            Watch what was manual become effortless. Every card flips from friction to flow.
-          </p>
-        </Reveal>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 14 }}>
-          {FLOW_TRANSFORMS.map((item, i) => <FlowTransformCard key={i} item={item} index={i} />)}
-        </div>
-        <Reveal delay={800}>
-          <div style={{ marginTop: 36, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>
-            <div style={{ width: 2, height: 48, background: 'linear-gradient(to bottom, rgba(232,146,26,0.8), transparent)' }} />
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 20px', borderRadius: 100, background: 'rgba(232,146,26,0.1)', border: '1px solid rgba(232,146,26,0.3)', fontSize: 13, fontWeight: 600, color: '#E8921A' }}>
-              <Zap size={13} />
-              One platform. Zero manual work.
-            </div>
           </div>
         </Reveal>
       </div>
@@ -816,7 +687,7 @@ function Act4HowItWorks() {
   }
 
   return (
-    <section id="how" ref={sectionRef} style={{ height: `${100 * (JOURNEY.length + 1)}vh`, position: 'relative' }}>
+    <section id="how" ref={sectionRef} style={{ height: `${60 * JOURNEY.length + 100}vh`, position: 'relative' }}>
       <div style={{
         position: 'sticky', top: 0, height: '100vh', overflow: 'hidden',
         display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 0,
@@ -870,6 +741,54 @@ const V6_STYLES = `
   @keyframes v6cardenter { from { opacity:0; transform:translateY(16px) scale(0.97); } to { opacity:1; transform:translateY(0) scale(1); } }
   @keyframes ruleExpand { from { transform:scaleX(0); } to { transform:scaleX(1); } }
 
+  .v2-btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    min-height: 48px; padding: 0 28px; border-radius: 100px;
+    font-weight: 700; font-size: 16px; text-decoration: none; cursor: pointer;
+    touch-action: manipulation;
+    transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.15s ease, color 0.15s ease;
+  }
+  .v2-btn--primary { background: var(--accent); color: #fff; box-shadow: 0 8px 24px var(--accent-glow); }
+  .v2-btn--primary:hover { background: var(--accent-hover); transform: translateY(-2px); box-shadow: 0 12px 32px var(--accent-glow); }
+  .v2-btn--ghost { border: 1px solid var(--border); color: var(--text-body); font-weight: 600; background: transparent; }
+  .v2-btn--ghost:hover { background: var(--surface-2); color: var(--text-primary); }
+  .v2-btn--sm { min-height: 44px; padding: 0 18px; font-size: 14px; font-weight: 600; box-shadow: none; }
+  .v2-btn--sm:hover { transform: none; }
+  .v2-btn:focus-visible, .v2-navlink:focus-visible, .v2-iconbtn:focus-visible,
+  .v6-page a:focus-visible, .v6-page button:focus-visible, .v6-page input:focus-visible {
+    outline: 2px solid var(--accent); outline-offset: 3px;
+  }
+  .v2-navlink {
+    display: inline-flex; align-items: center; min-height: 44px; padding: 0 14px;
+    color: var(--text-body); font-size: 14px; font-weight: 500;
+    border-radius: 100px; text-decoration: none; transition: background 0.15s, color 0.15s;
+  }
+  .v2-navlink:hover { background: var(--surface-2); color: var(--text-primary); }
+  .v2-proof {
+    list-style: none; padding: 0; margin: 32px 0 0;
+    display: flex; flex-wrap: wrap; justify-content: center; gap: 8px 20px;
+    font-size: 14px; font-weight: 500; color: var(--text-muted);
+  }
+  .v2-proof li { display: inline-flex; align-items: center; gap: 6px; }
+  .v2-proof svg { color: var(--accent); }
+  .v2-invoice-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 40px; align-items: center; }
+  .v2-invoice-grid figure { max-width: 480px; margin: 0 auto; }
+  @media (min-width: 900px) {
+    .v2-invoice-grid { grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); gap: 64px; }
+  }
+  html { scroll-behavior: smooth; }
+  [id] { scroll-margin-top: 96px; }
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    .v2-btn, .v2-btn:hover { transition: none; transform: none; }
+  }
+
+  /* Below 1180px the side gutters are too narrow for tiles */
+  @media (max-width: 1180px) { .v6-floating-tiles { display: none !important; } }
+  @media (max-width: 860px) {
+    .v6-nav-links  { display: none !important; }
+    .v6-hamburger  { display: flex !important; }
+  }
   @media (max-width: 680px) {
     .v6-nav-links  { display: none !important; }
     .v6-nav-signin { display: none !important; }
@@ -881,12 +800,12 @@ const V6_STYLES = `
 
 function InjectStyles() {
   useEffect(() => {
-    if (document.getElementById('v6-styles')) return;
+    if (document.getElementById('v2-styles')) return;
     const tag = document.createElement('style');
-    tag.id = 'v6-styles';
+    tag.id = 'v2-styles';
     tag.textContent = V6_STYLES;
     document.head.appendChild(tag);
-    return () => document.getElementById('v6-styles')?.remove();
+    return () => document.getElementById('v2-styles')?.remove();
   }, []);
   return null;
 }
@@ -902,15 +821,13 @@ export default function LandingPage() {
       <main id="main-content">
         <Act1Hero />
         <Act2Reality />
-        <Act3Flow />
+        <TaxRiskCalculator />
+        <InvoiceShowcase />
         <Act4HowItWorks />
-        <FlowPipeline />
         <Act5Impact />
         <DashboardReveal />
-        <Act6Ecosystem />
         <ComparisonTable />
         <Pricing />
-        <TaxRiskCalculator />
         <FAQ />
         <Act7Return />
       </main>

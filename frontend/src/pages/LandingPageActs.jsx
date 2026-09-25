@@ -1,14 +1,14 @@
 /**
- * LandingPageV6Acts — Section components for LandingPageV6
- * Exports: reduced, useInView, Reveal, FlowCanvas, FlowPipeline, Act5Impact,
- *          DashboardReveal, Act6Ecosystem, ComparisonTable, Pricing, Act7Return, Footer
+ * LandingPageActs — Section components for LandingPage (served at /)
  */
 import { useState, useEffect, useRef } from 'react';
+import { quickTaxEstimate } from '../utils/taxCalc.js';
 import { Link } from 'react-router-dom';
 import {
   FileText, TrendingDown, Calendar, Briefcase,
   Download, IndianRupee, BarChart2,
   Zap, Shield, RefreshCw, Check, ChevronRight,
+  ShieldCheck, ArrowLeftRight, Type, QrCode,
 } from 'lucide-react';
 import LogoMark from '../components/ui/LogoMark.jsx';
 
@@ -229,11 +229,11 @@ export function FlowPipeline() {
 
 const IMPACTS = [
   { icon: FileText, color: '#60a5fa', headline: 'Send a professional invoice in 30 seconds.', subline: 'GST auto-calculated. Rule 46-compliant. Your brand\'s finance team gets exactly what they need.', stat: '30s', statLabel: 'avg send time' },
-  { icon: Shield, color: '#4ade80', headline: 'One less thing to think about.', subline: 'CGST, SGST, IGST — Kcretio picks the right one based on your state codes. You never think about it.', stat: '₹0', statLabel: 'penalty risk' },
-  { icon: TrendingDown, color: '#a78bfa', headline: 'Every rupee tracked. No surprises.', subline: 'TDS deducted by brands? Recorded automatically. Form 16A expected? Tracked. ITR season? Zero panic.', stat: '100%', statLabel: 'TDS reconciliation' },
-  { icon: Calendar, color: '#fb923c', headline: 'Never miss an advance tax deadline.', subline: '14-day reminders. Pre-calculated amounts. No penalties, no interest, no surprise CA calls.', stat: '14d', statLabel: 'before every deadline' },
+  { icon: Shield, color: '#4ade80', headline: 'The right GST, every time.', subline: 'CGST + SGST or IGST — Kcretio picks the right one from your state and your brand’s GSTIN, and checks the codes match.', stat: 'Auto', statLabel: 'CGST / SGST / IGST' },
+  { icon: TrendingDown, color: '#a78bfa', headline: 'Every rupee tracked. No surprises.', subline: 'Log the 10% each brand deducts under 194J, track which Form 16As are still pending, and see your total TDS credit before ITR.', stat: '194J', statLabel: 'TDS tracked per brand' },
+  { icon: Calendar, color: '#fb923c', headline: 'Never miss an advance tax deadline.', subline: 'Quarterly amounts worked out from your real income, with reminders before Jun 15, Sep 15, Dec 15 and Mar 15. Free plan gets the March reminder.', stat: '4', statLabel: 'deadlines a year' },
   { icon: Briefcase, color: '#f59e0b', headline: 'Your brand pipeline, always current.', subline: 'Log deals in seconds. Track status. Forecast revenue. Know which brands owe you money — right now.', stat: '∞', statLabel: 'brand deals tracked' },
-  { icon: Download, color: '#34d399', headline: 'Your CA will love you.', subline: 'All invoices, all income, all TDS. One clean ZIP. 20 minutes to file. Cleanest file of the season.', stat: '20m', statLabel: 'to file ITR' },
+  { icon: Download, color: '#34d399', headline: 'Your CA will love you.', subline: 'All invoices, income, expenses and TDS for the financial year in one clean export, ready for ITR-3 or ITR-4.', stat: '1', statLabel: 'export for your CA' },
 ];
 
 function ImpactCard({ item, index }) {
@@ -608,11 +608,11 @@ export function ComparisonTable() {
 // ─── Pricing ──────────────────────────────────────────────────────────────────
 
 const PLANS = [
-  { name: 'Basic', price: '₹0', period: '/month', desc: 'For creators just starting their business journey.', color: '#60a5fa', features: ['Unlimited GST invoices (Kcretio watermark)', 'CGST / SGST / IGST auto', 'TDS tracking (10 entries)', 'March advance tax reminder'], cta: 'Start free', href: '/register' },
+  { name: 'Basic', price: '₹0', period: '/month', desc: 'For creators just starting their business journey.', color: '#60a5fa', features: ['Unlimited GST invoices (small Kcretio watermark)', 'CGST / SGST / IGST auto', 'TDS tracking (10 entries)', 'March advance tax reminder'], cta: 'Start free', href: '/register' },
   // Paid plans disabled for now — premium is granted on request
   // { name: 'Starter', price: '₹299', period: '/month', desc: 'For creators with regular brand deals.', color: '#34d399', features: ['Watermark-free invoices, all 7 templates', 'Unlimited TDS + Form 16A tracker', 'Smart Inbox (Gmail auto-detect)', 'All 4 advance tax reminders', 'Expense tracker'], cta: 'Start 28-day free trial', href: '/register' },
   // { name: 'Creator Pro', price: '₹599', period: '/month', desc: 'For serious creators managing real brand business.', color: '#E8921A', highlight: true, features: ['Everything in Starter', 'Advance tax calculator', 'P&L + income dashboard', 'ITR-ready export (ZIP)', 'Smart Inbox auto-apply'], cta: 'Start 28-day free trial', href: '/register' },
-  { name: 'Creator Pro', price: '₹0', period: ' for 28 days', desc: 'Request free Pro access — we review every request personally.', color: '#E8921A', highlight: true, features: ['Watermark-free invoices, all 7 templates', 'Unlimited TDS + Form 16A tracker', 'Advance tax calculator', 'P&L + income dashboard', 'ITR-ready export (ZIP)', 'Smart Inbox (Gmail auto-detect)'], cta: 'Start free · request Pro', href: '/register' },
+  { name: 'Creator Pro', price: '₹0', period: ' for 28 days', desc: 'Request 28 days of Pro from inside the app — free, no card needed. We review every request personally.', color: '#E8921A', highlight: true, features: ['Watermark-free invoices, all 7 templates', 'Unlimited TDS + Form 16A tracker', 'Advance tax calculator', 'P&L + income dashboard', 'ITR-ready export (ZIP)', 'Smart Inbox (Gmail auto-detect)'], cta: 'Start free · request Pro', href: '/register' },
   // Business/Agency plan paused
   // { name: 'Agency', price: '₹1,999', period: '/month', desc: 'For MCNs, talent managers, and creator agencies.', color: '#a78bfa', features: ['Everything in Pro', 'Up to 20 creators', 'Team access', 'White-label invoices', 'Dedicated account manager'], cta: 'Contact us', href: '/register' },
 ];
@@ -673,6 +673,92 @@ export function Pricing() {
         </Reveal>
         <div style={{ display: 'flex', gap: 16, justifyContent: 'center', flexWrap: 'wrap', alignItems: 'stretch' }}>
           {PLANS.map((plan, i) => <PricingCard key={i} plan={plan} index={i} />)}
+        </div>
+        <p style={{ textAlign: 'center', marginTop: 28, fontSize: 14, color: 'var(--text-muted)' }}>
+          Paid plans (Starter ₹299/month, Pro ₹599/month) launch later. Anything you set up on the free plan carries over.
+        </p>
+      </div>
+    </section>
+  );
+}
+
+// ─── Invoice showcase ────────────────────────────────────────────────────────
+
+const INVOICE_POINTS = [
+  { icon: ShieldCheck, title: 'Every Rule 46 field', body: 'Your GSTIN and the brand’s, state codes next to both addresses, SAC 998399, place of supply.' },
+  { icon: ArrowLeftRight, title: 'IGST or CGST + SGST, picked for you', body: 'Different states means IGST, same state means CGST + SGST. Kcretio decides from the state codes.' },
+  { icon: Type, title: 'Amount in words + reverse charge', body: 'The two lines finance teams check first, printed on every invoice.' },
+  { icon: QrCode, title: 'Bank + UPI so you get paid faster', body: 'Saved bank accounts and UPI IDs drop in automatically. No retyping IFSC codes.' },
+];
+
+export function InvoiceShowcase() {
+  return (
+    <section id="invoice" aria-labelledby="invoice-title" style={{ padding: 'clamp(48px, 6vw, 96px) 24px', background: 'var(--surface-0)' }}>
+      <div className="v2-invoice-grid" style={{ maxWidth: 1100, margin: '0 auto' }}>
+        <Reveal>
+          <figure style={{ margin: 0 }}>
+            <picture>
+              <source srcSet="/landing/invoice-sample.webp" type="image/webp" />
+              <img
+                src="/landing/invoice-sample.png"
+                width={1191}
+                height={1684}
+                loading="lazy"
+                decoding="async"
+                alt="Sample Kcretio GST tax invoice from Sanket Kumar Creative (Karnataka) to Acme Foods Pvt Ltd (Maharashtra): Instagram Reel campaign, SAC 998399, taxable value ₹50,000, IGST at 18% ₹9,000, total ₹59,000, amount in words, reverse charge not applicable, bank and UPI payment details."
+                style={{
+                  display: 'block', width: '100%', height: 'auto',
+                  borderRadius: 'var(--radius-lg)', border: '1px solid var(--border)',
+                  boxShadow: '0 24px 64px rgba(0,0,0,0.25)',
+                }}
+              />
+            </picture>
+            <figcaption style={{ marginTop: 12, fontSize: 13, color: 'var(--text-muted)', textAlign: 'center' }}>
+              A real free-plan invoice, sample data. Note the faint Kcretio watermark.
+            </figcaption>
+          </figure>
+        </Reveal>
+
+        <div>
+          <Reveal delay={80}>
+            <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.15em', color: 'var(--accent)', textTransform: 'uppercase', marginBottom: 16 }}>The invoice</div>
+            <h2 id="invoice-title" style={{ fontSize: 'clamp(28px, 4vw, 44px)', fontWeight: 900, lineHeight: 1.1, letterSpacing: '-0.03em', color: 'var(--text-primary)', margin: '0 0 16px' }}>
+              What your brand's finance team receives.
+            </h2>
+            <p style={{ fontSize: 16, color: 'var(--text-body)', lineHeight: 1.7, margin: '0 0 28px' }}>
+              Brands hold payment until the invoice is right. Kcretio fills in the parts creators usually get wrong.
+            </p>
+          </Reveal>
+          <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 28px', display: 'grid', gap: 20 }}>
+            {INVOICE_POINTS.map((pt, i) => {
+              const Icon = pt.icon;
+              return (
+                <li key={pt.title}>
+                  <Reveal delay={120 + i * 50} style={{ display: 'flex', gap: 14, alignItems: 'flex-start' }}>
+                    <span aria-hidden="true" style={{
+                      flexShrink: 0, width: 40, height: 40, borderRadius: 10,
+                      background: 'var(--accent-dim)', color: 'var(--accent)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    }}>
+                      <Icon size={18} />
+                    </span>
+                    <div>
+                      <h3 style={{ margin: '0 0 4px', fontSize: 16, fontWeight: 700, color: 'var(--text-primary)' }}>{pt.title}</h3>
+                      <p style={{ margin: 0, fontSize: 15, color: 'var(--text-body)', lineHeight: 1.6 }}>{pt.body}</p>
+                    </div>
+                  </Reveal>
+                </li>
+              );
+            })}
+          </ul>
+          <Reveal delay={320}>
+            <Link to="/register" className="v2-btn v2-btn--primary">
+              Make your first invoice free <ChevronRight size={16} aria-hidden="true" />
+            </Link>
+            <p style={{ margin: '12px 0 0', fontSize: 13, color: 'var(--text-muted)' }}>
+              Free plan invoices carry a small Kcretio watermark. Unlimited invoices, no card needed.
+            </p>
+          </Reveal>
         </div>
       </div>
     </section>
@@ -898,27 +984,20 @@ export function TaxRiskCalculator() {
   const [brands, setBrands] = useState('');
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
-  async function handleEstimate(e) {
+  function handleEstimate(e) {
     e.preventDefault();
     const m = parseFloat(monthly) || 0;
     const b = parseInt(brands, 10) || 1;
     if (m <= 0) return;
-    setLoading(true);
-    try {
-      const r = await fetch(`/api/v1/tax/quick-estimate?monthly_income=${m}&brand_count=${b}`);
-      const data = await r.json();
-      setResult(data);
-    } catch {
-      /* ignore */
-    } finally {
-      setLoading(false);
-    }
+    setError('');
+    setResult(quickTaxEstimate(m, b));
   }
 
   return (
     <Reveal>
-      <section style={{
+      <section id="tax-calculator" aria-labelledby="tax-calc-title" style={{
         maxWidth: 760,
         margin: '0 auto',
         padding: 'var(--space-12) var(--space-5)',
@@ -926,8 +1005,8 @@ export function TaxRiskCalculator() {
       }}>
         <div style={{
           display: 'inline-block',
-          background: 'rgba(232,146,26,.12)',
-          border: '1px solid rgba(232,146,26,.3)',
+          background: 'var(--accent-dim)',
+          border: '1px solid var(--accent)',
           borderRadius: 999,
           padding: '4px 16px',
           fontSize: 11,
@@ -936,14 +1015,14 @@ export function TaxRiskCalculator() {
           color: 'var(--accent)',
           textTransform: 'uppercase',
           marginBottom: 'var(--space-4)',
-        }}>Tax Risk Calculator</div>
+        }}>Free · no signup</div>
 
-        <h2 style={{
-          fontSize: 'clamp(22px, 4vw, 32px)',
-          fontWeight: 800,
+        <h2 id="tax-calc-title" style={{
+          fontSize: 'clamp(26px, 4vw, 40px)',
+          fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.02em',
           marginBottom: 'var(--space-3)',
           lineHeight: 1.25,
-        }}>What actually happens to your income?</h2>
+        }}>Brands deducted TDS. Do you owe tax or get a refund?</h2>
         <p style={{ color: 'var(--text-secondary)', marginBottom: 'var(--space-6)', fontSize: 15 }}>
           Enter your monthly earnings — see exactly what brands deduct, what you receive, and what you get back at ITR. No account needed.
         </p>
@@ -956,8 +1035,8 @@ export function TaxRiskCalculator() {
           marginBottom: 'var(--space-6)',
         }}>
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 4 }}>
-            <label style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.06em', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>
-              Monthly Income
+            <label htmlFor="calc-monthly" style={{ fontSize: 12, fontWeight: 700, letterSpacing: '.06em', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>
+              Monthly income
             </label>
             <div style={{ position: 'relative' }}>
               <span style={{
@@ -965,7 +1044,9 @@ export function TaxRiskCalculator() {
                 color: 'var(--text-secondary)', fontSize: 14, pointerEvents: 'none',
               }}>₹</span>
               <input
+                id="calc-monthly"
                 type="number"
+                inputMode="numeric"
                 min="0"
                 value={monthly}
                 onChange={e => setMonthly(e.target.value)}
@@ -977,20 +1058,21 @@ export function TaxRiskCalculator() {
                   borderRadius: 'var(--radius)',
                   background: 'var(--bg-card)',
                   color: 'var(--text-primary)',
-                  fontSize: 15,
+                  fontSize: 16, minHeight: 48,
                   width: 160,
-                  outline: 'none',
                 }}
               />
             </div>
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 4 }}>
-            <label style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.06em', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>
-              No. of Brands
+            <label htmlFor="calc-brands" style={{ fontSize: 12, fontWeight: 700, letterSpacing: '.06em', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>
+              Brands per month
             </label>
             <input
+              id="calc-brands"
               type="number"
+              inputMode="numeric"
               min="1"
               max="50"
               value={brands}
@@ -1002,9 +1084,8 @@ export function TaxRiskCalculator() {
                 borderRadius: 'var(--radius)',
                 background: 'var(--bg-card)',
                 color: 'var(--text-primary)',
-                fontSize: 15,
+                fontSize: 16, minHeight: 48,
                 width: 100,
-                outline: 'none',
               }}
             />
           </div>
@@ -1017,7 +1098,7 @@ export function TaxRiskCalculator() {
             border: 'none',
             borderRadius: 'var(--radius)',
             fontWeight: 700,
-            fontSize: 14,
+            fontSize: 15, minHeight: 48,
             cursor: loading ? 'not-allowed' : 'pointer',
             opacity: loading ? 0.7 : 1,
             transition: 'opacity .2s',
@@ -1026,8 +1107,12 @@ export function TaxRiskCalculator() {
           </button>
         </form>
 
+        {error && (
+          <p role="alert" style={{ color: 'var(--danger)', fontSize: 14, margin: '0 0 var(--space-4)' }}>{error}</p>
+        )}
+
         {result && (
-          <div style={{ textAlign: 'left' }}>
+          <div aria-live="polite" style={{ textAlign: 'left' }}>
             {/* Part 1: Money flow */}
             <div style={{
               display: 'grid',

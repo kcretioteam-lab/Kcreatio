@@ -104,6 +104,27 @@ export function calculateAdvanceTax(annualIncomeRupees, regime = 'new', tdsDeduc
   };
 }
 
+// Landing-page Tax Risk Calculator — mirrors backend GET /tax/quick-estimate.
+// No standard deduction (creator income is professional income), 87A rebate up to ₹60,000 when ≤ ₹12L.
+export function quickTaxEstimate(monthlyIncomeRupees, brandCount = 1) {
+  const annual = Math.max(0, monthlyIncomeRupees) * 12;
+  let preCessTax = taxOnSlabs(Math.round(annual * 100), NEW_REGIME_SLABS) / 100;
+  if (annual <= 1200000) preCessTax = Math.max(0, preCessTax - 60000);
+  const incomeTax = Math.round(preCessTax * 1.04); // 4% cess
+
+  const estimatedTds = Math.round(annual * 0.10);
+  const advanceTaxOwed = Math.max(0, incomeTax - estimatedTds);
+  const itrRefund = Math.max(0, estimatedTds - incomeTax);
+  const q2Due = Math.round(advanceTaxOwed * 0.45); // 45% cumulative by Sep 15
+
+  const lateCount = Math.round(brandCount * 0.4);
+  const form16aRisk = brandCount < 3
+    ? `${Math.round(brandCount * 40)}% chance of delay`
+    : `~${lateCount} of ${brandCount} brand${lateCount !== 1 ? 's' : ''} likely late`;
+
+  return { annual, estimatedTds, incomeTax, advanceTaxOwed, itrRefund, q2Due, form16aRisk };
+}
+
 export function getAdvanceTaxQuarter(date) {
   const month = date.getMonth() + 1;
   if (month >= 4 && month <= 6) return 'Q1';
