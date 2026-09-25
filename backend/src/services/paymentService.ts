@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { supabase } from '../lib/supabase.js';
 import { getAdvanceTaxQuarter, getFinancialYear } from './invoiceService.js';
+import { logInvoiceEvent } from './auditLog.js';
 
 // Body for marking an invoice or deal paid. TDS is what the brand actually deducted —
 // brands often deduct odd amounts, so the client suggests rate × taxable value and the user confirms.
@@ -75,6 +76,7 @@ export async function recordDetectedPayment(
       paymentDate, amountReceived, tdsDeducted: tds, tdsSection: tds > 0 ? '393 (formerly 194J)' : undefined,
     });
     if (result.ok) {
+      await logInvoiceEvent(null, userId, { id: invoice.id }, 'paid', { via: 'smart_inbox', amount_received: amountReceived, tds });
       const { data: income } = await supabase.from('income').select('*').eq('invoice_id', invoice.id).eq('user_id', userId).maybeSingle();
       return { invoiceId: invoice.id, income };
     }

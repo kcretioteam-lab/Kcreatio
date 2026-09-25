@@ -5,6 +5,7 @@ import cookieParser from 'cookie-parser';
 import rateLimit from 'express-rate-limit';
 import emailDetectionsRoutes from './routes/emailDetections.js';
 import authRoutes from './routes/auth.js';
+import securityRoutes from './routes/security.js';
 import invoiceRoutes from './routes/invoices.js';
 import invoiceSettingsRoutes from './routes/invoiceSettings.js';
 import uploadRoutes from './routes/upload.js';
@@ -103,6 +104,7 @@ app.get('/api/health', (_, res) => res.json({ status: 'ok', timestamp: new Date(
 
 // Routes
 app.use('/api/v1/auth', authLimiter, authRoutes);
+app.use('/api/v1/auth', authLimiter, securityRoutes);
 app.use('/api/v1/invoices', invoiceRoutes);
 app.use('/api/v1/invoice-settings', invoiceSettingsRoutes);
 app.use('/api/v1/upload', uploadRoutes);

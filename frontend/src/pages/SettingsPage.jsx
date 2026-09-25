@@ -12,6 +12,8 @@ import { PLAN_DISPLAY, PLAN_HIERARCHY } from '../utils/planConfig.js';
 import { CURRENT_FY, PREVIOUS_FY } from '../utils/financialYear.js';
 import { taxYearLabel } from '../utils/taxLabels.js';
 import { INDIAN_STATES, gstinError, panFromGstin, stateLabel } from '../utils/gst.js';
+import TwoFactorCard from '../components/settings/TwoFactorCard.jsx';
+import SessionsCard from '../components/settings/SessionsCard.jsx';
 
 const SECTIONS = ['Profile', 'Tax Profile', 'Invoice Settings', 'Billing', 'Notifications', 'Security', 'Export', 'Integrations', 'Danger Zone'];
 
@@ -1504,7 +1506,11 @@ export default function SettingsPage() {
   const { user, fetchUser } = useAuth();
   const toast = useToast();
   const isMobile = useIsMobile();
-  const [activeSection, setActiveSection] = useState('Profile');
+  // Deep link from emails, e.g. /settings?section=Security
+  const [activeSection, setActiveSection] = useState(() => {
+    const requested = new URLSearchParams(window.location.search).get('section');
+    return SECTIONS.includes(requested) ? requested : 'Profile';
+  });
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
   const [deleting, setDeleting] = useState(false);
@@ -1924,7 +1930,11 @@ export default function SettingsPage() {
 
         {/* ── Security Section ──────────────────────────────────────── */}
         {activeSection === 'Security' && (
-          <SecuritySection />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }}>
+            <SecuritySection />
+            <TwoFactorCard />
+            <SessionsCard />
+          </div>
         )}
 
         {/* ── Export Section ────────────────────────────────────────── */}

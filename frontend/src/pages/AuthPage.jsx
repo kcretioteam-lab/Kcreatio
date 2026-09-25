@@ -8,6 +8,7 @@ import Input from '../components/ui/Input.jsx';
 import api, { getErrorMessage } from '../utils/api.js';
 import { useTheme } from '../App.jsx';
 import LogoMark from '../components/ui/LogoMark.jsx';
+import TwoFactorStep from '../components/auth/TwoFactorStep.jsx';
 
 const BRAND_BULLETS = [
   { icon: FileText,   text: 'GST-compliant invoices in 30 seconds' },
@@ -60,7 +61,9 @@ export default function AuthPage({ defaultMode = 'register' }) {
       : {}
   );
   const [loading, setLoading] = useState(false);
-  const { login, register } = useAuth();
+  const { login, register, verifyTwoFactor } = useAuth();
+  // Set when the password step passed on an account with two-factor sign-in (or after Google sign-in)
+  const [twoFactorChallenge, setTwoFactorChallenge] = useState(() => searchParams.get('twofa'));
   const navigate = useNavigate();
   const location = useLocation();
   const [nextParams] = useSearchParams();
@@ -164,6 +167,7 @@ export default function AuthPage({ defaultMode = 'register' }) {
       const result = await login(email.trim(), password);
       setLoading(false);
       if (result.success) navigate(afterLogin, { replace: true });
+      else if (result.requires2fa) { setErrors({}); setTwoFactorChallenge(result.challenge); }
       else {
         if (result.errorCode === 'ACCOUNT_LOCKED') {
           setErrors({ form: result.error + ' ' });
@@ -265,6 +269,17 @@ export default function AuthPage({ defaultMode = 'register' }) {
 
         {/* Right form panel */}
         <div style={{ padding: isMobile ? 'var(--space-6)' : 'var(--space-10)' }}>
+          {twoFactorChallenge ? (
+            <TwoFactorStep
+              onVerify={async (code) => {
+                const r = await verifyTwoFactor(twoFactorChallenge, code);
+                if (r.success) navigate(afterLogin, { replace: true });
+                else if (r.expired) { setTwoFactorChallenge(null); setErrors({ form: r.error }); }
+                return r;
+              }}
+              onCancel={() => { setTwoFactorChallenge(null); setPassword(''); }}
+            />
+          ) : (<>
           <h1 style={{ fontSize: 'var(--text-xl)', fontWeight: 700, color: 'var(--text-primary)', marginBottom: 'var(--space-1)' }}>
             {mode === 'register' ? 'Create your free account' : 'Welcome back'}
           </h1>
@@ -502,6 +517,7 @@ export default function AuthPage({ defaultMode = 'register' }) {
               {mode === 'register' ? 'Sign in' : 'Start free'}
             </Link>
           </p>
+          </>)}
         </div>
       </div>
 

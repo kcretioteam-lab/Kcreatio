@@ -111,6 +111,8 @@ export function AuthProvider({ children }) {
     // failed logins look like a blank flash back to an empty form.
     try {
       const res = await api.post('/auth/login', { identifier, password });
+      // Two-factor sign-in: the password was right, now the authenticator code is needed
+      if (res.data?.requires2fa) return { success: false, requires2fa: true, challenge: res.data.challenge };
       dispatch({ type: 'SET_USER', payload: res.data.user });
       return { success: true };
     } catch (e) {
@@ -138,6 +140,16 @@ export function AuthProvider({ children }) {
       const msg = getErrorMessage(e, 'Registration failed');
       dispatch({ type: 'SET_ERROR', payload: msg });
       return { success: false, error: msg };
+    }
+  }, []);
+
+  const verifyTwoFactor = useCallback(async (challenge, code) => {
+    try {
+      const res = await api.post('/auth/2fa/verify', { challenge, code });
+      dispatch({ type: 'SET_USER', payload: res.data.user });
+      return { success: true };
+    } catch (e) {
+      return { success: false, error: getErrorMessage(e, 'Couldn’t verify the code'), expired: e?.response?.data?.error === 'CHALLENGE_EXPIRED' };
     }
   }, []);
 
@@ -182,6 +194,7 @@ export function AuthProvider({ children }) {
         login,
         register,
         logout,
+        verifyTwoFactor,
         trialDaysLeft,
         isTrialActive,
         hasActivePlan,

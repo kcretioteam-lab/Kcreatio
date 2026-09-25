@@ -29,6 +29,8 @@ services:
         sync: false
       - key: JWT_REFRESH_SECRET
         sync: false
+      - key: TOTP_ENCRYPTION_KEY
+        generateValue: true
       - key: SUPABASE_URL
         sync: false
       - key: SUPABASE_SERVICE_ROLE_KEY
