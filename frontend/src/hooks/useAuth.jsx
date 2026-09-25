@@ -1,6 +1,7 @@
 import { createContext, useContext, useReducer, useCallback, useEffect, useRef } from 'react';
-import api from '../utils/api.js';
+import api, { getErrorMessage } from '../utils/api.js';
 import { canAccess as canAccessFn } from '../utils/planConfig.js';
+import { setCacheOwner } from '../utils/listCache.js';
 
 const AuthContext = createContext(null);
 
@@ -67,6 +68,9 @@ export function AuthProvider({ children }) {
   // /login right after getting in.
   const fetchAbortRef = useRef(null);
 
+  // Cached list data belongs to one user; clear it when the user changes or signs out
+  useEffect(() => { setCacheOwner(state.user?.id); }, [state.user?.id]);
+
   const fetchUser = useCallback(async () => {
     const controller = new AbortController();
     fetchAbortRef.current = controller;
@@ -110,7 +114,7 @@ export function AuthProvider({ children }) {
       dispatch({ type: 'SET_USER', payload: res.data.user });
       return { success: true };
     } catch (e) {
-      const msg = e.response?.data?.message || 'Login failed';
+      const msg = getErrorMessage(e, 'Login failed');
       const code = e.response?.data?.error;
       dispatch({ type: 'SET_ERROR', payload: msg });
       return { success: false, error: msg, errorCode: code };
@@ -131,7 +135,7 @@ export function AuthProvider({ children }) {
       dispatch({ type: 'SET_USER', payload: res.data.user });
       return { success: true };
     } catch (e) {
-      const msg = e.response?.data?.message || 'Registration failed';
+      const msg = getErrorMessage(e, 'Registration failed');
       dispatch({ type: 'SET_ERROR', payload: msg });
       return { success: false, error: msg };
     }

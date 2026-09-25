@@ -84,7 +84,10 @@ const authLimiter = rateLimit({
   max: 10,
   standardHeaders: true,
   legacyHeaders: false,
-  message: { error: 'RATE_LIMITED', message: 'Too many auth attempts', statusCode: 429 },
+  message: { error: 'RATE_LIMITED', message: 'Too many sign-in attempts. Please wait 15 minutes and try again.', statusCode: 429 },
+  // Session checks run on every page load and must not lock signed-in users out;
+  // they're still covered by the global limit above.
+  skip: (req) => ['/me', '/refresh', '/profile', '/logout', '/sessions'].some(p => req.path === p || req.path.startsWith(p + '/')),
 });
 
 // Razorpay webhook needs raw body BEFORE express.json() parses it

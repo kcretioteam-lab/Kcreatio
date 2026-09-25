@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../hooks/useAuth.jsx';
-import { useNavigate, Link, useSearchParams } from 'react-router-dom';
+import { useNavigate, Link, useSearchParams, useLocation } from 'react-router-dom';
+import { nextPathFrom } from '../utils/redirect.js';
 import { Eye, EyeOff, FileText, Receipt, Calculator, CheckCircle2, Loader2, ArrowLeft, Sun, Moon } from 'lucide-react';
 import { useIsMobile } from '../hooks/useIsMobile.js';
 import Input from '../components/ui/Input.jsx';
-import api from '../utils/api.js';
+import api, { getErrorMessage } from '../utils/api.js';
 import { useTheme } from '../App.jsx';
 import LogoMark from '../components/ui/LogoMark.jsx';
 
@@ -61,6 +62,9 @@ export default function AuthPage({ defaultMode = 'register' }) {
   const [loading, setLoading] = useState(false);
   const { login, register } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const [nextParams] = useSearchParams();
+  const afterLogin = nextPathFrom(location, nextParams);
   const isMobile = useIsMobile(640);
   const { theme, toggleTheme } = useTheme();
 
@@ -116,7 +120,7 @@ export default function AuthPage({ defaultMode = 'register' }) {
       setOtpStep(true);
       setOtpCooldown(30);
     } catch (err) {
-      setErrors({ email: err?.response?.data?.message || 'Failed to send OTP' });
+      setErrors({ email: getErrorMessage(err, 'Failed to send OTP') });
     } finally {
       setOtpSending(false);
     }
@@ -133,7 +137,7 @@ export default function AuthPage({ defaultMode = 'register' }) {
       setOtpStep(false);
       setOtp('');
     } catch (err) {
-      setErrors({ otp: err?.response?.data?.message || 'Invalid or expired OTP' });
+      setErrors({ otp: getErrorMessage(err, 'Invalid or expired OTP') });
     } finally {
       setOtpVerifying(false);
     }
@@ -154,12 +158,12 @@ export default function AuthPage({ defaultMode = 'register' }) {
         marketingEmails,
       });
       setLoading(false);
-      if (result.success) navigate('/dashboard');
+      if (result.success) navigate(afterLogin, { replace: true });
       else setErrors({ form: result.error });
     } else {
       const result = await login(email.trim(), password);
       setLoading(false);
-      if (result.success) navigate('/dashboard');
+      if (result.success) navigate(afterLogin, { replace: true });
       else {
         if (result.errorCode === 'ACCOUNT_LOCKED') {
           setErrors({ form: result.error + ' ' });

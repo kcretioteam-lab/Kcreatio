@@ -3,7 +3,7 @@ import { format } from 'date-fns';
 import { Plus, X, Briefcase, FileText } from 'lucide-react';
 import { useNavigate, Link } from 'react-router-dom';
 import MarkPaidDialog from '../components/features/payment/MarkPaidDialog.jsx';
-import api from '../utils/api.js';
+import api, { getErrorMessage } from '../utils/api.js';
 import { useToast } from '../hooks/useToast.jsx';
 import { formatINR } from '../utils/formatINR.js';
 import Badge from '../components/ui/Badge.jsx';
@@ -11,6 +11,7 @@ import Modal from '../components/ui/Modal.jsx';
 import Input from '../components/ui/Input.jsx';
 import { SkeletonCard } from '../components/ui/Skeleton.jsx';
 import EmptyState from '../components/ui/EmptyState.jsx';
+import { readCache, writeCache } from '../utils/listCache.js';
 
 const STATUSES = ['inquiry', 'negotiating', 'active', 'delivered', 'invoiced', 'paid', 'rejected'];
 const STATUS_LABELS = { inquiry: 'Inquiry', negotiating: 'Negotiating', active: 'Active', delivered: 'Delivered', invoiced: 'Invoiced', paid: 'Paid', rejected: 'Rejected' };
@@ -39,11 +40,15 @@ export default function DealsPage() {
   }, []);
 
   async function loadDeals() {
-    setLoading(true);
+    // Show the last copy straight away, then refresh
+    const cached = readCache('deals');
+    if (cached) { setDeals(cached); setLoading(false); }
+    else setLoading(true);
     try {
       const res = await api.get('/deals');
       setDeals(res.data.deals || []);
-    } catch { toast.error('Failed to load deals'); }
+      writeCache('deals', res.data.deals || []);
+    } catch (err) { if (!cached) toast.error(getErrorMessage(err, 'Couldn’t load deals')); }
     finally { setLoading(false); }
   }
 
@@ -67,7 +72,7 @@ export default function DealsPage() {
       setAddOpen(false);
       setForm(EMPTY_FORM);
       loadDeals();
-    } catch (err) { toast.error(err?.response?.data?.message || 'Failed to create deal'); }
+    } catch (err) { toast.error(getErrorMessage(err, 'Failed to create deal')); }
     finally { setSaving(false); }
   }
 
@@ -86,7 +91,7 @@ export default function DealsPage() {
       setDeals(prev => prev.map(d => d.id === deal.id ? updated : d));
       setSelectedDeal(cur => (cur?.id === deal.id ? { ...cur, ...updated } : cur));
       toast.success(`Moved to ${STATUS_LABELS[newStatus]}`);
-    } catch (err) { toast.error(err?.response?.data?.message || 'Couldn’t update the deal. Please try again.'); }
+    } catch (err) { toast.error(getErrorMessage(err, 'Couldn’t update the deal. Please try again.')); }
   }
 
   async function recordDealPayment(body) {

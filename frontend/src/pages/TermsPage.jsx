@@ -40,7 +40,7 @@ const SECTIONS = [
   },
   {
     title: '10. Intellectual Property',
-    body: 'The Kcretio name, product design, and software are the property of Kcretio. The invoices, financial records, and business data you enter remain yours.',
+    body: 'The Kcretio name, product design, and software are the property of [LEGAL ENTITY NAME], which operates Kcretio. The invoices, financial records, and business data you enter remain yours.',
   },
   {
     title: '11. Termination',
@@ -60,7 +60,7 @@ const SECTIONS = [
   },
   {
     title: '15. Contact',
-    body: 'Questions about these terms can be sent to kcretioteam@gmail.com.',
+    body: 'Kcretio is operated by [LEGAL ENTITY NAME], [REGISTERED ADDRESS]. Questions about these terms can be sent to support@kcretio.in.',
   },
 ];
 

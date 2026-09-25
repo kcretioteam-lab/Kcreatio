@@ -4,7 +4,7 @@ import { format } from 'date-fns';
 import { Eye, Pencil, Download, FileJson, Trash2, ChevronUp, ChevronDown, ChevronsUpDown, CheckCircle, Send, Copy } from 'lucide-react';
 import Badge from '../../ui/Badge.jsx';
 import { formatINR } from '../../../utils/formatINR.js';
-import api from '../../../utils/api.js';
+import api, { getErrorMessage } from '../../../utils/api.js';
 import { useToast } from '../../../hooks/useToast.jsx';
 
 const STATUS_VARIANT = { draft: 'muted', sent: 'info', paid: 'success', overdue: 'danger' };
@@ -33,7 +33,7 @@ export default function InvoiceList({ invoices, loading, onDownload, onExportJso
       await api.post(`/invoices/${inv.id}/send`);
       toast.success(`Invoice sent to ${inv.brand_email}`);
       onRefresh?.();
-    } catch (err) { toast.error(err?.response?.data?.message || 'Failed to send invoice'); }
+    } catch (err) { toast.error(getErrorMessage(err, 'Failed to send invoice')); }
     finally { setSendingId(null); }
   }
 

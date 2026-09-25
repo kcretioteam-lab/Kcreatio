@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import { Plus, RefreshCw } from 'lucide-react';
-import api from '../utils/api.js';
+import api, { getErrorMessage } from '../utils/api.js';
 import { useToast } from '../hooks/useToast.jsx';
 import { useIsMobile } from '../hooks/useIsMobile.js';
 import { formatINR } from '../utils/formatINR.js';
@@ -16,6 +16,7 @@ import UsageBar from '../components/ui/UsageBar.jsx';
 import { useUsage } from '../hooks/useUsage.jsx';
 import { CURRENT_FY, PREVIOUS_FY as PREV_FY, getFinancialYear } from '../utils/financialYear.js';
 import { taxYearLabel, tdsSectionLabel } from '../utils/taxLabels.js';
+import { readCache, writeCache } from '../utils/listCache.js';
 
 const FORM_16A_VARIANT = {
   received: 'success',
@@ -46,7 +47,11 @@ export default function TDSPage() {
   useEffect(() => { loadData(); }, [fy]);
 
   async function loadData() {
-    setLoading(true);
+    // Show the last copy straight away, then refresh
+    const cacheKey = `tds:${fy}`;
+    const cached = readCache(cacheKey);
+    if (cached) { setRecords(cached.list); setSummary(cached.summary); setLoading(false); }
+    else setLoading(true);
     try {
       const [recs, sum] = await Promise.all([
         api.get('/tds', { params: { fy } }),
@@ -54,7 +59,8 @@ export default function TDSPage() {
       ]);
       setRecords(recs.data.records || []);
       setSummary(sum.data);
-    } catch { toast.error('Failed to load TDS data'); }
+      writeCache(cacheKey, { list: recs.data.records || [], summary: sum.data });
+    } catch (err) { if (!cached) toast.error(getErrorMessage(err, 'Failed to load TDS data')); }
     finally { setLoading(false); }
   }
 
@@ -77,7 +83,7 @@ export default function TDSPage() {
       setForm({ brandName: '', brandTan: '', invoiceAmount: '', tdsRate: '10', tdsAmount: '', paymentDate: format(new Date(), 'yyyy-MM-dd') });
       loadData();
       refreshUsage();
-    } catch (err) { toast.error(err?.response?.data?.message || 'Failed to add record'); }
+    } catch (err) { toast.error(getErrorMessage(err, 'Failed to add record')); }
     finally { setSaving(false); }
   }
 

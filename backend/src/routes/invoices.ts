@@ -142,7 +142,7 @@ const CreateInvoiceSchema = z.object({
   includeTerms: z.boolean().default(false),
   termsText: z.string().max(5000).nullish(),
   // Signatory
-  includeSignatory: z.boolean().default(false),
+  includeSignatory: z.boolean().default(true),
   signatoryName: z.string().max(200).nullish(),
   signatoryImageUrl: z.string().nullish().refine(isValidImageField, { message: 'signatoryImageUrl must be a base64 data URL or Supabase storage URL' }),
   sellerBusinessName: z.string().max(200).nullish(),

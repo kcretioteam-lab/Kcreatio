@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import { Plus, TrendingUp, Pencil } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
-import api from '../utils/api.js';
+import api, { getErrorMessage } from '../utils/api.js';
 import { useToast } from '../hooks/useToast.jsx';
 import { useIsMobile } from '../hooks/useIsMobile.js';
 import { formatINR, formatINRCompact } from '../utils/formatINR.js';
@@ -14,6 +14,7 @@ import EmptyState from '../components/ui/EmptyState.jsx';
 import PlanGate from '../components/ui/PlanGate.jsx';
 import { CURRENT_FY, PREVIOUS_FY as PREV_FY } from '../utils/financialYear.js';
 import { taxYearLabel } from '../utils/taxLabels.js';
+import { readCache, writeCache } from '../utils/listCache.js';
 
 const SOURCES = ['brand_deal', 'adsense', 'instagram_bonus', 'affiliate', 'consulting', 'other'];
 const SOURCE_LABELS = { brand_deal: 'Brand Deal', adsense: 'YouTube AdSense', instagram_bonus: 'Instagram Bonus', affiliate: 'Affiliate', consulting: 'Consulting', other: 'Other' };
@@ -32,7 +33,11 @@ export default function IncomePage() {
   useEffect(() => { loadData(); }, [fy]);
 
   async function loadData() {
-    setLoading(true);
+    // Show the last copy straight away, then refresh
+    const cacheKey = `income:${fy}`;
+    const cached = readCache(cacheKey);
+    if (cached) { setEntries(cached.list); setSummary(cached.summary); setLoading(false); }
+    else setLoading(true);
     try {
       const [inc, sum] = await Promise.all([
         api.get('/income', { params: { fy } }),
@@ -40,7 +45,8 @@ export default function IncomePage() {
       ]);
       setEntries(inc.data.income || []);
       setSummary(sum.data);
-    } catch { toast.error('Failed to load income'); }
+      writeCache(cacheKey, { list: inc.data.income || [], summary: sum.data });
+    } catch (err) { if (!cached) toast.error(getErrorMessage(err, 'Failed to load income')); }
     finally { setLoading(false); }
   }
 
@@ -54,7 +60,7 @@ export default function IncomePage() {
       setAddOpen(false);
       setForm({ source: 'brand_deal', amount: '', description: '', incomeDate: format(new Date(), 'yyyy-MM-dd') });
       loadData();
-    } catch (err) { toast.error(err?.response?.data?.message || 'Failed to log income'); }
+    } catch (err) { toast.error(getErrorMessage(err, 'Failed to log income')); }
     finally { setSaving(false); }
   }
 
@@ -68,7 +74,7 @@ export default function IncomePage() {
       setEditingEntry(null);
       setForm({ source: 'brand_deal', amount: '', description: '', incomeDate: format(new Date(), 'yyyy-MM-dd') });
       loadData();
-    } catch (err) { toast.error(err?.response?.data?.message || 'Failed to update income'); }
+    } catch (err) { toast.error(getErrorMessage(err, 'Failed to update income')); }
     finally { setSaving(false); }
   }
 

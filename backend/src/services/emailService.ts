@@ -2,7 +2,7 @@ import { Resend } from 'resend';
 import { getFrontendUrl } from '../lib/env.js';
 
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
-const FROM = process.env.FROM_EMAIL || 'noreply@kcretio.com';
+const FROM = process.env.FROM_EMAIL || 'noreply@kcretio.in';
 
 async function send(to: string, subject: string, html: string) {
   if (!resend) {

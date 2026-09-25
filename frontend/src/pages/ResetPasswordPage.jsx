@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import { Eye, EyeOff, CheckCircle2 } from 'lucide-react';
-import api from '../utils/api.js';
+import api, { getErrorMessage } from '../utils/api.js';
 import LogoMark from '../components/ui/LogoMark.jsx';
 
 function getPasswordStrength(password) {
@@ -40,7 +40,7 @@ export default function ResetPasswordPage() {
       setSuccess(true);
       setTimeout(() => navigate('/login'), 3000);
     } catch (err) {
-      setError(err?.response?.data?.message || 'Reset link is invalid or expired.');
+      setError(getErrorMessage(err, 'Reset link is invalid or expired.'));
     } finally {
       setLoading(false);
     }

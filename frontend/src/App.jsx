@@ -1,5 +1,6 @@
 import { useEffect, lazy, Suspense, useState, createContext, useContext } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useSearchParams } from 'react-router-dom';
+import { nextPathFrom } from './utils/redirect.js';
 import { AuthProvider, useAuth } from './hooks/useAuth.jsx';
 import { UsageProvider } from './hooks/useUsage.jsx';
 import { ToastProvider } from './hooks/useToast.jsx';
@@ -39,15 +40,19 @@ function AppInitializer() { return null; }
 // Auth-enforced route guard: redirects unauthenticated users to /login
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth();
+  const location = useLocation();
   if (loading) return <SkeletonPage />;
-  if (!user) return <Navigate to="/login" replace />;
+  // Remember where the user was going so login can send them back there
+  if (!user) return <Navigate to="/login" replace state={{ from: location }} />;
   return children;
 }
 
 function PublicOnlyRoute({ children }) {
   const { user, loading } = useAuth();
+  const location = useLocation();
+  const [searchParams] = useSearchParams();
   if (loading) return <SkeletonPage />;
-  if (user) return <Navigate to="/dashboard" replace />;
+  if (user) return <Navigate to={nextPathFrom(location, searchParams)} replace />;
   return children;
 }
 

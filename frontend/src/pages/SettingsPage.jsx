@@ -5,7 +5,7 @@ import { useIsMobile } from '../hooks/useIsMobile.js';
 import Input from '../components/ui/Input.jsx';
 import Modal from '../components/ui/Modal.jsx';
 import { useToast } from '../hooks/useToast.jsx';
-import api from '../utils/api.js';
+import api, { getErrorMessage } from '../utils/api.js';
 // import { openSubscriptionCheckout } from '../utils/razorpay.js'; // Payments disabled — premium is granted on request
 import { usePremiumRequest } from '../hooks/usePremiumRequest.jsx';
 import { PLAN_DISPLAY, PLAN_HIERARCHY } from '../utils/planConfig.js';
@@ -113,7 +113,7 @@ function InvoiceSettingsSection({ user }) {
       toast.success(editingBank ? 'Bank account updated' : 'Bank account added');
       setShowBankForm(false); setEditingBank(null);
       loadSettings();
-    } catch (err) { toast.error(err?.response?.data?.message || 'Failed to save'); }
+    } catch (err) { toast.error(getErrorMessage(err, 'Failed to save')); }
     finally { setSavingBank(false); }
   }
 
@@ -150,7 +150,7 @@ function InvoiceSettingsSection({ user }) {
       toast.success(editingTerms ? 'T&C updated' : 'T&C profile added');
       setShowTermsForm(false); setEditingTerms(null);
       loadSettings();
-    } catch (err) { toast.error(err?.response?.data?.message || 'Failed to save'); }
+    } catch (err) { toast.error(getErrorMessage(err, 'Failed to save')); }
     finally { setSavingTerms(false); }
   }
 
@@ -193,7 +193,7 @@ function InvoiceSettingsSection({ user }) {
       toast.success('Signatory saved');
       setShowSignatoryForm(false);
       loadSettings();
-    } catch (err) { toast.error(err?.response?.data?.message || 'Failed to save signatory'); }
+    } catch (err) { toast.error(getErrorMessage(err, 'Failed to save signatory')); }
     finally { setSavingSignatory(false); }
   }
 
@@ -227,7 +227,7 @@ function InvoiceSettingsSection({ user }) {
       toast.success(editingUpi ? 'UPI updated' : 'UPI added');
       setShowUpiForm(false); setEditingUpi(null);
       loadSettings();
-    } catch (err) { toast.error(err?.response?.data?.message || 'Failed to save'); }
+    } catch (err) { toast.error(getErrorMessage(err, 'Failed to save')); }
     finally { setSavingUpi(false); }
   }
   async function deleteUpi(id) {
@@ -722,7 +722,7 @@ const UPGRADE_FEATURES = {
 //         },
 //       });
 //     } catch (e) {
-//       toast.error(e.response?.data?.message || 'Failed to start the upgrade. Please try again.');
+//       toast.error(getErrorMessage(e, 'Failed to start the upgrade. Please try again.'));
 //       setActionLoading('');
 //     }
 //   };
@@ -734,7 +734,7 @@ const UPGRADE_FEATURES = {
 //       toast.success('Subscription will cancel at end of billing period.');
 //       await fetchStatus();
 //     } catch (e) {
-//       toast.error(e.response?.data?.message || 'Failed to cancel subscription');
+//       toast.error(getErrorMessage(e, 'Failed to cancel subscription'));
 //     } finally {
 //       setActionLoading('');
 //       setConfirmModal(null);
@@ -748,7 +748,7 @@ const UPGRADE_FEATURES = {
 //       toast.success('Subscription reactivated successfully.');
 //       await fetchStatus();
 //     } catch (e) {
-//       toast.error(e.response?.data?.message || 'Failed to reactivate');
+//       toast.error(getErrorMessage(e, 'Failed to reactivate'));
 //     } finally {
 //       setActionLoading('');
 //     }
@@ -1147,7 +1147,7 @@ function SecuritySection() {
       toast.success('Password changed successfully');
       setForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
     } catch (err) {
-      setErrors({ currentPassword: err?.response?.data?.message || 'Failed to change password' });
+      setErrors({ currentPassword: getErrorMessage(err, 'Failed to change password') });
     } finally { setSaving(false); }
   }
 
@@ -1210,7 +1210,7 @@ function ExportSection({ user }) {
       URL.revokeObjectURL(url);
       toast.success('Export downloaded');
     } catch (err) {
-      toast.error(err?.response?.data?.message || 'Export failed. Ensure you have a Pro plan.');
+      toast.error(getErrorMessage(err, 'Export failed. Ensure you have a Pro plan.'));
     } finally { setDownloading(false); }
   }
 
@@ -1294,7 +1294,7 @@ function IntegrationsSection({ user, onRefresh }) {
       toast.success(`Scan complete — ${res.data.new_detections} new items found`);
       onRefresh();
     } catch (err) {
-      toast.error(err.response?.data?.message ?? 'Scan failed');
+      toast.error(getErrorMessage(err, 'Scan failed'));
     } finally {
       setScanning(false);
     }
@@ -1318,6 +1318,7 @@ function IntegrationsSection({ user, onRefresh }) {
           <div style={{ flex: 1 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 'var(--space-1)' }}>
               <span style={{ fontWeight: 700, fontSize: 'var(--text-md)', color: 'var(--text-primary)' }}>Gmail</span>
+              <span title="Google is still reviewing Kcretio’s Gmail access, so you may see an “unverified app” screen when connecting." style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', padding: '1px 6px', borderRadius: 'var(--radius-sm)', background: 'var(--warning-dim)', color: 'var(--warning-text)' }}>Beta</span>
               {gmailConnected && (
                 <span style={{ padding: '1px 7px', background: 'var(--success-dim)', color: 'var(--success-text)', borderRadius: 'var(--radius-full)', fontSize: 10, fontWeight: 700 }}>CONNECTED</span>
               )}
@@ -1562,7 +1563,7 @@ export default function SettingsPage() {
       await fetchUser();
       toast.success('Tax profile saved');
       setEditingBusiness(false);
-    } catch (err) { toast.error(err?.response?.data?.message || 'Couldn’t save. Please try again.'); }
+    } catch (err) { toast.error(getErrorMessage(err, 'Couldn’t save. Please try again.')); }
     finally { setSavingBusiness(false); }
   };
 
