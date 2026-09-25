@@ -1,10 +1,22 @@
 // Kcretio tax engine — single source of truth for income-tax maths.
-// MIRROR of backend/src/services/taxEngine.ts. Both copies are checked against
+// MIRRORED in frontend/src/utils/taxCalc.js. Both copies are checked against
 // backend/src/services/__tests__/taxCases.json — change them together.
 //
 // All amounts are in rupees. Rules as of tax year 2026-27 (Income-tax Act 2025;
 // slab rates and 87A carried over from FY 2025-26). PENDING CA SIGN-OFF.
 
+export type Regime = 'new' | 'old';
+export type Presumptive = 'none' | '44ADA' | '44AD';
+
+export interface TaxInput {
+  grossReceipts: number;      // business/professional receipts, excl. GST
+  expenses?: number;          // only used when presumptive = 'none'
+  salaryIncome?: number;      // gross salary, if any
+  regime?: Regime;
+  presumptive?: Presumptive;
+  tdsPaid?: number;
+  advanceTaxPaid?: number;
+}
 
 export const NEW_REGIME_SLABS = [
   { min: 0,       max: 400000,   rate: 0 },
@@ -33,9 +45,9 @@ export const INSTALMENT_SCHEDULE = [
   { quarter: 'Q2', dueDate: 'Sep 15', dueMonth: 8,  dueDay: 15, cumPct: 0.45 },
   { quarter: 'Q3', dueDate: 'Dec 15', dueMonth: 11, dueDay: 15, cumPct: 0.75 },
   { quarter: 'Q4', dueDate: 'Mar 15', dueMonth: 2,  dueDay: 15, cumPct: 1.00 },
-];
+] as const;
 
-export function slabTax(taxable, regime) {
+export function slabTax(taxable: number, regime: Regime): number {
   const slabs = regime === 'old' ? OLD_REGIME_SLABS : NEW_REGIME_SLABS;
   let tax = 0;
   for (const s of slabs) {
@@ -45,9 +57,9 @@ export function slabTax(taxable, regime) {
   return Math.round(tax);
 }
 
-export function computeTax(input) {
-  const regime = input.regime === 'old' ? 'old' : 'new';
-  const presumptive = input.presumptive ?? 'none';
+export function computeTax(input: TaxInput) {
+  const regime: Regime = input.regime === 'old' ? 'old' : 'new';
+  const presumptive: Presumptive = input.presumptive ?? 'none';
   const gross = Math.max(0, input.grossReceipts || 0);
   const salary = Math.max(0, input.salaryIncome || 0);
   const tdsPaid = Math.max(0, input.tdsPaid || 0);
@@ -102,7 +114,12 @@ export function computeTax(input) {
 // Interest for deferring advance tax (old s.234C): 1% a month on the shortfall,
 // 3 months for Q1–Q3 and 1 month for Q4. Q1/Q2 are safe at 12%/36% paid.
 // paidCumulative[i] = total advance tax paid by instalment i's due date.
-export function estimateDeferralInterest(instalments, paidCumulative, asOf, fyStartYear) {
+export function estimateDeferralInterest(
+  instalments: { cumulativeDue: number }[],
+  paidCumulative: number[],
+  asOf: Date,
+  fyStartYear: number,
+): { quarter: string; shortfall: number; interest: number }[] {
   const safePct = [0.12, 0.36, 0.75, 1];
   return INSTALMENT_SCHEDULE.map((inst, i) => {
     const due = new Date(inst.dueMonth < 3 ? fyStartYear + 1 : fyStartYear, inst.dueMonth, inst.dueDay);
@@ -118,7 +135,7 @@ export function estimateDeferralInterest(instalments, paidCumulative, asOf, fySt
 
 // Landing-page calculator. Assumes brands deduct 10% TDS on professional fees
 // (Sec 393, formerly 194J) on the taxable value.
-export function quickTaxEstimate(monthlyIncome, brandCount = 1) {
+export function quickTaxEstimate(monthlyIncome: number, brandCount = 1) {
   const annual = Math.max(0, monthlyIncome) * 12;
   const estimatedTds = Math.round(annual * 0.10);
   const r = computeTax({ grossReceipts: annual, tdsPaid: estimatedTds });
@@ -128,23 +145,4 @@ export function quickTaxEstimate(monthlyIncome, brandCount = 1) {
     ? `${Math.round(brandCount * 40)}% chance of delay`
     : `~${lateCount} of ${brandCount} brand${lateCount !== 1 ? 's' : ''} likely late`;
   return { annual, estimatedTds, incomeTax: r.totalTax, advanceTaxOwed: r.netPayable, itrRefund: r.refund, q2Due, form16aRisk };
-}
-
-export function getFinancialYear(date) {
-  const year = date.getFullYear();
-  const month = date.getMonth() + 1;
-  if (month >= 4) return `${year}-${String(year + 1).slice(-2)}`;
-  return `${year - 1}-${String(year).slice(-2)}`;
-}
-
-export function getFYStartYear(fy) {
-  return parseInt(fy.split('-')[0]);
-}
-
-export function getAdvanceTaxQuarter(date) {
-  const month = date.getMonth() + 1;
-  if (month >= 4 && month <= 6) return 'Q1';
-  if (month >= 7 && month <= 9) return 'Q2';
-  if (month >= 10 && month <= 12) return 'Q3';
-  return 'Q4';
 }
