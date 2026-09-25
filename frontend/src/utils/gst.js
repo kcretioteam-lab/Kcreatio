@@ -11,17 +11,18 @@ export const STATE_CODES = {
   '28': 'Andhra Pradesh (old)', '29': 'Karnataka', '30': 'Goa',
   '31': 'Lakshadweep', '32': 'Kerala', '33': 'Tamil Nadu', '34': 'Puducherry',
   '35': 'Andaman & Nicobar Islands', '36': 'Telangana', '37': 'Andhra Pradesh', '38': 'Ladakh',
-  '97': 'Other Territory',
+  '96': 'Foreign country', '97': 'Other Territory',
 };
 
 // Current states for pickers — legacy codes (25, 28) stay valid in GSTINs but aren't offered.
 export const INDIAN_STATES = Object.entries(STATE_CODES)
-  .filter(([code]) => code !== '25' && code !== '28')
+  .filter(([code]) => code !== '25' && code !== '28' && code !== '96')
   .map(([code, name]) => ({ code, name }));
 
 // GST rates after the September 2025 rationalisation. 12% and 28% were removed.
 export const GST_RATES = [0, 5, 18, 40];
 export const DEFAULT_GST_RATE = 18;
+export const FOREIGN_STATE_CODE = '96';
 
 export const GSTIN_REGEX = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
 export const PAN_REGEX = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;

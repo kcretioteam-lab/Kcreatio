@@ -6,7 +6,7 @@ import { supabase } from '../lib/supabase.js';
 import { authenticate, AuthRequest } from '../middleware/auth.js';
 import { checkPlan } from '../middleware/auth.js';
 import { getFinancialYear } from '../services/invoiceService.js';
-import { computeTax, Presumptive, Regime } from '../services/taxEngine.js';
+import { computeTax, firstYearDepreciation, Presumptive, Regime } from '../services/taxEngine.js';
 import { generateInvoicePdfWithPuppeteer, renderHtmlToPdf } from '../services/puppeteerPdfService.js';
 import { stateLabel } from '../lib/gst.js';
 
@@ -68,7 +68,10 @@ router.get('/annual', checkPlan('pro'), async (req: AuthRequest, res: Response):
   const user = userRes.data;
 
   const totalIncome = sum(income, 'amount');
-  const totalExpenses = sum(expenses, 'amount');
+  const fyStartYear = parseInt(fy.split('-')[0], 10);
+  const depreciation = firstYearDepreciation(
+    expenses.filter(e => e.is_capital_asset).map(e => ({ amount: num(e.amount), assetClass: e.asset_class, purchaseDate: e.expense_date })), fyStartYear);
+  const totalExpenses = sum(expenses.filter(e => !e.is_capital_asset), 'amount') + depreciation;
   const totalTds = sum(tds, 'tds_amount');
   const advanceTaxPaid = sum(taxPaid, 'amount_paid');
   const gstCollected = sum(invoices, 'gst_amount');
@@ -90,7 +93,8 @@ router.get('/annual', checkPlan('pro'), async (req: AuthRequest, res: Response):
     ['Regime', regime === 'new' ? 'New' : 'Old'],
     ['Taxation', presumptive === 'none' ? 'Regular books' : `Presumptive (formerly ${presumptive})`],
     ['Gross receipts (excl. GST)', totalIncome],
-    ['Business expenses', totalExpenses],
+    ['Business expenses (incl. depreciation)', totalExpenses],
+    ['of which depreciation on assets bought this year', depreciation],
     ['GST charged on invoices', gstCollected],
     ['TDS deducted by brands', totalTds],
     ['Advance tax paid', advanceTaxPaid],
@@ -136,7 +140,10 @@ router.get('/annual', checkPlan('pro'), async (req: AuthRequest, res: Response):
     { header: 'Category', key: 'category' },
     { header: 'Description', key: 'description', width: 40 },
     { header: 'Amount', key: 'amount', money: true },
-  ], expenses, ['amount']);
+    { header: 'GST paid (ITC)', key: 'gst_paid', money: true },
+    { header: 'Vendor GSTIN', key: 'vendor_gstin', width: 18 },
+    { header: 'Capital asset', key: 'asset_class' },
+  ], expenses, ['amount', 'gst_paid']);
 
   addSheet(wb, 'TDS', [
     { header: 'Payment date', key: 'payment_date' },

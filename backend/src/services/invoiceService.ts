@@ -1,3 +1,4 @@
+import { supabase } from '../lib/supabase.js';
 // GST configuration for Indian content creators
 export const CREATOR_GST_CONFIG = {
   hsnCode: '998399',
@@ -20,7 +21,7 @@ export interface GstCalculation {
   gstRate: GstRate;
   gstAmount: number;
   totalAmount: number;
-  supplyType: 'intrastate' | 'interstate';
+  supplyType: 'intrastate' | 'interstate' | 'export';
   cgstAmount: number | null;
   sgstAmount: number | null;
   igstAmount: number | null;
@@ -35,7 +36,10 @@ export function calculateInvoiceTotals(
   discount: { value?: number | null; type?: 'flat' | 'percent' | null },
   supplierState: string,
   placeOfSupply: string,
+  opts: { exportUnderLut?: boolean } = {},
 ): GstCalculation {
+  // Exports under a Letter of Undertaking are zero-rated: no IGST is charged.
+  if (opts.exportUnderLut) lines = lines.map(l => ({ ...l, gstRate: 0 }));
   // Work in paise to avoid floating point errors
   const linePaise = lines.map(l => Math.round(l.amount * 100));
   const subtotalPaise = linePaise.reduce((s, p) => s + p, 0);
@@ -56,7 +60,7 @@ export function calculateInvoiceTotals(
     return { ...l, taxableValue: taxable / 100, gstAmount: gst / 100 };
   });
 
-  const supplyType: 'intrastate' | 'interstate' = supplierState === placeOfSupply ? 'intrastate' : 'interstate';
+  const supplyType: GstCalculation['supplyType'] = opts.exportUnderLut ? 'export' : supplierState === placeOfSupply ? 'intrastate' : 'interstate';
   const cgstPaise = Math.floor(gstPaise / 2);
   return {
     baseAmount: basePaise / 100,
@@ -66,7 +70,7 @@ export function calculateInvoiceTotals(
     supplyType,
     cgstAmount: supplyType === 'intrastate' ? cgstPaise / 100 : null,
     sgstAmount: supplyType === 'intrastate' ? (gstPaise - cgstPaise) / 100 : null,
-    igstAmount: supplyType === 'interstate' ? gstPaise / 100 : null,
+    igstAmount: supplyType === 'interstate' ? gstPaise / 100 : supplyType === 'export' ? 0 : null,
     discountAmount: discountPaise / 100,
     lines: computed,
   };
@@ -103,4 +107,18 @@ export function getFYCode(fy: string): string {
   // "2025-26" → "2526"
   const [startYear, endYY] = fy.split('-');
   return `${startYear.slice(-2)}${endYY}`;
+}
+
+// Next number in the creator's series for this tax year, e.g. INV/2627/0007
+export async function nextInvoiceNumber(userId: string, prefix: string, fyCode: string): Promise<string> {
+  const { data } = await supabase
+    .from('invoices')
+    .select('invoice_number')
+    .eq('user_id', userId)
+    .like('invoice_number', `${prefix}/${fyCode}/%`);
+  const maxSeq = (data || []).reduce((max, row) => {
+    const n = parseInt(String(row.invoice_number).split('/').pop() || '0', 10);
+    return Number.isFinite(n) && n > max ? n : max;
+  }, 0);
+  return `${prefix}/${fyCode}/${String(maxSeq + 1).padStart(4, '0')}`;
 }

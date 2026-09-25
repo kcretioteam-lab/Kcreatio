@@ -26,6 +26,8 @@ const CreateTDSSchema = z.object({
 
 const UpdateTDSSchema = z.object({
   form16aStatus: z.enum(['received', 'awaiting', 'requested', 'overdue']).optional(),
+  form16aPath: z.string().max(300).nullable().optional(),   // storage path from /upload/document
+  inAis: z.boolean().nullable().optional(),                 // does this entry appear in Form 26AS / AIS?
   brandTan: z.string().max(10).trim().optional(),
   notes: z.string().max(500).optional(),
 });
@@ -54,7 +56,7 @@ router.get('/summary', async (req: AuthRequest, res: Response): Promise<void> =>
 
   const { data, error } = await supabase
     .from('tds_records')
-    .select('tds_amount, received_amount, form_16a_status')
+    .select('tds_amount, received_amount, form_16a_status, quarter, in_ais')
     .eq('user_id', req.userId!)
     .eq('financial_year', currentFY);
 
@@ -65,12 +67,25 @@ router.get('/summary', async (req: AuthRequest, res: Response): Promise<void> =>
     .filter(r => r.form_16a_status === 'received')
     .reduce((s, r) => s + Number(r.tds_amount), 0);
   const pending = totalDeducted - form16aReceived;
+  const r2 = (n: number) => Math.round(n * 100) / 100;
+  const byQuarter = ['Q1', 'Q2', 'Q3', 'Q4'].map(q => ({
+    quarter: q,
+    amount: r2((data || []).filter(r => r.quarter === q).reduce((s, r) => s + Number(r.tds_amount), 0)),
+  }));
+  // Checklist before filing: every deduction should show up in Form 26AS / AIS
+  const ais = {
+    unchecked: (data || []).filter(r => r.in_ais == null).length,
+    missing: (data || []).filter(r => r.in_ais === false).length,
+    missingAmount: r2((data || []).filter(r => r.in_ais === false).reduce((s, r) => s + Number(r.tds_amount), 0)),
+  };
 
   res.json({
     financialYear: currentFY,
     totalDeducted: Math.round(totalDeducted * 100) / 100,
     form16aReceived: Math.round(form16aReceived * 100) / 100,
     pending: Math.round(pending * 100) / 100,
+    byQuarter,
+    ais,
     netTdsCredit: Math.round(totalDeducted * 100) / 100,
     recordCount: (data || []).length,
   });
@@ -141,6 +156,15 @@ router.put('/:id', validateBody(UpdateTDSSchema), async (req: AuthRequest, res: 
   const updates: Record<string, any> = {};
   if (req.body.form16aStatus) updates.form_16a_status = req.body.form16aStatus;
   if (req.body.brandTan) updates.brand_tan = req.body.brandTan;
+  if (req.body.notes !== undefined) updates.notes = req.body.notes;
+  if (req.body.inAis !== undefined) updates.in_ais = req.body.inAis;
+  if (req.body.form16aPath !== undefined) {
+    if (req.body.form16aPath && !req.body.form16aPath.startsWith(`${req.userId!}/docs/`)) {
+      res.status(422).json({ error: 'VALIDATION_ERROR', message: 'Upload the Form 16A again' }); return;
+    }
+    updates.form_16a_url = req.body.form16aPath;
+    if (req.body.form16aPath) updates.form_16a_status = 'received';
+  }
 
   const { data, error } = await supabase
     .from('tds_records')

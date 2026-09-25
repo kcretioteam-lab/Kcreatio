@@ -1,7 +1,7 @@
 // PENDING CA SIGN-OFF — expected values in taxCases.json must be confirmed by a CA
 // before release. The frontend mirror (frontend/src/utils/taxCalc.js) runs the same cases.
 import { describe, it, expect } from 'vitest';
-import { computeTax, estimateDeferralInterest, quickTaxEstimate } from '../taxEngine';
+import { computeTax, estimateDeferralInterest, quickTaxEstimate, firstYearDepreciation } from '../taxEngine';
 import fixtures from './taxCases.json';
 
 describe('computeTax', () => {
@@ -37,5 +37,14 @@ describe('estimateDeferralInterest', () => {
 describe('quickTaxEstimate', () => {
   it('₹1L/month → full TDS refund', () => {
     expect(quickTaxEstimate(100000)).toMatchObject({ annual: 1200000, incomeTax: 0, itrRefund: 120000, advanceTaxOwed: 0 });
+  });
+});
+
+describe('firstYearDepreciation', () => {
+  it('uses full rate when used 180+ days, half rate otherwise', () => {
+    // ₹1,00,000 laptop bought 1 Jun 2026: 40% = ₹40,000
+    expect(firstYearDepreciation([{ amount: 100000, assetClass: 'computer', purchaseDate: '2026-06-01' }], 2026)).toBe(40000);
+    // ₹2,00,000 camera bought 15 Jan 2027: 15% × ½ = ₹15,000
+    expect(firstYearDepreciation([{ amount: 200000, assetClass: 'camera_equipment', purchaseDate: '2027-01-15' }], 2026)).toBe(15000);
   });
 });

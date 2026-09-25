@@ -7,6 +7,7 @@ import emailDetectionsRoutes from './routes/emailDetections.js';
 import authRoutes from './routes/auth.js';
 import securityRoutes from './routes/security.js';
 import invoiceRoutes from './routes/invoices.js';
+import creditNoteRoutes from './routes/creditNotes.js';
 import invoiceSettingsRoutes from './routes/invoiceSettings.js';
 import uploadRoutes from './routes/upload.js';
 import tdsRoutes from './routes/tds.js';
@@ -106,6 +107,7 @@ app.get('/api/health', (_, res) => res.json({ status: 'ok', timestamp: new Date(
 app.use('/api/v1/auth', authLimiter, authRoutes);
 app.use('/api/v1/auth', authLimiter, securityRoutes);
 app.use('/api/v1/invoices', invoiceRoutes);
+app.use('/api/v1/credit-notes', creditNoteRoutes);
 app.use('/api/v1/invoice-settings', invoiceSettingsRoutes);
 app.use('/api/v1/upload', uploadRoutes);
 app.use('/api/v1/tds', tdsRoutes);
