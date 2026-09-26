@@ -4,18 +4,18 @@
 import { writeFileSync, readFileSync, mkdirSync } from 'fs';
 import path from 'path';
 
-const SITE_URL = (process.env.VITE_SITE_URL || 'https://kcretio.netlify.app').replace(/\/$/, '');
+const SITE_URL = (process.env.VITE_SITE_URL || 'https://kcreatio.com').replace(/\/$/, '');
 
 const PAGES = [
   {
     route: '/',
-    title: 'Kcretio — GST invoices, TDS & advance tax for Indian creators',
+    title: 'Kcreatio — GST invoices, TDS & advance tax for Indian creators',
     description: 'GST-compliant invoices, TDS tracking with Form 16A, advance tax planning and a brand-deal pipeline, built for Indian YouTubers, Instagram creators and podcasters.',
     priority: '1.0',
     body: `
       <main>
         <h1>GST, TDS and advance tax for Indian content creators</h1>
-        <p>Kcretio is the financial workspace for Indian YouTubers, Instagram creators and podcasters. Create GST invoices brands accept, track the TDS they deduct, and know your advance tax before each deadline.</p>
+        <p>Kcreatio is the financial workspace for Indian YouTubers, Instagram creators and podcasters. Create GST invoices brands accept, track the TDS they deduct, and know your advance tax before each deadline.</p>
         <h2>GST invoices in under a minute</h2>
         <p>Rule 46 fields, CGST + SGST or IGST worked out from your GSTIN and the place of supply, SAC 998399, amount in words, and export invoices under LUT for foreign clients.</p>
         <h2>TDS and Form 16A tracking</h2>
@@ -31,17 +31,17 @@ const PAGES = [
   },
   {
     route: '/privacy',
-    title: 'Privacy Policy — Kcretio',
-    description: 'What Kcretio collects, why, who it is shared with, and your rights under India’s Digital Personal Data Protection Act.',
+    title: 'Privacy Policy — Kcreatio',
+    description: 'What Kcreatio collects, why, who it is shared with, and your rights under India’s Digital Personal Data Protection Act.',
     priority: '0.3',
-    body: '<main><h1>Privacy Policy</h1><p>How Kcretio handles your personal and financial data, your rights under the DPDP Act 2023, and how to contact our Grievance Officer.</p></main>',
+    body: '<main><h1>Privacy Policy</h1><p>How Kcreatio handles your personal and financial data, your rights under the DPDP Act 2023, and how to contact our Grievance Officer.</p></main>',
   },
   {
     route: '/terms',
-    title: 'Terms of Service — Kcretio',
-    description: 'The terms for using Kcretio, the financial workspace for Indian content creators.',
+    title: 'Terms of Service — Kcreatio',
+    description: 'The terms for using Kcreatio, the financial workspace for Indian content creators.',
     priority: '0.3',
-    body: '<main><h1>Terms of Service</h1><p>The terms for using Kcretio. Kcretio is a software tool and does not provide tax advice.</p></main>',
+    body: '<main><h1>Terms of Service</h1><p>The terms for using Kcreatio. Kcreatio is a software tool and does not provide tax advice.</p></main>',
   },
 ];
 
@@ -52,7 +52,7 @@ function pageHtml(template, page) {
   const jsonLd = page.route === '/' ? `<script type="application/ld+json">${JSON.stringify({
     '@context': 'https://schema.org',
     '@type': 'SoftwareApplication',
-    name: 'Kcretio',
+    name: 'Kcreatio',
     applicationCategory: 'FinanceApplication',
     operatingSystem: 'Web',
     url: SITE_URL,
@@ -78,7 +78,7 @@ function pageHtml(template, page) {
 export default function seoPlugin() {
   let outDir = 'dist';
   return {
-    name: 'kcretio-seo',
+    name: 'kcreatio-seo',
     apply: 'build',
     configResolved(config) { outDir = path.resolve(config.root, config.build.outDir); },
     closeBundle() {

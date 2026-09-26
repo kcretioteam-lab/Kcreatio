@@ -58,10 +58,10 @@ export default function TwoFactorCard() {
   }
 
   function downloadCodes() {
-    const text = `Kcretio recovery codes\nEach code works once. Keep them somewhere safe.\n\n${recoveryCodes.join('\n')}\n`;
+    const text = `Kcreatio recovery codes\nEach code works once. Keep them somewhere safe.\n\n${recoveryCodes.join('\n')}\n`;
     const url = URL.createObjectURL(new Blob([text], { type: 'text/plain' }));
     const a = document.createElement('a');
-    a.href = url; a.download = 'kcretio-recovery-codes.txt'; a.click();
+    a.href = url; a.download = 'kcreatio-recovery-codes.txt'; a.click();
     setTimeout(() => URL.revokeObjectURL(url), 5000);
   }
 

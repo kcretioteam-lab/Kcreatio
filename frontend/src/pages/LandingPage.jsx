@@ -1,5 +1,5 @@
 /**
- * LandingPage — Kcretio Cinematic Experience
+ * LandingPage — Kcreatio Cinematic Experience
  * Base: v5 (7-act narrative) + Act1Hero from v5 + 3 v2 sections
  * Act4 scroll bug fixed: stepRefs + translateY to keep active step visible
  */
@@ -329,7 +329,7 @@ function Navbar() {
         <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: 8, textDecoration: 'none' }}>
           <LogoMark size={28} />
           <span style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: 14, letterSpacing: '-0.02em' }}>
-            Kcretio
+            Kcreatio
           </span>
         </Link>
 
@@ -507,7 +507,7 @@ const JOURNEY = [
   {
     step: '05', icon: Calendar, color: '#fb923c',
     title: 'Sep 15 arrives. No late interest.',
-    body: 'Kcretio works out your Q2 advance tax and reminds you 14 days before the deadline. ₹18,400 paid on time. No interest. No panic calls.',
+    body: 'Kcreatio works out your Q2 advance tax and reminds you 14 days before the deadline. ₹18,400 paid on time. No interest. No panic calls.',
     tag: '14-day reminder sent',
     detail: 'Q2 advance tax: ₹18,400 · Interest avoided: ₹552',
   },
@@ -660,7 +660,7 @@ function Act4HowItWorks() {
                 One deal. Fully handled.
               </h2>
               <p style={{ fontSize: 15, color: 'var(--text-body)', lineHeight: 1.7 }}>
-                Follow Riya's journey — from brand deal to filed ITR. Kcretio handles every step.
+                Follow Riya's journey — from brand deal to filed ITR. Kcreatio handles every step.
               </p>
             </div>
           </Reveal>

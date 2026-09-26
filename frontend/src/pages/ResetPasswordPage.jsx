@@ -62,7 +62,7 @@ export default function ResetPasswordPage() {
       <div style={{ width: '100%', maxWidth: 420, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl)', padding: 'var(--space-8)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', marginBottom: 'var(--space-6)' }}>
           <LogoMark size={28} />
-          <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>Kcretio</span>
+          <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>Kcreatio</span>
         </div>
 
         {success ? (

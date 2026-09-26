@@ -2,7 +2,7 @@ import { Resend } from 'resend';
 import { getFrontendUrl } from '../lib/env.js';
 
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
-const FROM = process.env.FROM_EMAIL || 'noreply@kcretio.in';
+const FROM = process.env.FROM_EMAIL || 'noreply@kcreatio.com';
 
 async function send(to: string, subject: string, html: string) {
   if (!resend) {
@@ -24,7 +24,7 @@ export async function sendOtpEmail(to: string, otp: string, purpose: 'email_veri
   const label = purpose === 'email_verify' ? 'Verify your email' : 'Reset your password';
   const html = `
     <div style="font-family:Inter,sans-serif;max-width:480px;margin:0 auto;padding:32px;background:#07080F;color:#F0F1F8;border-radius:12px;">
-      <div style="font-size:22px;font-weight:700;margin-bottom:8px;color:#E8921A;">Kcretio</div>
+      <div style="font-size:22px;font-weight:700;margin-bottom:8px;color:#E8921A;">Kcreatio</div>
       <h2 style="font-size:18px;font-weight:600;margin:0 0 16px;">${label}</h2>
       <p style="color:#94a3b8;margin:0 0 24px;">Your verification code is valid for 10 minutes.</p>
       <div style="background:#0E1018;border:1px solid #1E2130;border-radius:8px;padding:24px;text-align:center;margin-bottom:24px;">
@@ -32,32 +32,32 @@ export async function sendOtpEmail(to: string, otp: string, purpose: 'email_veri
       </div>
       <p style="color:#64748b;font-size:12px;">If you didn't request this, ignore this email. Do not share this code with anyone.</p>
     </div>`;
-  await send(to, `${otp} — ${label} (Kcretio)`, html);
+  await send(to, `${otp} — ${label} (Kcreatio)`, html);
 }
 
 export async function sendPasswordResetEmail(to: string, name: string, resetLink: string) {
   const html = `
     <div style="font-family:Inter,sans-serif;max-width:480px;margin:0 auto;padding:32px;background:#07080F;color:#F0F1F8;border-radius:12px;">
-      <div style="font-size:22px;font-weight:700;margin-bottom:8px;color:#E8921A;">Kcretio</div>
+      <div style="font-size:22px;font-weight:700;margin-bottom:8px;color:#E8921A;">Kcreatio</div>
       <h2 style="font-size:18px;font-weight:600;margin:0 0 8px;">Reset your password</h2>
       <p style="color:#94a3b8;margin:0 0 24px;">Hi ${name}, someone (hopefully you) requested a password reset.</p>
       <a href="${resetLink}" style="display:inline-block;background:#E8921A;color:#fff;font-weight:700;padding:14px 32px;border-radius:8px;text-decoration:none;margin-bottom:24px;">Reset Password</a>
       <p style="color:#64748b;font-size:12px;margin:0;">This link expires in 1 hour. If you didn't request this, ignore this email.</p>
     </div>`;
-  await send(to, 'Reset your Kcretio password', html);
+  await send(to, 'Reset your Kcreatio password', html);
 }
 
 export async function sendWelcomeEmail(to: string, name: string) {
   const html = `
     <div style="font-family:Inter,sans-serif;max-width:480px;margin:0 auto;padding:32px;background:#07080F;color:#F0F1F8;border-radius:12px;">
-      <div style="font-size:22px;font-weight:700;margin-bottom:8px;color:#E8921A;">Kcretio</div>
+      <div style="font-size:22px;font-weight:700;margin-bottom:8px;color:#E8921A;">Kcreatio</div>
       <h2 style="font-size:18px;font-weight:600;margin:0 0 8px;">Welcome, ${name}! 🎉</h2>
       <!-- Auto 28-day trial disabled — premium is now granted on request -->
       <p style="color:#94a3b8;margin:0 0 16px;">Want Pro features (advance tax calculator, P&amp;L, CA export, Smart Inbox)? Request 28 days of free Pro access from Settings.</p>
       <p style="color:#94a3b8;margin:0 0 24px;">Start by creating your first GST-compliant invoice in under 30 seconds.</p>
       <a href="${getFrontendUrl()}/invoices/new" style="display:inline-block;background:#E8921A;color:#fff;font-weight:700;padding:14px 32px;border-radius:8px;text-decoration:none;">Create First Invoice →</a>
     </div>`;
-  await send(to, `Welcome to Kcretio, ${name}!`, html);
+  await send(to, `Welcome to Kcreatio, ${name}!`, html);
 }
 
 export async function sendInvoiceEmail(to: string, opts: {
@@ -75,7 +75,7 @@ export async function sendInvoiceEmail(to: string, opts: {
       <p style="color:#94a3b8;margin:0 0 8px;">Dear ${opts.brandName},</p>
       <p style="color:#94a3b8;margin:0 0 24px;">Please find attached the GST invoice for <strong style="color:#F0F1F8;">${opts.amount}</strong>. Kindly process payment at your earliest convenience.</p>
       ${opts.pdfUrl ? `<a href="${opts.pdfUrl}" style="display:inline-block;background:#E8921A;color:#fff;font-weight:700;padding:14px 32px;border-radius:8px;text-decoration:none;margin-bottom:24px;">Download Invoice PDF</a>` : ''}
-      <p style="color:#64748b;font-size:12px;margin:0;">This invoice was generated using Kcretio.</p>
+      <p style="color:#64748b;font-size:12px;margin:0;">This invoice was generated using Kcreatio.</p>
     </div>`;
   await send(to, `GST Invoice ${opts.invoiceNumber} from ${opts.creatorName}`, html);
 }
@@ -93,7 +93,7 @@ export async function sendPaymentConfirmedEmail(to: string, opts: {
       <h2 style="font-size:18px;font-weight:600;margin:0 0 8px;">Invoice ${opts.invoiceNumber}</h2>
       <p style="color:#94a3b8;margin:0 0 16px;">Hi ${opts.recipientName},</p>
       <p style="color:#94a3b8;margin:0 0 24px;">Payment of <strong style="color:#F0F1F8;">${opts.amount}</strong> has been confirmed for invoice <strong style="color:#F0F1F8;">${opts.invoiceNumber}</strong> between <strong style="color:#F0F1F8;">${opts.creatorName}</strong> and <strong style="color:#F0F1F8;">${opts.brandName}</strong>.</p>
-      <p style="color:#64748b;font-size:12px;">Powered by Kcretio</p>
+      <p style="color:#64748b;font-size:12px;">Powered by Kcreatio</p>
     </div>`;
   await send(to, `Payment confirmed — Invoice ${opts.invoiceNumber}`, html);
 }
@@ -108,7 +108,7 @@ export async function sendAdvanceTaxReminder(to: string, opts: {
   const urgency = opts.daysLeft <= 2 ? '🔴 URGENT: ' : opts.daysLeft <= 7 ? '🟡 ' : '';
   const html = `
     <div style="font-family:Inter,sans-serif;max-width:480px;margin:0 auto;padding:32px;background:#07080F;color:#F0F1F8;border-radius:12px;">
-      <div style="font-size:22px;font-weight:700;margin-bottom:8px;color:#E8921A;">Kcretio</div>
+      <div style="font-size:22px;font-weight:700;margin-bottom:8px;color:#E8921A;">Kcreatio</div>
       <h2 style="font-size:18px;font-weight:600;margin:0 0 8px;">${urgency}Advance Tax Due in ${opts.daysLeft} day${opts.daysLeft !== 1 ? 's' : ''}</h2>
       <p style="color:#94a3b8;margin:0 0 16px;">Hi ${opts.creatorName},</p>
       <div style="background:#0E1018;border:1px solid #1E2130;border-radius:8px;padding:20px;margin-bottom:24px;">
@@ -135,7 +135,7 @@ export async function sendPremiumRequestAdminEmail(opts: {
   }
   const html = `
     <div style="font-family:Inter,sans-serif;max-width:480px;margin:0 auto;padding:32px;background:#07080F;color:#F0F1F8;border-radius:12px;">
-      <div style="font-size:22px;font-weight:700;margin-bottom:8px;color:#E8921A;">Kcretio</div>
+      <div style="font-size:22px;font-weight:700;margin-bottom:8px;color:#E8921A;">Kcreatio</div>
       <h2 style="font-size:18px;font-weight:600;margin:0 0 16px;">New premium access request</h2>
       <p style="color:#94a3b8;margin:0 0 4px;"><strong style="color:#F0F1F8;">${escHtml(opts.name)}</strong> · ${escHtml(opts.email)}</p>
       <p style="color:#94a3b8;margin:0 0 4px;">Platform: ${escHtml(opts.platform)} · Followers: ${opts.followerCount.toLocaleString('en-IN')}</p>
@@ -150,21 +150,21 @@ export async function sendPremiumRequestAdminEmail(opts: {
 export async function sendPremiumApprovedEmail(to: string, name: string, endsAt: Date) {
   const html = `
     <div style="font-family:Inter,sans-serif;max-width:480px;margin:0 auto;padding:32px;background:#07080F;color:#F0F1F8;border-radius:12px;">
-      <div style="font-size:22px;font-weight:700;margin-bottom:8px;color:#E8921A;">Kcretio</div>
+      <div style="font-size:22px;font-weight:700;margin-bottom:8px;color:#E8921A;">Kcreatio</div>
       <h2 style="font-size:18px;font-weight:600;margin:0 0 8px;">You're on Pro, ${escHtml(name)}! 🎉</h2>
       <p style="color:#94a3b8;margin:0 0 24px;">Your premium access request was approved. You have full Pro access until ${endsAt.toDateString()}.</p>
-      <a href="${getFrontendUrl()}/dashboard" style="display:inline-block;background:#E8921A;color:#fff;font-weight:700;padding:14px 32px;border-radius:8px;text-decoration:none;">Open Kcretio →</a>
+      <a href="${getFrontendUrl()}/dashboard" style="display:inline-block;background:#E8921A;color:#fff;font-weight:700;padding:14px 32px;border-radius:8px;text-decoration:none;">Open Kcreatio →</a>
     </div>`;
-  await send(to, 'Your Kcretio Pro access is live', html);
+  await send(to, 'Your Kcreatio Pro access is live', html);
 }
 
 export async function sendNewDeviceEmail(to: string, name: string, opts: { device: string; ip: string; when: Date }) {
   const when = opts.when.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', dateStyle: 'medium', timeStyle: 'short' });
   const html = `
     <div style="font-family:Inter,sans-serif;max-width:480px;margin:0 auto;padding:32px;background:#07080F;color:#F0F1F8;border-radius:12px;">
-      <div style="font-size:22px;font-weight:700;margin-bottom:8px;color:#E8921A;">Kcretio</div>
+      <div style="font-size:22px;font-weight:700;margin-bottom:8px;color:#E8921A;">Kcreatio</div>
       <h2 style="font-size:18px;font-weight:600;margin:0 0 8px;">New sign-in to your account</h2>
-      <p style="color:#94a3b8;margin:0 0 16px;">Hi ${name}, your Kcretio account was just signed in to from a new device.</p>
+      <p style="color:#94a3b8;margin:0 0 16px;">Hi ${name}, your Kcreatio account was just signed in to from a new device.</p>
       <table style="color:#F0F1F8;font-size:14px;margin:0 0 24px;">
         <tr><td style="color:#94a3b8;padding-right:12px;">Device</td><td>${opts.device}</td></tr>
         <tr><td style="color:#94a3b8;padding-right:12px;">When</td><td>${when} IST</td></tr>
@@ -173,7 +173,7 @@ export async function sendNewDeviceEmail(to: string, name: string, opts: { devic
       <p style="color:#94a3b8;margin:0 0 16px;">If this was you, you can ignore this email. If not, change your password and sign out of all devices now.</p>
       <a href="${getFrontendUrl()}/settings?section=Security" style="display:inline-block;background:#E8921A;color:#fff;font-weight:700;padding:14px 32px;border-radius:8px;text-decoration:none;">Review security</a>
     </div>`;
-  await send(to, 'New sign-in to your Kcretio account', html);
+  await send(to, 'New sign-in to your Kcreatio account', html);
 }
 
 export async function sendPaymentReminderEmail(to: string, opts: { brandName: string; creatorName: string; invoiceNumber: string; amountDue: string; dueDate: string; daysOverdue: number; replyTo?: string }) {
@@ -183,7 +183,7 @@ export async function sendPaymentReminderEmail(to: string, opts: { brandName: st
       <p style="margin:0 0 12px;">Hello ${opts.brandName} team,</p>
       <p style="margin:0 0 12px;">This is a friendly reminder that invoice <strong>${opts.invoiceNumber}</strong> from <strong>${opts.creatorName}</strong> for <strong>${opts.amountDue}</strong> was due on ${opts.dueDate}${opts.daysOverdue > 0 ? ` (${opts.daysOverdue} day${opts.daysOverdue === 1 ? '' : 's'} ago)` : ''}.</p>
       <p style="margin:0 0 12px;">If you've already paid, thank you — please ignore this email. When paying, please share the TDS deducted and the Form 16A so it can be claimed.</p>
-      <p style="margin:0;color:#6b7280;font-size:12px;">Sent on behalf of ${opts.creatorName} by Kcretio${opts.replyTo ? ` · reply to ${opts.replyTo}` : ''}.</p>
+      <p style="margin:0;color:#6b7280;font-size:12px;">Sent on behalf of ${opts.creatorName} by Kcreatio${opts.replyTo ? ` · reply to ${opts.replyTo}` : ''}.</p>
     </div>`;
   await send(to, `Reminder: invoice ${opts.invoiceNumber} from ${opts.creatorName}`, html);
 }
@@ -191,7 +191,7 @@ export async function sendPaymentReminderEmail(to: string, opts: { brandName: st
 export async function sendRecurringDraftEmail(to: string, name: string, invoiceNumber: string, brandName: string, invoiceId: string) {
   const html = `
     <div style="font-family:Inter,sans-serif;max-width:480px;margin:0 auto;padding:32px;background:#07080F;color:#F0F1F8;border-radius:12px;">
-      <div style="font-size:22px;font-weight:700;margin-bottom:8px;color:#E8921A;">Kcretio</div>
+      <div style="font-size:22px;font-weight:700;margin-bottom:8px;color:#E8921A;">Kcreatio</div>
       <h2 style="font-size:18px;font-weight:600;margin:0 0 8px;">Your recurring invoice is ready</h2>
       <p style="color:#94a3b8;margin:0 0 24px;">Hi ${name}, we've drafted ${invoiceNumber} for ${brandName}. Check it and send it when you're ready.</p>
       <a href="${getFrontendUrl()}/invoices/${invoiceId}/edit" style="display:inline-block;background:#E8921A;color:#fff;font-weight:700;padding:14px 32px;border-radius:8px;text-decoration:none;">Review draft</a>

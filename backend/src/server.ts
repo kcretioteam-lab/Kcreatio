@@ -134,7 +134,7 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
 });
 
 app.listen(PORT, () => {
-  console.log(`Kcretio backend running on port ${PORT}`);
+  console.log(`Kcreatio backend running on port ${PORT}`);
 
   // Start background cron jobs (only in production or when explicitly enabled)
   if (process.env.NODE_ENV === 'production' || process.env.ENABLE_JOBS === 'true') {

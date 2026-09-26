@@ -983,7 +983,7 @@ function BillingSection({ user }) {
         <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)', marginTop: 'var(--space-2)' }}>
           {hasPro
             ? 'You have full Pro access.'
-            : 'Unlimited GST invoices (with Kcretio watermark), TDS tracker (10 entries), March advance tax reminder.'}
+            : 'Unlimited GST invoices (with Kcreatio watermark), TDS tracker (10 entries), March advance tax reminder.'}
         </p>
       </div>
 
@@ -1210,7 +1210,7 @@ function ExportSection({ user }) {
       const url = URL.createObjectURL(res.data);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `kcretio-${selectedFY}.zip`;
+      a.download = `kcreatio-${selectedFY}.zip`;
       a.click();
       URL.revokeObjectURL(url);
       toast.success('Export downloaded');
@@ -1240,7 +1240,7 @@ function ExportSection({ user }) {
         </button>
       </div>
       <p style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', marginTop: 'var(--space-3)' }}>
-        Includes: invoices/*.pdf · kcretio-&lt;year&gt;.xlsx · summary.pdf
+        Includes: invoices/*.pdf · kcreatio-&lt;year&gt;.xlsx · summary.pdf
       </p>
     </div>
   );
@@ -1323,7 +1323,7 @@ function IntegrationsSection({ user, onRefresh }) {
           <div style={{ flex: 1 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 'var(--space-1)' }}>
               <span style={{ fontWeight: 700, fontSize: 'var(--text-md)', color: 'var(--text-primary)' }}>Gmail</span>
-              <span title="Google is still reviewing Kcretio’s Gmail access, so you may see an “unverified app” screen when connecting." style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', padding: '1px 6px', borderRadius: 'var(--radius-sm)', background: 'var(--warning-dim)', color: 'var(--warning-text)' }}>Beta</span>
+              <span title="Google is still reviewing Kcreatio’s Gmail access, so you may see an “unverified app” screen when connecting." style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', padding: '1px 6px', borderRadius: 'var(--radius-sm)', background: 'var(--warning-dim)', color: 'var(--warning-text)' }}>Beta</span>
               {gmailConnected && (
                 <span style={{ padding: '1px 7px', background: 'var(--success-dim)', color: 'var(--success-text)', borderRadius: 'var(--radius-full)', fontSize: 10, fontWeight: 700 }}>CONNECTED</span>
               )}
@@ -1805,7 +1805,7 @@ export default function SettingsPage() {
           <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: 'var(--space-6)', display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
             <h2 style={{ fontSize: 'var(--text-md)', fontWeight: 700, color: 'var(--text-primary)' }}>Tax Profile</h2>
             <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)', marginTop: 'calc(-1 * var(--space-2))' }}>
-              Every GST and tax calculation in Kcretio uses these settings.
+              Every GST and tax calculation in Kcreatio uses these settings.
             </p>
 
             <ToggleRow

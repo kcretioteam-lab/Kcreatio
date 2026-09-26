@@ -1,4 +1,4 @@
-// Razorpay Checkout helper — subscription flow for Kcretio.
+// Razorpay Checkout helper — subscription flow for Kcreatio.
 //
 // The backend (backend/src/routes/payments.ts) is the source of truth: it creates the
 // Razorpay subscription and activates the plan in the DB from the `subscription.charged`
@@ -67,7 +67,7 @@ export async function openSubscriptionCheckout({
   const rzp = new window.Razorpay({
     key: KEY_ID,
     subscription_id: subscriptionId,
-    name: 'Kcretio',
+    name: 'Kcreatio',
     description: `${planName} plan — ₹${Number(amount || 0).toLocaleString('en-IN')}/month`,
     image: '/favicon.svg',
     prefill: {

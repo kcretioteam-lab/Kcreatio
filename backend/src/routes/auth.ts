@@ -822,7 +822,7 @@ router.get('/gmail/callback', async (req: Request, res: Response): Promise<void>
 
   // `state` is plain, unsigned base64 — anyone could craft one embedding an
   // arbitrary victim's userId, complete their OWN Google consent, and hit this
-  // callback directly to attach their Gmail account to someone else's Kcretio
+  // callback directly to attach their Gmail account to someone else's Kcreatio
   // profile (this route had no login check of its own). We don't use the shared
   // `authenticate` middleware here because a failed check should send the user
   // back to Settings with a friendly error, not a raw 401 — so it's verified

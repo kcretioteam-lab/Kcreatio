@@ -59,8 +59,8 @@ export function verifyTotp(secret: string, code: string, now = Date.now()): numb
 }
 
 export function otpauthUri(secret: string, accountEmail: string): string {
-  const label = encodeURIComponent(`Kcretio:${accountEmail}`);
-  return `otpauth://totp/${label}?secret=${secret}&issuer=Kcretio&algorithm=SHA1&digits=6&period=${STEP_SECONDS}`;
+  const label = encodeURIComponent(`Kcreatio:${accountEmail}`);
+  return `otpauth://totp/${label}?secret=${secret}&issuer=Kcreatio&algorithm=SHA1&digits=6&period=${STEP_SECONDS}`;
 }
 
 // ── Encryption at rest (AES-256-GCM) ──────────────────────────────────────────

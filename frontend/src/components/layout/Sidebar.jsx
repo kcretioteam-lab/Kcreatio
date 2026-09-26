@@ -8,8 +8,8 @@ import {
 // WhatsApp support number in international format without '+', e.g. 919876543210
 const SUPPORT_WHATSAPP = import.meta.env.VITE_SUPPORT_WHATSAPP;
 const SUPPORT_HREF = SUPPORT_WHATSAPP
-  ? `https://wa.me/${SUPPORT_WHATSAPP}?text=${encodeURIComponent('Hi Kcretio team, I need help with ')}`
-  : 'mailto:support@kcretio.in';
+  ? `https://wa.me/${SUPPORT_WHATSAPP}?text=${encodeURIComponent('Hi Kcreatio team, I need help with ')}`
+  : 'mailto:support@kcreatio.com';
 import { useAuth } from '../../hooks/useAuth.jsx';
 import LogoMark from '../ui/LogoMark.jsx';
 
@@ -70,7 +70,7 @@ export default function Sidebar({ collapsed, onToggle }) {
         <LogoMark size={28} />
         {!collapsed && (
           <span style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: 'var(--text-base)', whiteSpace: 'nowrap', letterSpacing: '-0.01em' }}>
-            Kcretio
+            Kcreatio
           </span>
         )}
       </div>

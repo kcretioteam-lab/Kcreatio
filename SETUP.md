@@ -1,4 +1,4 @@
-# Kcretio — Setup Guide
+# Kcreatio — Setup Guide
 
 ## Prerequisites
 - Node.js 20+ 
@@ -10,7 +10,7 @@
 ## 1. Clone & Install
 
 ```bash
-cd kcretio
+cd kcreatio
 npm run install:all
 ```
 
@@ -66,7 +66,7 @@ GOOGLE_CLIENT_SECRET=<from google cloud console>
 GOOGLE_REDIRECT_URI=http://localhost:4000/api/v1/auth/google/callback
 GMAIL_REDIRECT_URI=http://localhost:4000/api/v1/auth/gmail/callback
 RESEND_API_KEY=re_xxxx       # optional for dev
-ADMIN_EMAIL=kcretioteam@gmail.com   # receives premium access requests
+ADMIN_EMAIL=kcreatioteam@gmail.com   # receives premium access requests
 API_URL=http://localhost:4000       # public backend URL, used in the Approve link
 FRONTEND_URL=http://localhost:5173
 NODE_ENV=development
@@ -150,7 +150,7 @@ Set env var: `VITE_API_URL=https://your-backend.onrender.com/api/v1`
 ## Architecture Overview
 
 ```
-kcretio/
+kcreatio/
 ├── frontend/          # React 18 + Vite — see frontend/README.md
 ├── backend/           # Express 4 + TypeScript + Supabase
 │   ├── src/

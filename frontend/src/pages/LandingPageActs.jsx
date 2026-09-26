@@ -153,7 +153,7 @@ export function FlowPipeline() {
   }, []);
 
   return (
-    <section ref={sectionRef} role="region" aria-label="How Kcretio works — pipeline"
+    <section ref={sectionRef} role="region" aria-label="How Kcreatio works — pipeline"
       style={{ maxWidth: 1100, margin: '0 auto', padding: 'var(--space-20) var(--space-6)', textAlign: 'center' }}
     >
       <style>{`
@@ -229,7 +229,7 @@ export function FlowPipeline() {
 
 const IMPACTS = [
   { icon: FileText, color: '#60a5fa', headline: 'Send a professional invoice in 30 seconds.', subline: 'GST auto-calculated. Rule 46-compliant. Your brand\'s finance team gets exactly what they need.', stat: '30s', statLabel: 'avg send time' },
-  { icon: Shield, color: '#4ade80', headline: 'The right GST, every time.', subline: 'CGST + SGST or IGST — Kcretio picks the right one from your state and your brand’s GSTIN, and checks the codes match.', stat: 'Auto', statLabel: 'CGST / SGST / IGST' },
+  { icon: Shield, color: '#4ade80', headline: 'The right GST, every time.', subline: 'CGST + SGST or IGST — Kcreatio picks the right one from your state and your brand’s GSTIN, and checks the codes match.', stat: 'Auto', statLabel: 'CGST / SGST / IGST' },
   { icon: TrendingDown, color: '#a78bfa', headline: 'Every rupee tracked. No surprises.', subline: 'Log the TDS each brand deducts (usually 1–10%), track which Form 16As are still pending, and see your total TDS credit before ITR.', stat: 'Sec 393', statLabel: 'TDS tracked per brand' },
   { icon: Calendar, color: '#fb923c', headline: 'Never miss an advance tax deadline.', subline: 'Quarterly amounts worked out from your real income, with reminders before Jun 15, Sep 15, Dec 15 and Mar 15. Free plan gets the March reminder.', stat: '4', statLabel: 'deadlines a year' },
   { icon: Briefcase, color: '#f59e0b', headline: 'Your brand pipeline, always current.', subline: 'Log deals in seconds. Track status. Forecast revenue. Know which brands owe you money — right now.', stat: '∞', statLabel: 'brand deals tracked' },
@@ -305,7 +305,7 @@ export function Act5Impact() {
               <span style={{ background: 'linear-gradient(135deg, #E8921A, #f59e0b)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Life improvements.</span>
             </h2>
             <p style={{ fontSize: 'clamp(15px, 1.8vw, 18px)', color: 'var(--text-body)', lineHeight: 1.7, maxWidth: 500, margin: '0 auto' }}>
-              Every tool in Kcretio is designed to give you back time, money, and mental space.
+              Every tool in Kcreatio is designed to give you back time, money, and mental space.
             </p>
           </div>
         </Reveal>
@@ -454,7 +454,7 @@ const CMP_ROWS = [
   { feature: 'Price',                               vals: ['From ₹0', 'Free', 'Paid plans', 'Varies'] },
 ];
 
-const CMP_COLS = ['Kcretio ★', 'Google Sheets', 'Zoho Books', 'CA Only'];
+const CMP_COLS = ['Kcreatio ★', 'Google Sheets', 'Zoho Books', 'CA Only'];
 
 const CMP_MOBILE_CARDS = [
   { feature: 'Brand deal pipeline',        ours: '✓ Kanban + list',     others: 'Not in accounting tools' },
@@ -489,10 +489,10 @@ function CmpRow({ row }) {
 
 export function ComparisonTable() {
   return (
-    <section aria-label="Why Kcretio" style={{ maxWidth: 1000, margin: '0 auto', padding: '0 var(--space-6) var(--space-20)' }}>
+    <section aria-label="Why Kcreatio" style={{ maxWidth: 1000, margin: '0 auto', padding: '0 var(--space-6) var(--space-20)' }}>
       <style>{`.cmp-desktop { display:block; overflow-x:auto; } .cmp-mobile { display:none; } @media (max-width:640px) { .cmp-desktop { display:none; } .cmp-mobile { display:flex; flex-direction:column; gap:var(--space-3); } }`}</style>
       <Reveal>
-        <p style={{ fontSize: 'var(--text-xs)', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--accent)', textAlign: 'center', margin: '0 auto var(--space-4)' }}>WHY KCRETIO</p>
+        <p style={{ fontSize: 'var(--text-xs)', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--accent)', textAlign: 'center', margin: '0 auto var(--space-4)' }}>WHY KCREATIO</p>
         <h2 style={{ fontSize: 'var(--text-2xl)', fontWeight: 700, color: 'var(--text-primary)', textAlign: 'center', margin: '0 auto var(--space-10)' }}>Built for this. Nothing else comes close.</h2>
       </Reveal>
       <div className="cmp-desktop">
@@ -524,7 +524,7 @@ export function ComparisonTable() {
 // ─── Pricing ──────────────────────────────────────────────────────────────────
 
 const PLANS = [
-  { name: 'Basic', price: '₹0', period: '/month', desc: 'For creators just starting their business journey.', color: '#60a5fa', features: ['Unlimited GST invoices (small Kcretio watermark)', 'CGST / SGST / IGST auto', 'TDS tracking (10 entries)', 'March advance tax reminder'], cta: 'Start free', href: '/register' },
+  { name: 'Basic', price: '₹0', period: '/month', desc: 'For creators just starting their business journey.', color: '#60a5fa', features: ['Unlimited GST invoices (small Kcreatio watermark)', 'CGST / SGST / IGST auto', 'TDS tracking (10 entries)', 'March advance tax reminder'], cta: 'Start free', href: '/register' },
   // Paid plans disabled for now — premium is granted on request
   // { name: 'Starter', price: '₹299', period: '/month', desc: 'For creators with regular brand deals.', color: '#34d399', features: ['Watermark-free invoices, all 7 templates', 'Unlimited TDS + Form 16A tracker', 'Smart Inbox (Gmail auto-detect)', 'All 4 advance tax reminders', 'Expense tracker'], cta: 'Start 28-day free trial', href: '/register' },
   // { name: 'Creator Pro', price: '₹599', period: '/month', desc: 'For serious creators managing real brand business.', color: '#E8921A', highlight: true, features: ['Everything in Starter', 'Advance tax calculator', 'P&L + income dashboard', 'ITR-ready export (ZIP)', 'Smart Inbox auto-apply'], cta: 'Start 28-day free trial', href: '/register' },
@@ -602,7 +602,7 @@ export function Pricing() {
 
 const INVOICE_POINTS = [
   { icon: ShieldCheck, title: 'Every Rule 46 field', body: 'Your GSTIN and the brand’s, state codes next to both addresses, SAC 998399, place of supply.' },
-  { icon: ArrowLeftRight, title: 'IGST or CGST + SGST, picked for you', body: 'Different states means IGST, same state means CGST + SGST. Kcretio decides from the state codes.' },
+  { icon: ArrowLeftRight, title: 'IGST or CGST + SGST, picked for you', body: 'Different states means IGST, same state means CGST + SGST. Kcreatio decides from the state codes.' },
   { icon: Type, title: 'Amount in words + reverse charge', body: 'The two lines finance teams check first, printed on every invoice.' },
   { icon: QrCode, title: 'Bank + UPI so you get paid faster', body: 'Saved bank accounts and UPI IDs drop in automatically. No retyping IFSC codes.' },
 ];
@@ -621,7 +621,7 @@ export function InvoiceShowcase() {
                 height={1684}
                 loading="lazy"
                 decoding="async"
-                alt="Sample Kcretio GST tax invoice from Sanket Kumar Creative (Karnataka) to Acme Foods Pvt Ltd (Maharashtra): Instagram Reel campaign, SAC 998399, taxable value ₹50,000, IGST at 18% ₹9,000, total ₹59,000, amount in words, reverse charge not applicable, bank and UPI payment details."
+                alt="Sample Kcreatio GST tax invoice from Sanket Kumar Creative (Karnataka) to Acme Foods Pvt Ltd (Maharashtra): Instagram Reel campaign, SAC 998399, taxable value ₹50,000, IGST at 18% ₹9,000, total ₹59,000, amount in words, reverse charge not applicable, bank and UPI payment details."
                 style={{
                   display: 'block', width: '100%', height: 'auto',
                   borderRadius: 'var(--radius-lg)', border: '1px solid var(--border)',
@@ -630,7 +630,7 @@ export function InvoiceShowcase() {
               />
             </picture>
             <figcaption style={{ marginTop: 12, fontSize: 13, color: 'var(--text-muted)', textAlign: 'center' }}>
-              A real free-plan invoice, sample data. Note the faint Kcretio watermark.
+              A real free-plan invoice, sample data. Note the faint Kcreatio watermark.
             </figcaption>
           </figure>
         </Reveal>
@@ -642,7 +642,7 @@ export function InvoiceShowcase() {
               What your brand's finance team receives.
             </h2>
             <p style={{ fontSize: 16, color: 'var(--text-body)', lineHeight: 1.7, margin: '0 0 28px' }}>
-              Brands hold payment until the invoice is right. Kcretio fills in the parts creators usually get wrong.
+              Brands hold payment until the invoice is right. Kcreatio fills in the parts creators usually get wrong.
             </p>
           </Reveal>
           <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 28px', display: 'grid', gap: 20 }}>
@@ -672,7 +672,7 @@ export function InvoiceShowcase() {
               Make your first invoice free <ChevronRight size={16} aria-hidden="true" />
             </Link>
             <p style={{ margin: '12px 0 0', fontSize: 13, color: 'var(--text-muted)' }}>
-              Free plan invoices carry a small Kcretio watermark. Unlimited invoices, no card needed.
+              Free plan invoices carry a small Kcreatio watermark. Unlimited invoices, no card needed.
             </p>
           </Reveal>
         </div>
@@ -685,20 +685,20 @@ export function InvoiceShowcase() {
 
 const FAQ_ITEMS = [
   {
-    q: 'Do I need to be GST-registered to use Kcretio?',
-    a: 'No. Kcretio works whether you\'re GST-registered or not. Unregistered creators send invoices without GST. Once you cross ₹20L annual turnover, Kcretio flags the threshold and you register — nothing breaks.',
+    q: 'Do I need to be GST-registered to use Kcreatio?',
+    a: 'No. Kcreatio works whether you\'re GST-registered or not. Unregistered creators send invoices without GST. Once you cross ₹20L annual turnover, Kcreatio flags the threshold and you register — nothing breaks.',
   },
   {
     q: 'How does the GST calculation actually work?',
-    a: 'Kcretio reads the first two digits of both GSTINs (yours and the brand\'s) and automatically applies CGST+SGST for intrastate deals, IGST for interstate. SAC code 998399 is pre-filled. Every invoice is Rule 46 CGST Rules 2017 compliant — no manual math, ever.',
+    a: 'Kcreatio reads the first two digits of both GSTINs (yours and the brand\'s) and automatically applies CGST+SGST for intrastate deals, IGST for interstate. SAC code 998399 is pre-filled. Every invoice is Rule 46 CGST Rules 2017 compliant — no manual math, ever.',
   },
   {
     q: 'What about TDS? Do I need to track it manually?',
-    a: 'No. When a brand deducts TDS before paying you (usually 10% on professional fees or 1–2% on contract work, now under Section 393 of the Income-tax Act 2025), you record the exact amount when you mark the invoice paid. Kcretio tracks every deduction and which Form 16As are pending, so you can check them against your Form 26AS / AIS before you file.',
+    a: 'No. When a brand deducts TDS before paying you (usually 10% on professional fees or 1–2% on contract work, now under Section 393 of the Income-tax Act 2025), you record the exact amount when you mark the invoice paid. Kcreatio tracks every deduction and which Form 16As are pending, so you can check them against your Form 26AS / AIS before you file.',
   },
   {
     q: 'Is the free plan actually free — or is it a trial?',
-    a: 'Actually free. No credit card. No expiry. The Basic plan gives you unlimited GST invoices forever, with a small Kcretio watermark. Need more? Request 28 days of free Creator Pro access from inside the app — watermark-free invoices, advance tax calculator, P&L and CA export.',
+    a: 'Actually free. No credit card. No expiry. The Basic plan gives you unlimited GST invoices forever, with a small Kcreatio watermark. Need more? Request 28 days of free Creator Pro access from inside the app — watermark-free invoices, advance tax calculator, P&L and CA export.',
   },
   {
     q: 'Can I export everything for my CA?',
@@ -706,7 +706,7 @@ const FAQ_ITEMS = [
   },
   {
     q: 'I already track things in Excel. Do I need to migrate?',
-    a: 'No migration needed. Start Kcretio from today — new invoices and deals go in here, your old Excel stays wherever it is. Your CA gets the Kcretio export for the new period; old data stays with you.',
+    a: 'No migration needed. Start Kcreatio from today — new invoices and deals go in here, your old Excel stays wherever it is. Your CA gets the Kcreatio export for the new period; old data stays with you.',
   },
   {
     q: 'How is my financial data protected?',
@@ -779,8 +779,8 @@ export function FAQ() {
         <Reveal delay={200}>
           <div style={{ textAlign: 'center', marginTop: 48, padding: '28px', borderRadius: 16, background: 'var(--surface-1)', border: '1px solid var(--border)' }}>
             <p style={{ fontSize: 14, color: 'var(--text-body)', margin: '0 0 12px' }}>Still have questions?</p>
-            <a href="mailto:hello@kcretio.in" style={{ fontSize: 14, fontWeight: 600, color: '#E8921A', textDecoration: 'none' }}>
-              hello@kcretio.in →
+            <a href="mailto:hello@kcreatio.com" style={{ fontSize: 14, fontWeight: 600, color: '#E8921A', textDecoration: 'none' }}>
+              hello@kcreatio.com →
             </a>
           </div>
         </Reveal>
@@ -852,7 +852,7 @@ export function Footer() {
           <div style={{ maxWidth: 260 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
               <LogoMark size={28} />
-              <span style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: 15 }}>Kcretio</span>
+              <span style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: 15 }}>Kcreatio</span>
             </div>
             <p style={{ fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.7 }}>
               The financial operating system for Indian content creators. Built for creators, by people who care about them.
@@ -878,7 +878,7 @@ export function Footer() {
         </div>
         <div style={{ height: 1, background: 'var(--border)', marginBottom: 24 }} />
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
-          <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>© 2026 Kcretio. Built with ♥ for Indian creators.</span>
+          <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>© 2026 Kcreatio. Built with ♥ for Indian creators.</span>
           <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Subject to GST as applicable</span>
         </div>
       </div>

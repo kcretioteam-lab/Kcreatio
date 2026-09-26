@@ -206,7 +206,7 @@ export default function AuthPage({ defaultMode = 'register' }) {
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
             <LogoMark size={24} />
-            <span style={{ fontWeight: 700, fontSize: 'var(--text-sm)', color: 'var(--text-primary)' }}>Kcretio</span>
+            <span style={{ fontWeight: 700, fontSize: 'var(--text-sm)', color: 'var(--text-primary)' }}>Kcreatio</span>
           </div>
         </div>
 
@@ -244,7 +244,7 @@ export default function AuthPage({ defaultMode = 'register' }) {
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', marginBottom: 'var(--space-10)' }}>
                 <LogoMark size={32} />
-                <span style={{ fontWeight: 700, fontSize: 'var(--text-md)', color: 'var(--text-primary)' }}>Kcretio</span>
+                <span style={{ fontWeight: 700, fontSize: 'var(--text-md)', color: 'var(--text-primary)' }}>Kcreatio</span>
               </div>
               <h2 style={{ fontFamily: "'Instrument Serif', Georgia, serif", fontSize: 'clamp(22px, 2vw, 30px)', fontWeight: 400, lineHeight: 1.2, color: 'var(--text-primary)', marginBottom: 'var(--space-6)', letterSpacing: '-0.01em' }}>
                 Your financial OS.<br />

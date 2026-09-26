@@ -81,7 +81,7 @@ router.get('/annual', checkPlan('pro'), async (req: AuthRequest, res: Response):
 
   // ── Excel workbook ──────────────────────────────────────────────────────────
   const wb = new ExcelJS.Workbook();
-  wb.creator = 'Kcretio';
+  wb.creator = 'Kcreatio';
   wb.created = new Date();
 
   const summaryRows: [string, string | number][] = [
@@ -178,7 +178,7 @@ router.get('/annual', checkPlan('pro'), async (req: AuthRequest, res: Response):
     .note{margin-top:18px;font-size:9px;color:#777}
   </style></head><body>
     <h1>Tax year ${esc(fy)} — summary for your CA</h1>
-    <div class="muted">Prepared with Kcretio on ${new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}</div>
+    <div class="muted">Prepared with Kcreatio on ${new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}</div>
     <h2>Taxpayer</h2>
     <div class="grid">
       <div>Name: <b>${esc(user.legal_name || user.name)}</b></div><div>PAN: <b>${esc(user.pan || '—')}</b></div>
@@ -209,7 +209,7 @@ router.get('/annual', checkPlan('pro'), async (req: AuthRequest, res: Response):
       ${row('GST charged on invoices', inr(gstCollected))}
       ${row('TDS entries', `${tds.length} (Form 16A received: ${tds.filter(t => t.form_16a_status === 'received').length})`)}
     </table>
-    <p class="note">These figures come from the records entered in Kcretio and are estimates. They are not tax advice — please check them against Form 26AS / AIS and the underlying documents before filing.${tax.surchargeNotApplied ? ' Surcharge on income above ₹50 lakh is not included.' : ''}</p>
+    <p class="note">These figures come from the records entered in Kcreatio and are estimates. They are not tax advice — please check them against Form 26AS / AIS and the underlying documents before filing.${tax.surchargeNotApplied ? ' Surcharge on income above ₹50 lakh is not included.' : ''}</p>
   </body></html>`;
 
   // ── Invoice PDFs (rendered one by one; if the PDF engine is down, the rest are listed as missing)
@@ -233,23 +233,23 @@ router.get('/annual', checkPlan('pro'), async (req: AuthRequest, res: Response):
   }
 
   const readme = [
-    `Kcretio export — tax year ${fy}`,
+    `Kcreatio export — tax year ${fy}`,
     '',
     `summary.${summaryPdf ? 'pdf' : 'html'}        One-page summary with the tax computation`,
-    `kcretio-${fy}.xlsx     Sheets: Summary, Invoices, Income, Expenses, TDS, Advance tax paid`,
+    `kcreatio-${fy}.xlsx     Sheets: Summary, Invoices, Income, Expenses, TDS, Advance tax paid`,
     `invoices/              ${invoicePdfs.length} invoice PDF(s)`,
-    ...(missing.length ? ['', `These invoices couldn't be rendered as PDF — download them from Kcretio: ${missing.join(', ')}`] : []),
+    ...(missing.length ? ['', `These invoices couldn't be rendered as PDF — download them from Kcreatio: ${missing.join(', ')}`] : []),
     '',
     'Figures are estimates based on the records entered. Verify against Form 26AS / AIS before filing.',
   ].join('\n');
 
   res.setHeader('Content-Type', 'application/zip');
-  res.setHeader('Content-Disposition', `attachment; filename="kcretio-${fy}.zip"`);
+  res.setHeader('Content-Disposition', `attachment; filename="kcreatio-${fy}.zip"`);
   const archive = archiver('zip', { zlib: { level: 9 } });
   archive.on('error', (err: Error) => { console.error('[export] zip failed:', err); res.destroy(err); });
   archive.pipe(res);
   archive.append(readme, { name: 'README.txt' });
-  archive.append(workbook, { name: `kcretio-${fy}.xlsx` });
+  archive.append(workbook, { name: `kcreatio-${fy}.xlsx` });
   if (summaryPdf) archive.append(summaryPdf, { name: 'summary.pdf' });
   else archive.append(summaryHtml, { name: 'summary.html' });
   for (const f of invoicePdfs) archive.append(f.buffer, { name: f.name });
