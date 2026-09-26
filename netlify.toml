@@ -8,6 +8,13 @@
 
 # Redirect rules are matched top to bottom — keep the SPA fallback last.
 
+# The live site is kcreatio.com — send the old Netlify address there so search engines index one site
+[[redirects]]
+  from   = "https://kcretio.netlify.app/*"
+  to     = "https://kcreatio.com/:splat"
+  status = 301
+  force  = true
+
 # The old /v2 preview of the landing page now lives at /
 [[redirects]]
   from   = "/v2"

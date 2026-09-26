@@ -2,7 +2,7 @@ name: Keep backend warm
 
 # Render's free tier sleeps after ~15 minutes idle, and the first request then takes
 # several seconds. This pings the health route during Indian daytime hours.
-# Set the repository variable BACKEND_URL (e.g. https://kcretio-backend.onrender.com) to enable it.
+# Set the repository variable BACKEND_URL (e.g. https://kcreatio-backend.onrender.com) to enable it.
 # A paid always-on instance makes this unnecessary.
 
 on:

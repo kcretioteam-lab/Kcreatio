@@ -23,7 +23,7 @@ export function UsageProvider({ children }) {
     if (!user) return;
     setLoading(true);
     try {
-      const res = await api.get('/usage');
+      const res = await api.get('/usage', { silent: true }); // background refresh — never block the screen
       setUsage(res.data);
     } catch {
       // Keep stale defaults on network error — don't block the UI

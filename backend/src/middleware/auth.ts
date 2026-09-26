@@ -22,7 +22,13 @@ export function authenticate(req: AuthRequest, res: Response, next: NextFunction
     return;
   }
   try {
-    const payload = jwt.verify(token, process.env.JWT_ACCESS_SECRET!, { algorithms: ['HS256'] }) as { sub: string; plan: string };
+    const payload = jwt.verify(token, process.env.JWT_ACCESS_SECRET!, { algorithms: ['HS256'] }) as { sub?: unknown; plan: string; purpose?: unknown };
+    // Short-lived tokens for other jobs (2FA challenge, email verification, premium approval) are
+    // signed with the same secret and carry a `purpose`. Only a real sign-in token may pass here —
+    // otherwise the 2FA challenge handed out after the password step would skip the 2FA code.
+    if (payload.purpose !== undefined || typeof payload.sub !== 'string' || !payload.sub) {
+      throw new Error('not an access token');
+    }
     req.userId = payload.sub;
     req.userPlan = payload.plan;
     next();

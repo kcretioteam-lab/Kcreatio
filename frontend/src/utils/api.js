@@ -1,4 +1,5 @@
 import axios from 'axios';
+import * as apiActivity from './apiActivity';
 
 const DEV_USER_ID = 'dev-bypass-user';
 const isDev = import.meta.env.DEV;
@@ -16,6 +17,28 @@ const api = axios.create({
     ...(isDev ? { 'X-Dev-User-Id': DEV_USER_ID } : {}),
   },
 });
+
+// Drive the full-screen loader. Pass { silent: true } in a request's config for background calls
+// that shouldn't block the screen. _tracked makes sure each request is counted and released exactly once.
+const releaseActivity = (config) => {
+  if (config?._tracked) {
+    config._tracked = false;
+    apiActivity.end();
+  }
+};
+
+api.interceptors.request.use((config) => {
+  if (!config.silent) {
+    config._tracked = true;
+    apiActivity.start();
+  }
+  return config;
+});
+
+api.interceptors.response.use(
+  (res) => { releaseActivity(res.config); return res; },
+  (error) => { releaseActivity(error.config); return Promise.reject(error); }
+);
 
 let isRefreshing = false;
 let failedQueue = [];
