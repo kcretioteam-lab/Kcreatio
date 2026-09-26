@@ -1762,7 +1762,7 @@ export default function SettingsPage() {
               <CardHeader title="Business &amp; Tax" onEdit={() => setEditingBusiness(true)} isEditing={editingBusiness} />
               {editingBusiness ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-                  <Input id="b-bname" label="Business / Channel Name" value={businessForm.business_name} onChange={e => setBusinessForm(p => ({...p, business_name: e.target.value}))} />
+                  <Input id="b-bname" format="name" label="Business / Channel Name" value={businessForm.business_name} onChange={e => setBusinessForm(p => ({...p, business_name: e.target.value}))} />
                   <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 'var(--space-3)' }}>
                     <Input id="b-gstin" format="gstin" label="GSTIN" value={businessForm.gstin} onChange={e => setGstin(e.target.value)} placeholder="29ABCDE1234F1ZW" maxLength={15} error={businessForm.gstin.length === 15 ? gstinProblem : undefined} hint="Fills in your state and PAN" />
                     <Input id="b-pan" format="pan" label="PAN" value={businessForm.pan} onChange={e => setBusinessForm(p => ({...p, pan: e.target.value.toUpperCase()}))} placeholder="ABCDE1234F" maxLength={10} />

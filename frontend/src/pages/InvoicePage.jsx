@@ -17,6 +17,7 @@ import MarkPaidDialog from '../components/features/payment/MarkPaidDialog.jsx';
 import CreditNoteDialog from '../components/features/invoice/CreditNoteDialog.jsx';
 import Input from '../components/ui/Input.jsx';
 import { LIMITS, sanitizeNumber } from '../utils/limits.js';
+import { limitText, TEXT_LIMITS } from '../utils/fieldFormats.js';
 import Badge from '../components/ui/Badge.jsx';
 import Modal from '../components/ui/Modal.jsx';
 import InvoiceList from '../components/features/invoice/InvoiceList.jsx';
@@ -299,7 +300,7 @@ function buildClassicHTML(inv, user, t, plan) {
   .hdr-right { text-align: right; font-size: 11px; opacity: .9; line-height: 1.7; }
   .rc { display: inline-block; background: rgba(255,255,255,.2); border-radius: 4px; padding: 2px 7px; font-size: 9px; margin-top: 6px; letter-spacing: .06em; }
   .body { border: 1px solid #e5e5e5; border-top: none; padding: 20px 24px; border-radius: 0 0 8px 8px; }
-  .parties { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+  .parties { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); overflow-wrap: anywhere; gap: 16px; margin-bottom: 16px; }
   .party-label { font-size: 8px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: #999; margin-bottom: 6px; }
   .party-name { font-weight: 700; font-size: 13px; margin-bottom: 3px; }
   .party-detail { font-size: 10px; color: #555; margin-top: 1px; }
@@ -447,13 +448,13 @@ function buildCorporateHTML(inv, user, t, plan) {
   .hdr-right .inv-label { font-size: 9px; letter-spacing: .14em; text-transform: uppercase; opacity: .7; }
   .hdr-right .inv-num { font-size: 15px; font-weight: 700; }
   .orig { display: inline-block; font-size: 8px; letter-spacing: .08em; text-transform: uppercase; border: 1px solid rgba(255,255,255,.5); padding: 2px 6px; border-radius: 3px; margin-top: 4px; }
-  .info-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0; border-bottom: 2px solid ${t.headerColor}; }
+  .info-row { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); overflow-wrap: anywhere; gap: 0; border-bottom: 2px solid ${t.headerColor}; }
   .info-cell { padding: 12px 16px; }
   .info-cell:first-child { border-right: 1px solid #e5e5e5; }
   .info-label { font-size: 8px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: #999; margin-bottom: 4px; }
   .info-val { font-size: 11px; color: #333; }
   .info-val strong { font-size: 13px; color: #111; }
-  .detail-row { display: grid; grid-template-columns: 1fr 1fr; background: #f8f8f8; border-bottom: 1px solid #e5e5e5; }
+  .detail-row { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); overflow-wrap: anywhere; background: #f8f8f8; border-bottom: 1px solid #e5e5e5; }
   .detail-cell { padding: 6px 16px; font-size: 10px; }
   .detail-cell .dl { color: #888; }
   .detail-cell .dv { color: #333; font-weight: 500; }
@@ -467,7 +468,7 @@ function buildCorporateHTML(inv, user, t, plan) {
   .trow span:last-child { font-variant-numeric: tabular-nums; }
   .tfinal { display: flex; justify-content: space-between; padding: 8px 12px; background: ${t.headerColor}; color: #fff; }
   .tfinal span:last-child { font-weight: 800; font-size: 14px; font-variant-numeric: tabular-nums; }
-  .footer-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-top: 20px; }
+  .footer-row { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); overflow-wrap: anywhere; gap: 12px; margin-top: 20px; }
   .footer-sect { font-size: 10px; }
   .footer-sect .fh { font-weight: 700; font-size: 9px; text-transform: uppercase; letter-spacing: .06em; color: #999; margin-bottom: 6px; }
   .notes { margin-top: 10px; padding: 8px 12px; background: #f9f9f9; border-radius: 4px; font-size: 10px; color: #555; }
@@ -610,7 +611,7 @@ function buildMinimalHTML(inv, user, t, plan) {
   .meta-row .m { }
   .meta-row .ml { font-weight: 700; color: #888; font-size: 9px; letter-spacing:.06em; text-transform:uppercase; }
   .meta-row .mv { color: #222; font-size: 11px; }
-  .parties { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 14px; padding: 10px; background: #f8f8f8; border-radius: 4px; }
+  .parties { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); overflow-wrap: anywhere; gap: 16px; margin-bottom: 14px; padding: 10px; background: #f8f8f8; border-radius: 4px; }
   .party-lbl { font-size: 8px; font-weight:700; letter-spacing:.1em; text-transform:uppercase; color:#999; margin-bottom:4px; }
   .party-name { font-weight: 700; font-size: 12px; }
   .party-d { font-size: 10px; color: #666; }
@@ -626,7 +627,7 @@ function buildMinimalHTML(inv, user, t, plan) {
   .tfinal span:last-child { color: ${t.accentColor}; font-size: 13px; font-variant-numeric: tabular-nums; }
   .cb { clear: both; }
   .notes { margin-top: 12px; padding: 8px 12px; background: #f9f9f9; border-radius: 4px; font-size: 10px; color: #555; line-height: 1.6; }
-  .btm { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-top: 20px; font-size: 10px; }
+  .btm { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); overflow-wrap: anywhere; gap: 12px; margin-top: 20px; font-size: 10px; }
   .btm-lbl { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: #999; margin-bottom: 6px; }
   @page { margin: 0; size: A4 portrait; }
   * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; }
@@ -1650,7 +1651,7 @@ export default function InvoicePage({ initialView }) {
                   <FileText size={12} aria-hidden="true" /> Load Saved Brand
                 </button>
               </div>
-              <Input id="brandName" label="Brand / Company Name *" value={form.brandName} onChange={e => update('brandName', e.target.value)} onBlur={() => touch('brandName')} error={showErr('brandName')} placeholder="Glowleaf Naturals Pvt Ltd" tooltip="Legal name of the brand or company you are billing. Must match their GST registration exactly for B2B invoices." />
+              <Input id="brandName" format="name" label="Brand / Company Name *" value={form.brandName} onChange={e => update('brandName', e.target.value)} onBlur={() => touch('brandName')} error={showErr('brandName')} placeholder="Glowleaf Naturals Pvt Ltd" tooltip="Legal name of the brand or company you are billing. Must match their GST registration exactly for B2B invoices." />
               <Input id="brandGstin" format="gstin" label="Brand GSTIN" value={form.brandGstin} onChange={e => update('brandGstin', e.target.value.toUpperCase().slice(0,15))} onBlur={() => touch('brandGstin')} error={showErr('brandGstin')} placeholder="27ABCDE1234F1Z0" hint={form.brandGstin.length === 15 && !gstinError(form.brandGstin) ? '✓ GSTIN checks out' : 'Mandatory for B2B input tax credit'} maxLength={15} tooltip="15-digit GST Identification Number of the brand. Format: 2 digits state code + 10 digit PAN + 1 digit entity number + Z + 1 check digit. Required for B2B input tax credit." style={form.brandGstin.length === 15 && !gstinError(form.brandGstin) ? { borderColor: 'var(--success)', boxShadow: '0 0 0 3px var(--success-dim)' } : {}} />
               <Input id="brandPan" format="pan" label="Brand PAN" value={form.brandPan} onChange={e => update('brandPan', e.target.value.toUpperCase().slice(0,10))} onBlur={() => touch('brandPan')} error={showErr('brandPan')} placeholder="ABCDE1234F" maxLength={10} tooltip="10-character Permanent Account Number of the brand. Optional but useful for TDS reconciliation and Form 26AS." />
               <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 'var(--space-3)' }}>
@@ -1662,7 +1663,7 @@ export default function InvoicePage({ initialView }) {
                   <label htmlFor="brandAddress" style={{ fontSize: 'var(--text-sm)', fontWeight: 500, color: 'var(--text-body)' }}>Brand Address <span style={{ color: 'var(--danger-text)', fontWeight: 700 }} aria-hidden="true">*</span></label>
                   <Tooltip text="Complete registered address of the brand. Must include city, state, and PIN code. Mandatory on GST invoices per Rule 46." />
                 </div>
-                <textarea id="brandAddress" value={form.brandAddress} onChange={e => update('brandAddress', e.target.value)} onBlur={() => touch('brandAddress')} rows={2} placeholder="123, Business Park, Mumbai, Maharashtra - 400001"
+                <textarea id="brandAddress" value={form.brandAddress} onChange={e => update('brandAddress', limitText(e.target.value, TEXT_LIMITS.address))} onBlur={() => touch('brandAddress')} rows={2} placeholder="123, Business Park, Mumbai, Maharashtra - 400001"
                   style={{ padding: 'var(--space-2) var(--space-3)', background: 'var(--surface-2)', border: (showErr('brandAddress') ? '1px solid var(--danger)' : '1px solid var(--border)'), borderRadius: 'var(--radius-md)', color: 'var(--text-primary)', fontSize: 'var(--text-base)', resize: 'vertical', fontFamily: 'inherit' }} />
                 {showErr('brandAddress') && <span role="alert" style={{ fontSize: 'var(--text-xs)', color: 'var(--danger-text)' }}>{formErrors.brandAddress}</span>}
               </div>
@@ -1702,7 +1703,7 @@ export default function InvoicePage({ initialView }) {
                         value={line.description}
                         onChange={e => {
                           const lines = [...form.serviceLines];
-                          lines[idx] = { ...lines[idx], description: e.target.value };
+                          lines[idx] = { ...lines[idx], description: limitText(e.target.value, TEXT_LIMITS.description) };
                           update('serviceLines', lines);
                           if (idx === 0) update('serviceDescription', e.target.value);
                         }}
@@ -1856,7 +1857,7 @@ export default function InvoicePage({ initialView }) {
             <Sect title="Notes">
               <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
                 <label htmlFor="notes" style={{ fontSize: 'var(--text-sm)', fontWeight: 500, color: 'var(--text-body)' }}>Internal Notes</label>
-                <textarea id="notes" value={form.notes} onChange={e => update('notes', e.target.value)} rows={2} placeholder="PO reference, special instructions..."
+                <textarea id="notes" value={form.notes} onChange={e => update('notes', limitText(e.target.value, TEXT_LIMITS.notes))} rows={2} placeholder="PO reference, special instructions..."
                   style={{ padding: 'var(--space-2) var(--space-3)', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', color: 'var(--text-primary)', fontSize: 'var(--text-base)', resize: 'vertical', fontFamily: 'inherit' }} />
               </div>
             </Sect>
@@ -2748,7 +2749,7 @@ function ClassicPreview({ form, calc, invoiceNumber, user, template }) {
 
       <div style={{ padding: '18px 22px' }}>
         {/* Parties */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 16 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', overflowWrap: 'anywhere', gap: 14, marginBottom: 16 }}>
           <div>
             <div style={{ fontSize: 8, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#999', marginBottom: 5 }}>SUPPLIER</div>
             <div style={{ fontWeight: 700, marginBottom: 2 }}>{user?.business_name || user?.name || '—'}</div>
@@ -2925,7 +2926,7 @@ function CorporatePreview({ form, calc, invoiceNumber, user, template }) {
       </div>
 
       {/* Two-column info row */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', borderBottom: `2px solid ${template.headerColor}` }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', overflowWrap: 'anywhere', borderBottom: `2px solid ${template.headerColor}` }}>
         <div style={{ padding: '10px 14px', borderRight: '1px solid #e5e5e5' }}>
           <div style={{ fontSize: 8, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#999', marginBottom: 4 }}>Customer Details</div>
           <div style={{ fontWeight: 700, fontSize: 11 }}>{form.brandName || 'Brand Name'}</div>
@@ -3034,7 +3035,7 @@ function MinimalPreview({ form, calc, invoiceNumber, user, template }) {
       </div>
 
       {/* Parties */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12, padding: 8, background: '#f8f8f8', borderRadius: 4 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', overflowWrap: 'anywhere', gap: 12, marginBottom: 12, padding: 8, background: '#f8f8f8', borderRadius: 4 }}>
         <div>
           <div style={{ fontSize: 7, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#999', marginBottom: 3 }}>Bill From</div>
           <div style={{ fontWeight: 700, fontSize: 11 }}>{user?.business_name || user?.name || '—'}</div>

@@ -6,6 +6,18 @@ import { gstinError, PAN_REGEX } from './gst.js';
 
 const upperAlnum = (max) => (v) => v.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, max);
 
+// Free text printed on the invoice. Each value stays within the backend Zod .max().
+export const TEXT_LIMITS = { name: 120, address: 300, description: 300, notes: 500 };
+export const MAX_WORD = 40;
+const LONG_WORD = new RegExp(String.raw`\S{${MAX_WORD + 1},}`, 'g');
+
+// Caps the length and cuts any run of characters with no space at MAX_WORD — a 60-letter "word"
+// can't wrap, so it would run off the edge of the invoice.
+export function limitText(v, max) {
+  return String(v ?? '').replace(LONG_WORD, (w) => w.slice(0, MAX_WORD)).slice(0, max);
+}
+export const textLimitMessage = (max) => `Up to ${max} characters, and no word longer than ${MAX_WORD} characters`;
+
 export const TAN_REGEX = /^[A-Z]{4}[0-9]{5}[A-Z]$/;
 export const IFSC_REGEX = /^[A-Z]{4}0[A-Z0-9]{6}$/;
 export const MOBILE_REGEX = /^(?:\+?91|0)?[6-9]\d{9}$/;
@@ -13,19 +25,29 @@ export const UPI_REGEX = /^[a-zA-Z0-9._-]{2,256}@[a-zA-Z][a-zA-Z0-9]{1,63}$/;
 export const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
 export const FORMATS = {
+  // Brand / business names
+  name: {
+    clean: (v) => limitText(v, TEXT_LIMITS.name),
+    trimmedMessage: textLimitMessage(TEXT_LIMITS.name),
+    validate: () => null,
+  },
   gstin: {
+    caps: true,
     clean: upperAlnum(15),
     validate: (v) => gstinError(v),
   },
   pan: {
+    caps: true,
     clean: upperAlnum(10),
     validate: (v) => (PAN_REGEX.test(v) ? null : 'PAN should look like ABCDE1234F'),
   },
   tan: {
+    caps: true,
     clean: upperAlnum(10),
     validate: (v) => (TAN_REGEX.test(v) ? null : 'TAN should look like BLRA12345B'),
   },
   ifsc: {
+    caps: true,
     clean: upperAlnum(11),
     validate: (v) => (IFSC_REGEX.test(v) ? null : 'IFSC should be 11 characters, like HDFC0001234'),
   },

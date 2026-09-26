@@ -49,7 +49,7 @@ export function InlineTooltip({ text }) {
 //   max      — upper limit (default LIMITS.MONEY, ₹99,99,999)
 //   decimals — decimal places allowed (default 2; 0 for whole numbers)
 //   currency — prefix the limit message with ₹ (default true)
-// format="gstin" | "pan" | "tan" | "ifsc" | "mobile" | "phone" | "account" | "upi" | "email"
+// format="name" | "gstin" | "pan" | "tan" | "ifsc" | "mobile" | "phone" | "account" | "upi" | "email"
 // (utils/fieldFormats.js) strips characters the field can't contain as you type, and
 // checks the finished value when the field loses focus.
 export default function Input({
@@ -86,8 +86,10 @@ export default function Input({
       }
     : fmt
       ? (e) => {
-          e.target.value = fmt.clean(e.target.value);
-          setFormatMsg('');
+          const raw = e.target.value;
+          e.target.value = fmt.clean(raw);
+          // Say why characters didn't appear when a length/word limit cut them
+          setFormatMsg(fmt.trimmedMessage && e.target.value.length < raw.length ? fmt.trimmedMessage : '');
           onChange?.(e);
         }
       : onChange;
@@ -112,7 +114,7 @@ export default function Input({
         type={numeric ? 'text' : type}
         {...(numeric && { inputMode: decimals > 0 ? 'decimal' : 'numeric', autoComplete: 'off' })}
         {...(fmt?.inputMode && { inputMode: fmt.inputMode })}
-        {...(fmt && !fmt.inputMode && { autoCapitalize: 'characters', spellCheck: false })}
+        {...(fmt?.caps && { autoCapitalize: 'characters', spellCheck: false })}
         onChange={handleChange}
         style={{
           padding: 'var(--space-2) var(--space-3)',

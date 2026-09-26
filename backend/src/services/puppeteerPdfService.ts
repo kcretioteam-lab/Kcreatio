@@ -157,7 +157,7 @@ function buildInvoiceHtml(inv: InvoiceForPdf, user: UserForPdf, plan?: string): 
   .hdr-right { text-align: right; font-size: 11px; opacity: .9; line-height: 1.7; }
   .rc { display: inline-block; background: rgba(255,255,255,.2); border-radius: 4px; padding: 2px 7px; font-size: 9px; margin-top: 6px; letter-spacing: .06em; }
   .body { border: 1px solid #e5e5e5; border-top: none; padding: 20px 24px; border-radius: 0 0 8px 8px; }
-  .parties { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+  .parties { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); overflow-wrap: anywhere; gap: 16px; margin-bottom: 16px; }
   .party-label { font-size: 8px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: #999; margin-bottom: 6px; }
   .party-name { font-weight: 700; font-size: 13px; margin-bottom: 3px; }
   .party-detail { font-size: 10px; color: #555; margin-top: 1px; }
