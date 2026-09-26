@@ -892,6 +892,17 @@ function inrFmt(n) {
   return '₹' + Math.round(n).toLocaleString('en-IN');
 }
 
+// Calculator input limits: ₹10 crore a month, 50 brands a month
+const MAX_MONTHLY = 100000000;
+const MAX_BRANDS = 50;
+
+// Text inputs (no number spinners) that accept whole numbers only and refuse keystrokes past `max`
+function clampDigits(raw, max) {
+  const digits = raw.replace(/\D/g, '').replace(/^0+(?=\d)/, '');
+  if (digits === '') return '';
+  return Number(digits) > max ? null : digits;
+}
+
 export function TaxRiskCalculator() {
   const [monthly, setMonthly] = useState('');
   const [brands, setBrands] = useState('');
@@ -902,8 +913,16 @@ export function TaxRiskCalculator() {
   function handleEstimate(e) {
     e.preventDefault();
     const m = parseFloat(monthly) || 0;
-    const b = parseInt(brands, 10) || 1;
-    if (m <= 0) return;
+    const b = brands === '' ? 1 : parseInt(brands, 10);
+    let msg = '';
+    if (!(m > 0)) msg = 'Enter a monthly income above ₹0 to see your numbers.';
+    else if (m > MAX_MONTHLY) msg = `Monthly income can be at most ${inrFmt(MAX_MONTHLY)} (₹10 crore).`;
+    else if (!(b >= 1 && b <= MAX_BRANDS)) msg = `Brands per month must be between 1 and ${MAX_BRANDS}.`;
+    if (msg) {
+      setResult(null);
+      setError(msg);
+      return;
+    }
     setError('');
     setResult(quickTaxEstimate(m, b));
   }
@@ -940,7 +959,7 @@ export function TaxRiskCalculator() {
           Enter your monthly earnings — see exactly what brands deduct, what you receive, and what you get back at ITR. No account needed.
         </p>
 
-        <form onSubmit={handleEstimate} style={{
+        <form onSubmit={handleEstimate} noValidate style={{
           display: 'flex',
           gap: 'var(--space-3)',
           justifyContent: 'center',
@@ -958,11 +977,21 @@ export function TaxRiskCalculator() {
               }}>₹</span>
               <input
                 id="calc-monthly"
-                type="number"
+                type="text"
                 inputMode="numeric"
-                min="0"
+                autoComplete="off"
                 value={monthly}
-                onChange={e => setMonthly(e.target.value)}
+                onChange={e => {
+                  const next = clampDigits(e.target.value, MAX_MONTHLY);
+                  if (next === null) {
+                    setError(`Monthly income can be at most ${inrFmt(MAX_MONTHLY)} (₹10 crore).`);
+                    return;
+                  }
+                  setMonthly(next);
+                  // A stale estimate must not stay on screen once the income is cleared or 0
+                  if (!(Number(next) > 0)) setResult(null);
+                  setError('');
+                }}
                 placeholder="50000"
                 required
                 style={{
@@ -984,12 +1013,20 @@ export function TaxRiskCalculator() {
             </label>
             <input
               id="calc-brands"
-              type="number"
+              type="text"
               inputMode="numeric"
-              min="1"
-              max="50"
+              autoComplete="off"
               value={brands}
-              onChange={e => setBrands(e.target.value)}
+              onChange={e => {
+                const next = clampDigits(e.target.value, MAX_BRANDS);
+                if (next === null) {
+                  setError(`Brands per month can be at most ${MAX_BRANDS}.`);
+                  return;
+                }
+                setBrands(next);
+                if (next === '0') setResult(null);
+                setError('');
+              }}
               placeholder="3"
               style={{
                 padding: '10px 12px',

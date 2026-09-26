@@ -1737,7 +1737,7 @@ export default function SettingsPage() {
                     <div style={{ padding: 'var(--space-2) var(--space-3)', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', fontSize: 'var(--text-sm)', color: 'var(--text-disabled)' }}>{user?.email}</div>
                     <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Email cannot be changed</div>
                   </div>
-                  <Input id="p-phone" label="Phone Number" type="tel" value={personalForm.phone} onChange={e => setPersonalForm(p => ({...p, phone: e.target.value}))} placeholder="+91 98765 43210" />
+                  <Input id="p-phone" label="Phone Number" type="tel" value={personalForm.phone} onChange={e => setPersonalForm(p => ({...p, phone: e.target.value}))} placeholder="+91 XXXXX XXXXX" />
                   <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-2)' }}>
                     <button onClick={savePersonal} disabled={savingPersonal} style={{ padding: 'var(--space-2) var(--space-4)', background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 'var(--radius-md)', fontWeight: 600, fontSize: 'var(--text-sm)', cursor: 'pointer', fontFamily: 'inherit' }}>
                       {savingPersonal ? 'Saving…' : 'Save'}

@@ -354,7 +354,7 @@ export default function AuthPage({ defaultMode = 'register' }) {
                   value={email}
                   onChange={e => { setEmail(e.target.value); setOtpVerified(false); setOtpStep(false); setVerificationToken(''); }}
                   autoComplete="email"
-                  placeholder={mode === 'login' ? 'you@example.com or +91 98765 43210' : 'you@example.com'}
+                  placeholder={mode === 'login' ? 'you@example.com or +91 XXXXX XXXXX' : 'you@example.com'}
                   style={{
                     flex: 1, padding: 'var(--space-2) var(--space-3)',
                     background: 'var(--surface-2)',
@@ -424,7 +424,7 @@ export default function AuthPage({ defaultMode = 'register' }) {
 
             {/* Phone (register only) */}
             {mode === 'register' && (
-              <Input id="phone" label="Mobile number (optional)" type="tel" value={phone} onChange={e => setPhone(e.target.value)} placeholder="+91 98765 43210" hint="Used for login and invoice contact" />
+              <Input id="phone" label="Mobile number (optional)" type="tel" value={phone} onChange={e => setPhone(e.target.value)} placeholder="+91 XXXXX XXXXX" hint="Used for login and invoice contact" />
             )}
 
             {/* Password */}

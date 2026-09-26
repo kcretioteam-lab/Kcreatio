@@ -128,7 +128,7 @@ export default function IncomePage() {
         </div>
       )}
 
-      {chartData.length > 0 && (
+      {chartData.some(d => Number(d.amount) > 0) && (
         <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: 'var(--space-5)', marginBottom: 'var(--space-5)' }}>
           <div className="label" style={{ marginBottom: 'var(--space-4)' }}>Monthly Income</div>
           <div role="img" aria-label="Monthly income bar chart">

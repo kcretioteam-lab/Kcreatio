@@ -1593,7 +1593,7 @@ export default function InvoicePage({ initialView }) {
               <Input id="brandPan" label="Brand PAN" value={form.brandPan} onChange={e => update('brandPan', e.target.value.toUpperCase().slice(0,10))} onBlur={() => touch('brandPan')} error={showErr('brandPan')} placeholder="ABCDE1234F" maxLength={10} tooltip="10-character Permanent Account Number of the brand. Optional but useful for TDS reconciliation and Form 26AS." />
               <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 'var(--space-3)' }}>
                 <Input id="brandEmail" label="Brand Email (optional)" type="email" value={form.brandEmail} onChange={e => update('brandEmail', e.target.value)} placeholder="accounts@brand.com" tooltip="Brand's billing or accounts email address. Optional — appears on invoice for reference." />
-                <Input id="brandPhone" label="Brand Contact No. (optional)" type="tel" value={form.brandPhone} onChange={e => update('brandPhone', e.target.value)} placeholder="+91 98765 43210" tooltip="Brand contact number. Optional — appears on invoice for reference." />
+                <Input id="brandPhone" label="Brand Contact No. (optional)" type="tel" value={form.brandPhone} onChange={e => update('brandPhone', e.target.value)} placeholder="+91 XXXXX XXXXX" tooltip="Brand contact number. Optional — appears on invoice for reference." />
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>

@@ -5,7 +5,7 @@ import {
   ChevronLeft, ChevronRight, MessageCircle,
 } from 'lucide-react';
 
-// WhatsApp support number in international format without '+', e.g. 919876543210
+// WhatsApp support number in international format without '+', e.g. 91XXXXXXXXXX
 const SUPPORT_WHATSAPP = import.meta.env.VITE_SUPPORT_WHATSAPP;
 const SUPPORT_HREF = SUPPORT_WHATSAPP
   ? `https://wa.me/${SUPPORT_WHATSAPP}?text=${encodeURIComponent('Hi Kcreatio team, I need help with ')}`
