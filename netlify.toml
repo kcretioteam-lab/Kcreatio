@@ -6,6 +6,29 @@
 [build.environment]
   NODE_VERSION = "22"
 
+# Redirect rules are matched top to bottom — keep the SPA fallback last.
+
+# The old /v2 preview of the landing page now lives at /
+[[redirects]]
+  from   = "/v2"
+  to     = "/"
+  status = 301
+  force  = true
+
+[[redirects]]
+  from   = "/v2/*"
+  to     = "/"
+  status = 301
+  force  = true
+
+# The API is served by the backend (VITE_API_URL), never by this site. Without this rule the
+# SPA fallback answered /api/* with index.html and a 200, which hid broken API calls.
+[[redirects]]
+  from   = "/api/*"
+  to     = "/404.html"
+  status = 404
+  force  = true
+
 [[redirects]]
   from   = "/*"
   to     = "/index.html"

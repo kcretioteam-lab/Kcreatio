@@ -103,12 +103,11 @@ export default router;
 router.put('/:id', validateBody(CreateExpenseSchema.partial()), async (req: AuthRequest, res: Response): Promise<void> => {
   const updates: Record<string, unknown> = {};
   if (req.body.category !== undefined) updates.category = req.body.category;
-  if (req.body.amount !== undefined) updates.amount = Math.round(req.body.amount * 100);
+  if (req.body.amount !== undefined) updates.amount = req.body.amount; // rupees, same as POST
   if (req.body.description !== undefined) updates.description = req.body.description || null;
   if (req.body.expenseDate !== undefined) {
     updates.expense_date = req.body.expenseDate;
-    const { getFinancialYear } = await import('../services/invoiceService.js').catch(() => ({ getFinancialYear: null }));
-    if (getFinancialYear) updates.financial_year = getFinancialYear(new Date(req.body.expenseDate + 'T00:00:00'));
+    updates.financial_year = getFinancialYear(new Date(req.body.expenseDate + 'T00:00:00'));
   }
   updates.updated_at = new Date().toISOString();
 

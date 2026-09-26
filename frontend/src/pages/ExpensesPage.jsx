@@ -11,12 +11,11 @@ import Input from '../components/ui/Input.jsx';
 import { SkeletonTableRow } from '../components/ui/Skeleton.jsx';
 import EmptyState from '../components/ui/EmptyState.jsx';
 import PlanGate from '../components/ui/PlanGate.jsx';
+import { CURRENT_FY, PREVIOUS_FY as PREV_FY } from '../utils/financialYear.js';
+import { taxYearLabel } from '../utils/taxLabels.js';
 
 const CATEGORIES = ['equipment', 'software', 'travel', 'props', 'marketing', 'team', 'subscription', 'other'];
 const CAT_LABELS = { equipment: 'Equipment', software: 'Software', travel: 'Travel', props: 'Props', marketing: 'Marketing', team: 'Team', subscription: 'Subscription', other: 'Other' };
-const CURRENT_FY = (() => { const n = new Date(), y = n.getFullYear(), m = n.getMonth()+1; return m>=4?`${y}-${String(y+1).slice(-2)}`:`${y-1}-${String(y).slice(-2)}`; })();
-const PREV_FY = (() => { const n = new Date(), y = n.getFullYear(), m = n.getMonth()+1; const b = m>=4?y:y-1; return `${b-1}-${String(b).slice(-2)}`; })();
-
 export default function ExpensesPage() {
   const toast = useToast();
   const isMobile = useIsMobile();
@@ -78,8 +77,8 @@ export default function ExpensesPage() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)' }}>
           
           <select value={fy} onChange={e => setFY(e.target.value)} style={{ padding: 'var(--space-1) var(--space-3)', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', color: 'var(--text-body)', fontSize: 'var(--text-sm)', fontFamily: 'inherit' }}>
-            <option value={CURRENT_FY}>FY {CURRENT_FY}</option>
-            <option value={PREV_FY}>FY {PREV_FY}</option>
+            <option value={CURRENT_FY}>{taxYearLabel(CURRENT_FY)}</option>
+            <option value={PREV_FY}>{taxYearLabel(PREV_FY)}</option>
           </select>
         </div>
         <button onClick={() => setAddOpen(true)} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', padding: 'var(--space-2) var(--space-4)', background: 'var(--accent)', color: '#fff', borderRadius: 'var(--radius-md)', fontWeight: 600, fontSize: 'var(--text-sm)', cursor: 'pointer', border: 'none' }}>
@@ -138,7 +137,7 @@ export default function ExpensesPage() {
                   <td style={{ padding: 'var(--space-3) var(--space-4)', fontSize: 'var(--text-sm)', color: 'var(--text-body)' }}>{e.description || '—'}</td>
                   <td style={{ padding: 'var(--space-3) var(--space-4)', fontSize: 'var(--text-sm)', fontWeight: 700, fontVariantNumeric: 'tabular-nums', color: 'var(--danger-text)' }}>{formatINR(e.amount)}</td>
                   <td style={{ padding: 'var(--space-3) var(--space-4)' }}>
-                    <button onClick={() => { setEditingEntry(e); setForm({ category: e.category, amount: String(e.amount/100), description: e.description || '', expenseDate: e.expense_date }); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 4, display: 'flex', alignItems: 'center' }} title="Edit">
+                    <button onClick={() => { setEditingEntry(e); setForm({ category: e.category, amount: String(e.amount), description: e.description || '', expenseDate: e.expense_date }); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 4, display: 'flex', alignItems: 'center' }} title="Edit">
                       <Pencil size={13} aria-hidden="true" />
                     </button>
                   </td>

@@ -14,6 +14,8 @@ import EmptyState from '../components/ui/EmptyState.jsx';
 import { IndianRupee, CheckCircle, Clock, AlertCircle, Receipt } from 'lucide-react';
 import UsageBar from '../components/ui/UsageBar.jsx';
 import { useUsage } from '../hooks/useUsage.jsx';
+import { CURRENT_FY, PREVIOUS_FY as PREV_FY, getFinancialYear } from '../utils/financialYear.js';
+import { taxYearLabel, tdsSectionLabel } from '../utils/taxLabels.js';
 
 const FORM_16A_VARIANT = {
   received: 'success',
@@ -28,21 +30,6 @@ const FORM_16A_LABEL = {
   overdue: 'Overdue',
 };
 
-const CURRENT_FY = (() => {
-  const now = new Date();
-  const y = now.getFullYear();
-  const m = now.getMonth() + 1;
-  return m >= 4 ? `${y}-${String(y + 1).slice(-2)}` : `${y - 1}-${String(y).slice(-2)}`;
-})();
-
-const PREV_FY = (() => {
-  const now = new Date();
-  const y = now.getFullYear();
-  const m = now.getMonth() + 1;
-  const base = m >= 4 ? y : y - 1;
-  return `${base - 1}-${String(base).slice(-2)}`;
-})();
-
 export default function TDSPage() {
   const toast = useToast();
   const isMobile = useIsMobile();
@@ -53,7 +40,7 @@ export default function TDSPage() {
   const [loading, setLoading] = useState(true);
   const [fy, setFY] = useState(CURRENT_FY);
   const [addOpen, setAddOpen] = useState(false);
-  const [form, setForm] = useState({ brandName: '', brandTan: '', invoiceAmount: '', tdsRate: '10', paymentDate: format(new Date(), 'yyyy-MM-dd') });
+  const [form, setForm] = useState({ brandName: '', brandTan: '', invoiceAmount: '', tdsRate: '10', tdsAmount: '', paymentDate: format(new Date(), 'yyyy-MM-dd') });
   const [saving, setSaving] = useState(false);
 
   useEffect(() => { loadData(); }, [fy]);
@@ -81,11 +68,13 @@ export default function TDSPage() {
         brandTan: form.brandTan || undefined,
         invoiceAmount: parseFloat(form.invoiceAmount),
         tdsRate: parseFloat(form.tdsRate),
+        tdsAmount: tdsAmount,
+        section: tdsSectionLabel(form.tdsRate === '10' ? '194J' : '194C', getFinancialYear(new Date(form.paymentDate))).replace(/^Sec /, ''),
         paymentDate: form.paymentDate,
       });
       toast.success('TDS record added');
       setAddOpen(false);
-      setForm({ brandName: '', brandTan: '', invoiceAmount: '', tdsRate: '10', paymentDate: format(new Date(), 'yyyy-MM-dd') });
+      setForm({ brandName: '', brandTan: '', invoiceAmount: '', tdsRate: '10', tdsAmount: '', paymentDate: format(new Date(), 'yyyy-MM-dd') });
       loadData();
       refreshUsage();
     } catch (err) { toast.error(err?.response?.data?.message || 'Failed to add record'); }
@@ -100,7 +89,9 @@ export default function TDSPage() {
     } catch { toast.error('Failed to update'); }
   }
 
-  const tdsAmount = form.invoiceAmount ? Math.round(parseFloat(form.invoiceAmount) * parseFloat(form.tdsRate)) / 100 : 0;
+  // Suggested TDS = rate × taxable value; the user can overwrite it with what the brand actually deducted.
+  const suggestedTds = form.invoiceAmount ? Math.round(parseFloat(form.invoiceAmount) * parseFloat(form.tdsRate)) / 100 : 0;
+  const tdsAmount = form.tdsAmount !== '' && Number.isFinite(parseFloat(form.tdsAmount)) ? parseFloat(form.tdsAmount) : suggestedTds;
 
   return (
     <div style={{ padding: isMobile ? 'var(--space-3)' : 'var(--space-6)', maxWidth: 1100, width: '100%' }}>
@@ -112,8 +103,8 @@ export default function TDSPage() {
             onChange={(e) => setFY(e.target.value)}
             style={{ padding: 'var(--space-1) var(--space-3)', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', color: 'var(--text-body)', fontSize: 'var(--text-sm)', fontFamily: 'inherit' }}
           >
-            <option value={CURRENT_FY}>FY {CURRENT_FY}</option>
-            <option value={PREV_FY}>FY {PREV_FY}</option>
+            <option value={CURRENT_FY}>{taxYearLabel(CURRENT_FY)}</option>
+            <option value={PREV_FY}>{taxYearLabel(PREV_FY)}</option>
           </select>
           {summary && (
             <Badge variant="warning" style={{ fontVariantNumeric: 'tabular-nums' }}>
@@ -191,7 +182,7 @@ export default function TDSPage() {
         <EmptyState
           icon={Receipt}
           title="No TDS records yet"
-          description="Brands deduct 10% before paying you under Section 194J. Track every rupee here so you can claim it back in your ITR."
+          description="Brands usually deduct 1–10% TDS before paying you. Track every rupee here so you can claim it back in your ITR."
           actionLabel="+ Add TDS Record"
           onAction={() => setAddOpen(true)}
         />
@@ -286,31 +277,25 @@ export default function TDSPage() {
       {/* Add TDS Modal */}
       <Modal isOpen={addOpen} onClose={() => setAddOpen(false)} title="Add TDS Record">
         <form onSubmit={handleAdd} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }} noValidate>
-          <Input id="tds-brand" label="Brand Name *" value={form.brandName} onChange={e => setForm(p => ({...p, brandName: e.target.value}))} placeholder="Mamaearth Pvt Ltd" />
-          <Input id="tds-tan" label="Brand TAN (optional)" value={form.brandTan} onChange={e => setForm(p => ({...p, brandTan: e.target.value.toUpperCase()}))} placeholder="MUMM12345E" maxLength={10} />
-          <Input id="tds-amount" label="Invoice Amount (₹) *" type="number" value={form.invoiceAmount} onChange={e => setForm(p => ({...p, invoiceAmount: e.target.value}))} placeholder="45000" style={{ fontVariantNumeric: 'tabular-nums' }} />
+          <Input id="tds-brand" label="Brand Name *" value={form.brandName} onChange={e => setForm(p => ({...p, brandName: e.target.value}))} placeholder="Glowleaf Naturals Pvt Ltd" />
+          <Input id="tds-tan" label="Brand TAN (optional)" value={form.brandTan} onChange={e => setForm(p => ({...p, brandTan: e.target.value.toUpperCase()}))} placeholder="BLRA12345B" maxLength={10} />
+          <Input id="tds-amount" label="Taxable value, before GST (₹) *" type="number" value={form.invoiceAmount} onChange={e => setForm(p => ({...p, invoiceAmount: e.target.value, tdsAmount: ''}))} placeholder="45000" hint="TDS is worked out on the amount before GST." style={{ fontVariantNumeric: 'tabular-nums' }} />
           <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 'var(--space-3)' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
               <label htmlFor="tds-rate" style={{ fontSize: 'var(--text-sm)', fontWeight: 500, color: 'var(--text-body)' }}>TDS Rate</label>
-              <select id="tds-rate" value={form.tdsRate} onChange={e => setForm(p => ({...p, tdsRate: e.target.value}))} style={{ padding: 'var(--space-2) var(--space-3)', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', color: 'var(--text-primary)', fontFamily: 'inherit' }}>
-                <option value="10">10% (Section 194J)</option>
-                <option value="2">2% (Section 194C)</option>
-                <option value="1">1% (Section 194C low)</option>
+              <select id="tds-rate" value={form.tdsRate} onChange={e => setForm(p => ({...p, tdsRate: e.target.value, tdsAmount: ''}))} style={{ padding: 'var(--space-2) var(--space-3)', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', color: 'var(--text-primary)', fontFamily: 'inherit' }}>
+                <option value="10">10% · {tdsSectionLabel('194J', fy)} (professional fees)</option>
+                <option value="2">2% · {tdsSectionLabel('194C', fy)} (contract, company)</option>
+                <option value="1">1% · {tdsSectionLabel('194C', fy)} (contract, individual)</option>
               </select>
             </div>
             <Input id="tds-date" label="Payment Date *" type="date" value={form.paymentDate} onChange={e => setForm(p => ({...p, paymentDate: e.target.value}))} />
           </div>
           {form.invoiceAmount && (
-            <div style={{ padding: 'var(--space-3)', background: 'var(--surface-2)', borderRadius: 'var(--radius-md)', fontSize: 'var(--text-sm)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: 'var(--text-muted)' }}>TDS Amount ({form.tdsRate}%)</span>
-                <span style={{ color: 'var(--warning-text)', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{formatINR(tdsAmount)}</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 'var(--space-1)' }}>
-                <span style={{ color: 'var(--text-muted)' }}>Amount you received</span>
-                <span style={{ color: 'var(--success-text)', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{formatINR(parseFloat(form.invoiceAmount) - tdsAmount)}</span>
-              </div>
-            </div>
+            <Input id="tds-actual" label="TDS actually deducted (₹)" type="number" value={form.tdsAmount === '' ? String(suggestedTds) : form.tdsAmount}
+              onChange={e => setForm(p => ({...p, tdsAmount: e.target.value}))}
+              hint="Brands often deduct an odd amount — copy it from their payment advice or Form 16A."
+              style={{ fontVariantNumeric: 'tabular-nums' }} />
           )}
           <button type="submit" disabled={saving} style={{ padding: 'var(--space-3)', background: 'var(--accent)', color: '#fff', borderRadius: 'var(--radius-md)', fontWeight: 600, cursor: 'pointer', border: 'none', marginTop: 'var(--space-2)' }}>
             {saving ? 'Saving…' : 'Add TDS Record'}

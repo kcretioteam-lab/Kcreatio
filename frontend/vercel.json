@@ -1,5 +1,9 @@
 {
   "installCommand": "npm install -g pnpm && pnpm install",
   "buildCommand": "pnpm run build",
-  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
+  "redirects": [
+    { "source": "/v2", "destination": "/", "permanent": true },
+    { "source": "/v2/:path*", "destination": "/", "permanent": true }
+  ],
+  "rewrites": [{ "source": "/((?!api/).*)", "destination": "/index.html" }]
 }

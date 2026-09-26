@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 
-// Shared animated counter — counts from 0 to `to` when visible
-export default function AnimatedCounter({ to, suffix = '', duration = 1400 }) {
+// Shared animated counter — counts from 0 to `to` when visible.
+// `format` renders each frame's value, e.g. formatINR for money.
+export default function AnimatedCounter({ to, suffix = '', duration = 1400, format }) {
   const ref = useRef(null);
   const [count, setCount] = useState(0);
   const [visible, setVisible] = useState(false);
@@ -37,5 +38,5 @@ export default function AnimatedCounter({ to, suffix = '', duration = 1400 }) {
     if (to === 0) setCount(0);
   }, [to]);
 
-  return <span ref={ref}>{count}{suffix}</span>;
+  return <span ref={ref}>{format ? format(count) : count}{suffix}</span>;
 }

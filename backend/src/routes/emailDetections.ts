@@ -6,6 +6,7 @@ import { validateBody } from '../middleware/validateBody.js';
 import { classifyEmail } from '../services/emailClassifier.js';
 import { scanInbox } from '../services/gmailService.js';
 import { hasFeature } from '../config/plans.js';
+import { recordDetectedPayment } from '../services/paymentService.js';
 
 const router = Router();
 
@@ -282,47 +283,12 @@ async function applyDetection(
 
   try {
     if (detectedType === 'payment_received') {
-      // Find matching unpaid sent invoice by amount (±1%)
-      let invoiceId = preferredInvoiceId;
-      if (!invoiceId && data.amount) {
-        const paise = Math.round(data.amount * 100);
-        const { data: invoices } = await db
-          .from('invoices')
-          .select('id, invoice_number, total_amount, brand_name')
-          .eq('user_id', userId)
-          .eq('status', 'sent')
-          .gte('total_amount', paise - paise * 0.01)
-          .lte('total_amount', paise + paise * 0.01)
-          .limit(1);
-        invoiceId = invoices?.[0]?.id;
-      }
-
-      if (invoiceId) {
-        await db.from('invoices').update({ status: 'paid' }).eq('id', invoiceId).eq('user_id', userId);
-        updates.linked_invoice_id = invoiceId;
-      }
-
-      // Log income entry regardless of whether an invoice matched
       if (data.amount) {
-        const today = new Date();
-        const fy = today.getMonth() >= 3
-          ? `${today.getFullYear()}-${String(today.getFullYear() + 1).slice(-2)}`
-          : `${today.getFullYear() - 1}-${String(today.getFullYear()).slice(-2)}`;
-        const qtr = [0,1,2].includes(today.getMonth()) ? 'Q4' :
-                    [3,4,5].includes(today.getMonth()) ? 'Q1' :
-                    [6,7,8].includes(today.getMonth()) ? 'Q2' : 'Q3';
-
-        const { data: income } = await db.from('income').insert({
-          user_id: userId,
-          source: 'brand_deal',
-          amount: data.amount,
-          description: data.description ?? data.brand_name ?? 'Payment detected via Smart Inbox',
-          income_date: new Date().toISOString().split('T')[0],
-          financial_year: fy,
-          quarter: qtr,
-          extracted_data: { detection_id: detectionId },
-        }).select().single();
-
+        const { invoiceId, income } = await recordDetectedPayment(
+          userId, Number(data.amount), detectionId,
+          data.description ?? data.brand_name ?? 'Payment detected via Smart Inbox', preferredInvoiceId,
+        );
+        if (invoiceId) updates.linked_invoice_id = invoiceId;
         updates.linked_income_id = income?.id;
         createdRecord = income;
       }

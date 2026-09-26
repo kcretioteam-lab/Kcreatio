@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { supabase } from '../lib/supabase.js';
 import { authenticate, AuthRequest } from '../middleware/auth.js';
 import { validateBody } from '../middleware/validateBody.js';
-import { getFinancialYear } from '../services/invoiceService.js';
+import { getFinancialYear, getAdvanceTaxQuarter } from '../services/invoiceService.js';
 import { PLAN_LIMITS, Plan } from '../config/plans.js';
 
 const router = Router();
@@ -11,9 +11,14 @@ router.use(authenticate);
 
 const CreateTDSSchema = z.object({
   brandName: z.string().min(1).max(200).trim(),
-  brandTan: z.string().max(10).trim().optional(),
-  invoiceAmount: z.number().positive().max(9999999),
+  brandTan: z.string().trim().toUpperCase().regex(/^([A-Z]{4}[0-9]{5}[A-Z])?$/, 'TAN should look like BLRA12345B').optional(),
+  // Taxable value — the amount before GST. TDS is never charged on GST.
+  invoiceAmount: z.number().positive('Enter the taxable value (before GST)').max(9999999),
   tdsRate: z.number().min(0).max(100).default(10),
+  // The TDS the brand actually deducted, if it differs from rate × taxable value
+  tdsAmount: z.number().min(0).max(9999999).optional(),
+  amountReceived: z.number().min(0).max(99999999).optional(),
+  section: z.string().max(60).optional(),
   paymentDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   invoiceId: z.string().uuid().optional(),
   financialYear: z.string().optional(),
@@ -93,10 +98,15 @@ router.post('/', validateBody(CreateTDSSchema), async (req: AuthRequest, res: Re
   }
   // ─────────────────────────────────────────────────────────────────────────
   const body = req.body;
-  const tdsAmountPaise = Math.round(body.invoiceAmount * body.tdsRate);
-  const tdsAmount = tdsAmountPaise / 100;
-  const receivedAmount = body.invoiceAmount - tdsAmount;
-  const financialYear = body.financialYear || getFinancialYear(new Date(body.paymentDate + 'T00:00:00'));
+  const tdsAmount = body.tdsAmount ?? Math.round(body.invoiceAmount * body.tdsRate) / 100;
+  if (tdsAmount > body.invoiceAmount) {
+    res.status(422).json({ error: 'VALIDATION_ERROR', field: 'tdsAmount', message: 'TDS can’t be more than the taxable value', statusCode: 422 });
+    return;
+  }
+  const tdsRate = body.tdsAmount !== undefined ? Math.round(tdsAmount / body.invoiceAmount * 10000) / 100 : body.tdsRate;
+  const receivedAmount = body.amountReceived ?? Math.round((body.invoiceAmount - tdsAmount) * 100) / 100;
+  const paymentDate = new Date(body.paymentDate + 'T00:00:00');
+  const financialYear = body.financialYear || getFinancialYear(paymentDate);
 
   const { data, error } = await supabase
     .from('tds_records')
@@ -106,9 +116,11 @@ router.post('/', validateBody(CreateTDSSchema), async (req: AuthRequest, res: Re
       brand_name: body.brandName,
       brand_tan: body.brandTan || null,
       invoice_amount: body.invoiceAmount,
-      tds_rate: body.tdsRate,
+      tds_rate: tdsRate,
       tds_amount: tdsAmount,
       received_amount: receivedAmount,
+      section: body.section || null,
+      quarter: getAdvanceTaxQuarter(paymentDate),
       form_16a_status: 'awaiting',
       financial_year: financialYear,
       payment_date: body.paymentDate,

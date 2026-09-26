@@ -12,12 +12,11 @@ import Input from '../components/ui/Input.jsx';
 import { SkeletonTableRow } from '../components/ui/Skeleton.jsx';
 import EmptyState from '../components/ui/EmptyState.jsx';
 import PlanGate from '../components/ui/PlanGate.jsx';
+import { CURRENT_FY, PREVIOUS_FY as PREV_FY } from '../utils/financialYear.js';
+import { taxYearLabel } from '../utils/taxLabels.js';
 
 const SOURCES = ['brand_deal', 'adsense', 'instagram_bonus', 'affiliate', 'consulting', 'other'];
 const SOURCE_LABELS = { brand_deal: 'Brand Deal', adsense: 'YouTube AdSense', instagram_bonus: 'Instagram Bonus', affiliate: 'Affiliate', consulting: 'Consulting', other: 'Other' };
-const CURRENT_FY = (() => { const n = new Date(), y = n.getFullYear(), m = n.getMonth()+1; return m>=4?`${y}-${String(y+1).slice(-2)}`:`${y-1}-${String(y).slice(-2)}`; })();
-const PREV_FY = (() => { const n = new Date(), y = n.getFullYear(), m = n.getMonth()+1; const b = m>=4?y:y-1; return `${b-1}-${String(b).slice(-2)}`; })();
-
 export default function IncomePage() {
   const toast = useToast();
   const isMobile = useIsMobile();
@@ -87,8 +86,8 @@ export default function IncomePage() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)' }}>
           
           <select value={fy} onChange={e => setFY(e.target.value)} style={{ padding: 'var(--space-1) var(--space-3)', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', color: 'var(--text-body)', fontSize: 'var(--text-sm)', fontFamily: 'inherit' }}>
-            <option value={CURRENT_FY}>FY {CURRENT_FY}</option>
-            <option value={PREV_FY}>FY {PREV_FY}</option>
+            <option value={CURRENT_FY}>{taxYearLabel(CURRENT_FY)}</option>
+            <option value={PREV_FY}>{taxYearLabel(PREV_FY)}</option>
           </select>
         </div>
         <button onClick={() => setAddOpen(true)} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', padding: 'var(--space-2) var(--space-4)', background: 'var(--accent)', color: '#fff', borderRadius: 'var(--radius-md)', fontWeight: 600, fontSize: 'var(--text-sm)', cursor: 'pointer', border: 'none' }}>
@@ -187,7 +186,7 @@ export default function IncomePage() {
                   <td style={{ padding: 'var(--space-3) var(--space-4)', fontSize: 'var(--text-sm)', fontWeight: 700, fontVariantNumeric: 'tabular-nums', color: 'var(--text-primary)' }}>{formatINR(e.amount)}</td>
                   <td style={{ padding: 'var(--space-3) var(--space-4)', fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>{e.quarter}</td>
                   <td style={{ padding: 'var(--space-3) var(--space-4)' }}>
-                    <button onClick={() => { setEditingEntry(e); setForm({ source: e.source, amount: String(e.amount/100), description: e.description || '', incomeDate: e.income_date }); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 4, display: 'flex', alignItems: 'center' }} title="Edit">
+                    <button onClick={() => { setEditingEntry(e); setForm({ source: e.source, amount: String(e.amount), description: e.description || '', incomeDate: e.income_date }); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 4, display: 'flex', alignItems: 'center' }} title="Edit">
                       <Pencil size={13} aria-hidden="true" />
                     </button>
                   </td>
@@ -209,7 +208,7 @@ export default function IncomePage() {
           </div>
           <Input id="inc-amount" label="Amount (₹) *" type="number" value={form.amount} onChange={e => setForm(p => ({...p, amount: e.target.value}))} style={{ fontVariantNumeric: 'tabular-nums' }} />
           <Input id="inc-date" label="Date *" type="date" value={form.incomeDate} onChange={e => setForm(p => ({...p, incomeDate: e.target.value}))} />
-          <Input id="inc-desc" label="Description" value={form.description} onChange={e => setForm(p => ({...p, description: e.target.value}))} placeholder="Brand deal from Mamaearth" />
+          <Input id="inc-desc" label="Description" value={form.description} onChange={e => setForm(p => ({...p, description: e.target.value}))} placeholder="Brand deal — Glowleaf Naturals" />
           <button type="submit" disabled={saving} style={{ padding: 'var(--space-3)', background: 'var(--accent)', color: '#fff', borderRadius: 'var(--radius-md)', fontWeight: 600, cursor: 'pointer', border: 'none' }}>
             {saving ? 'Saving…' : 'Log Income'}
           </button>

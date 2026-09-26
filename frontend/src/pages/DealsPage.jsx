@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { format } from 'date-fns';
-import { Plus, X, Briefcase } from 'lucide-react';
+import { Plus, X, Briefcase, FileText } from 'lucide-react';
+import { useNavigate, Link } from 'react-router-dom';
+import MarkPaidDialog from '../components/features/payment/MarkPaidDialog.jsx';
 import api from '../utils/api.js';
 import { useToast } from '../hooks/useToast.jsx';
 import { formatINR } from '../utils/formatINR.js';
@@ -26,6 +28,8 @@ export default function DealsPage() {
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const [payingDeal, setPayingDeal] = useState(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
     loadDeals();
@@ -67,19 +71,35 @@ export default function DealsPage() {
     finally { setSaving(false); }
   }
 
-  async function moveStatus(deal, newStatus) {
-    try {
-      await api.put(`/deals/${deal.id}`, { status: newStatus });
-      setDeals(prev => prev.map(d => d.id === deal.id ? { ...d, status: newStatus } : d));
-    } catch { toast.error('Failed to update'); }
+  // Open the side panel straight away, then fill in the linked invoice
+  function openDeal(deal) {
+    setSelectedDeal(deal);
+    api.get(`/deals/${deal.id}`)
+      .then(res => setSelectedDeal(cur => (cur?.id === deal.id ? res.data : cur)))
+      .catch(() => {});
   }
 
-  async function markPaid(deal) {
+  async function moveStatus(deal, newStatus) {
     try {
-      await api.post(`/deals/${deal.id}/mark-paid`, {});
-      toast.success('Deal marked paid — income logged');
-      loadDeals();
-    } catch { toast.error('Failed to mark paid'); }
+      const res = await api.put(`/deals/${deal.id}`, { status: newStatus });
+      const updated = { ...deal, ...res.data };
+      setDeals(prev => prev.map(d => d.id === deal.id ? updated : d));
+      setSelectedDeal(cur => (cur?.id === deal.id ? { ...cur, ...updated } : cur));
+      toast.success(`Moved to ${STATUS_LABELS[newStatus]}`);
+    } catch (err) { toast.error(err?.response?.data?.message || 'Couldn’t update the deal. Please try again.'); }
+  }
+
+  async function recordDealPayment(body) {
+    const deal = payingDeal;
+    const res = await api.post(`/deals/${deal.id}/mark-paid`, body);
+    toast.success(res.data?.viaInvoice ? 'Invoice and deal marked paid — income logged' : 'Deal marked paid — income logged');
+    setPayingDeal(null);
+    setDeals(prev => prev.map(d => d.id === deal.id ? { ...d, status: 'paid' } : d));
+    setSelectedDeal(cur => (cur?.id === deal.id ? { ...cur, status: 'paid', invoice: cur.invoice && { ...cur.invoice, status: 'paid' } } : cur));
+  }
+
+  function createInvoice(deal) {
+    navigate(`/invoices/new?deal_id=${deal.id}`, { state: { deal_id: deal.id } });
   }
 
   async function deleteDeal(deal) {
@@ -126,10 +146,10 @@ export default function DealsPage() {
         /* Mobile: list view */
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
           {deals.map(deal => (
-            <div key={deal.id} onClick={() => setSelectedDeal(deal)} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: 'var(--space-4)', cursor: 'pointer' }}>
+            <div key={deal.id} onClick={() => openDeal(deal)} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: 'var(--space-4)', cursor: 'pointer' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                <div>
-                  <div style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: 'var(--text-base)', marginBottom: 2 }}>{deal.brand_name}</div>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: 'var(--text-base)', marginBottom: 2, overflowWrap: 'anywhere' }}>{deal.brand_name}</div>
                   <div style={{ fontSize: 'var(--text-xl)', fontWeight: 700, color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>{formatINR(deal.deal_value)}</div>
                 </div>
                 <Badge variant={STATUS_VARIANT[deal.status]}>{STATUS_LABELS[deal.status]}</Badge>
@@ -152,7 +172,7 @@ export default function DealsPage() {
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
                   {col.map(deal => (
-                    <DealCard key={deal.id} deal={deal} onClick={() => setSelectedDeal(deal)} />
+                    <DealCard key={deal.id} deal={deal} onClick={() => openDeal(deal)} />
                   ))}
                   {col.length === 0 && (
                     <div style={{ padding: 'var(--space-4)', border: '1px dashed var(--border)', borderRadius: 'var(--radius-md)', textAlign: 'center' }}>
@@ -169,9 +189,9 @@ export default function DealsPage() {
       {/* Add Deal Modal */}
       <Modal isOpen={addOpen} onClose={() => setAddOpen(false)} title="New Brand Deal">
         <form onSubmit={handleCreate} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }} noValidate>
-          <Input id="deal-brand" label="Brand Name *" value={form.brandName} onChange={e => setForm(p => ({...p, brandName: e.target.value}))} placeholder="Mamaearth Pvt Ltd" />
+          <Input id="deal-brand" label="Brand Name *" value={form.brandName} onChange={e => setForm(p => ({...p, brandName: e.target.value}))} placeholder="Glowleaf Naturals Pvt Ltd" maxLength={120} />
           <Input id="deal-email" label="Brand Contact Email" type="email" value={form.brandContactEmail} onChange={e => setForm(p => ({...p, brandContactEmail: e.target.value}))} />
-          <Input id="deal-value" label="Deal Value (₹) *" type="number" value={form.dealValue} onChange={e => setForm(p => ({...p, dealValue: e.target.value}))} style={{ fontVariantNumeric: 'tabular-nums' }} />
+          <Input id="deal-value" label="Deal value before GST (₹) *" type="number" value={form.dealValue} onChange={e => setForm(p => ({...p, dealValue: e.target.value}))} style={{ fontVariantNumeric: 'tabular-nums' }} />
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
             <label htmlFor="deal-status" style={{ fontSize: 'var(--text-sm)', fontWeight: 500, color: 'var(--text-body)' }}>Status</label>
             <select id="deal-status" value={form.status} onChange={e => setForm(p => ({...p, status: e.target.value}))} style={{ padding: 'var(--space-2) var(--space-3)', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', color: 'var(--text-primary)', fontFamily: 'inherit' }}>
@@ -191,8 +211,18 @@ export default function DealsPage() {
 
       {/* Deal Detail Panel */}
       {selectedDeal && (
-        <DealDetail deal={selectedDeal} onClose={() => setSelectedDeal(null)} onMove={moveStatus} onMarkPaid={markPaid} onDelete={deleteDeal} />
+        <DealDetail deal={selectedDeal} onClose={() => setSelectedDeal(null)} onMove={moveStatus} onMarkPaid={setPayingDeal} onCreateInvoice={createInvoice} onDelete={deleteDeal} />
       )}
+
+      <MarkPaidDialog
+        isOpen={Boolean(payingDeal)}
+        onClose={() => setPayingDeal(null)}
+        title={payingDeal ? `Mark ${payingDeal.brand_name} deal as paid` : ''}
+        brandName={payingDeal?.brand_name}
+        taxableValue={Number(payingDeal?.invoice?.base_amount ?? payingDeal?.deal_value ?? 0)}
+        total={Number(payingDeal?.invoice?.total_amount ?? payingDeal?.deal_value ?? 0)}
+        onSubmit={recordDealPayment}
+      />
     </div>
   );
 }
@@ -200,12 +230,12 @@ export default function DealsPage() {
 function DealCard({ deal, onClick }) {
   const daysInStage = Math.floor((new Date() - new Date(deal.updated_at || deal.created_at)) / 86400000);
   return (
-    <div onClick={onClick} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', padding: 'var(--space-3)', cursor: 'pointer', transition: 'border-color var(--duration-fast)' }}
+    <div onClick={onClick} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', padding: 'var(--space-3)', cursor: 'pointer', minWidth: 0, transition: 'border-color var(--duration-fast)' }}
       onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--border-2)'}
       onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border)'}
     >
-      <div style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: 'var(--text-sm)', marginBottom: 'var(--space-1)' }}>{deal.brand_name}</div>
-      <div style={{ fontSize: 'var(--text-lg)', fontWeight: 700, color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums', marginBottom: 'var(--space-2)' }}>{formatINR(deal.deal_value)}</div>
+      <div style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: 'var(--text-sm)', marginBottom: 'var(--space-1)', overflowWrap: 'anywhere', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }} title={deal.brand_name}>{deal.brand_name}</div>
+      <div style={{ fontSize: 'var(--text-lg)', fontWeight: 700, color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums', marginBottom: 'var(--space-2)', overflowWrap: 'anywhere' }}>{formatINR(deal.deal_value)}</div>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         {deal.deadline ? <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{format(new Date(deal.deadline + 'T00:00:00'), 'd MMM')}</span> : <span />}
         {daysInStage > 14 && <span style={{ fontSize: 10, color: 'var(--warning-text)', fontWeight: 600 }}>{daysInStage}d in stage</span>}
@@ -214,15 +244,17 @@ function DealCard({ deal, onClick }) {
   );
 }
 
-function DealDetail({ deal, onClose, onMove, onMarkPaid, onDelete }) {
-  const nextStatus = { inquiry: 'negotiating', negotiating: 'active', active: 'delivered', delivered: 'invoiced', invoiced: 'paid' };
+function DealDetail({ deal, onClose, onMove, onMarkPaid, onCreateInvoice, onDelete }) {
+  // "Invoiced" is reached by creating an invoice, and "Paid" only through Mark paid (so income is logged).
+  const nextStatus = { inquiry: 'negotiating', negotiating: 'active', active: 'delivered' };
   const next = nextStatus[deal.status];
+  const invoice = deal.invoice;
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 500, display: 'flex', justifyContent: 'flex-end' }} onClick={onClose}>
       <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 420, background: 'var(--surface)', borderLeft: '1px solid var(--border)', height: '100%', overflow: 'auto', padding: 'var(--space-6)', display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-          <h2 style={{ fontSize: 'var(--text-md)', fontWeight: 700, color: 'var(--text-primary)' }}>{deal.brand_name}</h2>
+          <h2 style={{ fontSize: 'var(--text-md)', fontWeight: 700, color: 'var(--text-primary)', overflowWrap: 'anywhere', minWidth: 0 }}>{deal.brand_name}</h2>
           <button onClick={onClose} aria-label="Close" style={{ color: 'var(--text-muted)', background: 'none', border: 'none', cursor: 'pointer' }}><X size={16} /></button>
         </div>
 
@@ -236,15 +268,27 @@ function DealDetail({ deal, onClose, onMove, onMarkPaid, onDelete }) {
         {deal.deliverables && <div style={{ fontSize: 'var(--text-sm)', color: 'var(--text-body)', whiteSpace: 'pre-wrap' }}><span style={{ color: 'var(--text-muted)' }}>Deliverables: </span>{deal.deliverables}</div>}
         {deal.notes && <div style={{ fontSize: 'var(--text-sm)', color: 'var(--text-body)', whiteSpace: 'pre-wrap' }}><span style={{ color: 'var(--text-muted)' }}>Notes: </span>{deal.notes}</div>}
 
+        {invoice && (
+          <Link to={invoice.status === 'draft' ? `/invoices/${invoice.id}/edit` : '/invoices'} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', fontSize: 'var(--text-sm)', color: 'var(--text-body)', textDecoration: 'none' }}>
+            <FileText size={14} aria-hidden="true" /> Invoice <strong style={{ fontFamily: 'monospace', color: 'var(--text-primary)' }}>{invoice.invoice_number}</strong>
+            <Badge variant={invoice.status === 'paid' ? 'success' : 'muted'}>{invoice.status}</Badge>
+          </Link>
+        )}
+
         <div style={{ borderTop: '1px solid var(--border)', paddingTop: 'var(--space-4)', display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
           {next && deal.status !== 'paid' && (
             <button onClick={() => onMove(deal, next)} style={{ padding: 'var(--space-2) var(--space-4)', background: 'var(--accent)', color: '#fff', borderRadius: 'var(--radius-md)', fontWeight: 600, fontSize: 'var(--text-sm)', cursor: 'pointer', border: 'none' }}>
               Move to {STATUS_LABELS[next]} →
             </button>
           )}
-          {deal.status !== 'paid' && (
+          {!invoice && !['paid', 'rejected'].includes(deal.status) && (
+            <button onClick={() => onCreateInvoice(deal)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 'var(--space-2)', padding: 'var(--space-2) var(--space-4)', background: 'var(--surface-2)', color: 'var(--text-primary)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', fontWeight: 600, fontSize: 'var(--text-sm)', cursor: 'pointer' }}>
+              <FileText size={14} aria-hidden="true" /> Create invoice
+            </button>
+          )}
+          {deal.status !== 'paid' && deal.status !== 'rejected' && (
             <button onClick={() => onMarkPaid(deal)} style={{ padding: 'var(--space-2) var(--space-4)', background: 'var(--success-dim)', color: 'var(--success-text)', border: '1px solid var(--success)', borderRadius: 'var(--radius-md)', fontWeight: 600, fontSize: 'var(--text-sm)', cursor: 'pointer' }}>
-              Mark Paid + Log Income
+              Mark paid + log income
             </button>
           )}
           <button onClick={() => onDelete(deal)} style={{ padding: 'var(--space-2) var(--space-4)', background: 'transparent', color: 'var(--danger-text)', border: '1px solid var(--danger)', borderRadius: 'var(--radius-md)', fontWeight: 500, fontSize: 'var(--text-sm)', cursor: 'pointer' }}>

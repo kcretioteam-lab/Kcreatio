@@ -29,7 +29,7 @@ interface InvoiceData {
     stateCode?: string;
   };
   serviceDescription: string;
-  gst: GstCalculation;
+  gst: Omit<GstCalculation, 'discountAmount' | 'lines'>;
   notes?: string;
 }
 

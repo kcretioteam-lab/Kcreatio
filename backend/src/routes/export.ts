@@ -28,7 +28,7 @@ router.get('/annual', checkPlan('pro'), async (req: AuthRequest, res: Response):
 
   // Fetch all data for the FY in parallel
   const [invoicesRes, tdsRes, incomeRes, expensesRes, userRes] = await Promise.all([
-    supabase.from('invoices').select('invoice_number, brand_name, brand_gstin, invoice_date, taxable_amount, cgst_amount, sgst_amount, igst_amount, total_amount, status').eq('user_id', userId).eq('financial_year', fy).order('invoice_date'),
+    supabase.from('invoices').select('invoice_number, brand_name, brand_gstin, invoice_date, base_amount, cgst_amount, sgst_amount, igst_amount, total_amount, status').eq('user_id', userId).eq('financial_year', fy).order('invoice_date'),
     supabase.from('tds_records').select('brand_name, brand_tan, invoice_amount, tds_rate, tds_amount, received_amount, payment_date, form_16a_status').eq('user_id', userId).eq('financial_year', fy).order('payment_date'),
     supabase.from('income').select('source, amount, description, income_date, quarter').eq('user_id', userId).eq('financial_year', fy).order('income_date'),
     supabase.from('expenses').select('category, amount, description, expense_date').eq('user_id', userId).eq('financial_year', fy).order('expense_date'),
@@ -41,19 +41,21 @@ router.get('/annual', checkPlan('pro'), async (req: AuthRequest, res: Response):
   const expenses = expensesRes.data || [];
   const user = userRes.data;
 
-  const toRupees = (paise: number) => (paise / 100).toFixed(2);
+  // Amounts are stored in rupees; Supabase returns numeric columns as strings.
+  const toRupees = (v: unknown) => Number(v || 0).toFixed(2);
+  const sum = (rows: Record<string, unknown>[], key: string) => rows.reduce((s, r) => s + Number(r[key] || 0), 0);
 
   // Build CSVs
   const invoiceCsv = toCsv(
     invoices.map(i => ({
       ...i,
-      taxable_amount: toRupees(i.taxable_amount),
+      base_amount: toRupees(i.base_amount),
       cgst_amount: toRupees(i.cgst_amount || 0),
       sgst_amount: toRupees(i.sgst_amount || 0),
       igst_amount: toRupees(i.igst_amount || 0),
       total_amount: toRupees(i.total_amount),
     })),
-    ['invoice_number', 'brand_name', 'brand_gstin', 'invoice_date', 'taxable_amount', 'cgst_amount', 'sgst_amount', 'igst_amount', 'total_amount', 'status']
+    ['invoice_number', 'brand_name', 'brand_gstin', 'invoice_date', 'base_amount', 'cgst_amount', 'sgst_amount', 'igst_amount', 'total_amount', 'status']
   );
 
   const tdsCsv = toCsv(
@@ -77,9 +79,9 @@ router.get('/annual', checkPlan('pro'), async (req: AuthRequest, res: Response):
   );
 
   // P&L summary
-  const totalIncome = income.reduce((s, i) => s + i.amount, 0);
-  const totalExpenses = expenses.reduce((s, e) => s + e.amount, 0);
-  const totalTds = tds.reduce((s, t) => s + t.tds_amount, 0);
+  const totalIncome = sum(income, 'amount');
+  const totalExpenses = sum(expenses, 'amount');
+  const totalTds = sum(tds, 'tds_amount');
   const netPnL = totalIncome - totalExpenses;
 
   const summary = [

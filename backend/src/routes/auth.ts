@@ -6,6 +6,9 @@ import { z } from 'zod';
 import rateLimit from 'express-rate-limit';
 import { supabase } from '../lib/supabase.js';
 import { validateBody } from '../middleware/validateBody.js';
+import { STATE_CODES, checkGstin, GSTIN_MESSAGES, panFromGstin } from '../lib/gst.js';
+
+const PROFILE_FIELDS = 'id, name, email, plan, trial_ends_at, gstin, pan, business_name, business_address, state_code, invoice_prefix, gst_registered, legal_name, trade_name, tax_regime, presumptive, lut_number, phone, show_phone_on_invoice, invoice_phone, invoice_email, avatar_url';
 import { authenticate, AuthRequest } from '../middleware/auth.js';
 import { isDisposableEmail } from '../lib/disposableEmail.js';
 import { getFrontendUrl } from '../lib/env.js';
@@ -368,7 +371,7 @@ router.post('/refresh', async (req: Request, res: Response): Promise<void> => {
 router.get('/me', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
   const { data: user, error } = await supabase
     .from('users')
-    .select('id, name, email, plan, trial_ends_at, gstin, pan, business_name, business_address, state_code, invoice_prefix, created_at, phone, show_phone_on_invoice, invoice_phone, invoice_email, avatar_url, is_email_verified, social_links, social_verified, gmail_connected_email, marketing_emails')
+    .select('id, name, email, plan, trial_ends_at, gstin, pan, business_name, business_address, state_code, invoice_prefix, gst_registered, legal_name, trade_name, tax_regime, presumptive, lut_number, created_at, phone, show_phone_on_invoice, invoice_phone, invoice_email, avatar_url, is_email_verified, social_links, social_verified, gmail_connected_email, marketing_emails')
     .eq('id', req.userId!)
     .maybeSingle();
 
@@ -385,9 +388,18 @@ const ProfileSchema = z.object({
   name: z.string().min(1).max(100).trim().optional(),
   business_name: z.string().max(200).trim().optional(),
   business_address: z.string().max(500).trim().optional(),
-  state_code: z.string().max(2).optional(),
-  gstin: z.string().regex(/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/).optional().or(z.literal('')),
-  pan: z.string().regex(/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/).optional().or(z.literal('')),
+  state_code: z.string().refine(c => c === '' || Boolean(STATE_CODES[c]), 'Pick a valid state').optional(),
+  gstin: z.string().trim().toUpperCase().superRefine((v, ctx) => {
+    const problem = v ? checkGstin(v) : null;
+    if (problem) ctx.addIssue({ code: 'custom', message: GSTIN_MESSAGES[problem] });
+  }).optional(),
+  pan: z.string().trim().toUpperCase().regex(/^([A-Z]{5}[0-9]{4}[A-Z]{1})?$/, 'PAN should look like ABCDE1234F').optional(),
+  gst_registered: z.boolean().optional(),
+  legal_name: z.string().max(200).trim().optional(),
+  trade_name: z.string().max(200).trim().optional(),
+  tax_regime: z.enum(['new', 'old']).optional(),
+  presumptive: z.enum(['none', '44ADA', '44AD']).optional(),
+  lut_number: z.string().max(40).trim().optional(),
   invoice_prefix: z.string().min(2).max(5).toUpperCase().optional(),
   phone: z.string().max(20).trim().optional().or(z.literal('')),
   show_phone_on_invoice: z.boolean().optional(),
@@ -407,20 +419,36 @@ const ProfileSchema = z.object({
   }).optional(),
 });
 
+// Fields a user may blank out; an empty string clears them.
+const CLEARABLE = new Set(['business_name', 'business_address', 'state_code', 'gstin', 'pan', 'phone', 'invoice_phone', 'invoice_email', 'avatar_url', 'legal_name', 'trade_name', 'lut_number']);
+
 router.put('/profile', authenticate, validateBody(ProfileSchema), async (req: AuthRequest, res: Response): Promise<void> => {
-  const updates = Object.fromEntries(
-    Object.entries(req.body).filter(([, v]) => v !== undefined && v !== '')
+  const updates: Record<string, unknown> = Object.fromEntries(
+    Object.entries(req.body)
+      .filter(([k, v]) => v !== undefined && (v !== '' || CLEARABLE.has(k)))
+      .map(([k, v]) => [k, v === '' ? null : v])
   );
+
+  // The GSTIN fixes the state and PAN — keep them consistent.
+  if (typeof updates.gstin === 'string') {
+    updates.state_code = updates.gstin.slice(0, 2);
+    const pan = panFromGstin(updates.gstin);
+    if (updates.pan && updates.pan !== pan) {
+      res.status(422).json({ error: 'VALIDATION_ERROR', field: 'pan', message: `Your PAN should match characters 3–12 of your GSTIN (${pan})`, statusCode: 422 });
+      return;
+    }
+    updates.pan = pan;
+  }
 
   const { data, error } = await supabase
     .from('users')
     .update({ ...updates, updated_at: new Date().toISOString() })
     .eq('id', req.userId!)
-    .select('id, name, email, plan, trial_ends_at, gstin, pan, business_name, business_address, state_code, invoice_prefix, phone, show_phone_on_invoice, invoice_phone, invoice_email, avatar_url, marketing_emails, social_links')
+    .select(`${PROFILE_FIELDS}, marketing_emails, social_links`)
     .single();
 
   if (error || !data) {
-    res.status(500).json({ error: 'INTERNAL_ERROR', message: 'Failed to update profile', statusCode: 500 });
+    res.status(500).json({ error: 'INTERNAL_ERROR', message: 'Couldn’t save your profile. Please try again.', statusCode: 500 });
     return;
   }
 

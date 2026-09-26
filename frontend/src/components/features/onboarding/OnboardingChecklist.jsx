@@ -9,7 +9,7 @@ const STEPS = [
   { id: 'invoice',  label: 'Create your first invoice',   detail: 'GST-compliant in 30 seconds',                href: '/invoices/new' },
   { id: 'income',   label: 'Log your first income',       detail: 'Unlocks advance tax estimate & P&L chart',   href: '/income' },
   { id: 'deal',     label: 'Add a brand deal',            detail: 'Track from inquiry to payment',              href: '/deals' },
-  { id: 'tds',      label: 'Add a TDS record',            detail: 'Every brand deducts 10% — track it all',     href: '/tds' },
+  { id: 'tds',      label: 'Add a TDS record',            detail: 'Brands usually deduct 1–10% — track it all',     href: '/tds' },
 ];
 
 const STORAGE_KEY = 'ctos_onboarding_v1';
