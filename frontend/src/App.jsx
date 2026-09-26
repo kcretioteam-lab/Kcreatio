@@ -9,6 +9,7 @@ import AppShell from './components/layout/AppShell.jsx';
 import { SkeletonPage } from './components/ui/Skeleton.jsx';
 import PageTransition from './components/ui/PageTransition.jsx';
 import ErrorBoundary from './components/ui/ErrorBoundary.jsx';
+import ApiLoadingOverlay from './components/ui/ApiLoadingOverlay.jsx';
 
 // Eager: auth-critical
 import LandingPage from './pages/LandingPage.jsx';
@@ -93,6 +94,7 @@ export default function App() {
             <ToastProvider>
             <PremiumRequestProvider>
               <AppInitializer />
+              <ApiLoadingOverlay />
               <a href="#main-content" className="skip-link">Skip to content</a>
               <Routes>
                 {/* Public routes */}

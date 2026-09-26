@@ -1,4 +1,4 @@
--- Kcretio — Migration 018
+-- Kcreatio — Migration 018
 -- Creator-specific features: barter deals, foreign income and export invoices, a fuller TDS
 -- tracker, tax-useful expenses, credit notes, partial payments, reminders, recurring invoices.
 

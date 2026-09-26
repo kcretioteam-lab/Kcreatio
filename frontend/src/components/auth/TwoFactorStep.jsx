@@ -31,7 +31,7 @@ export default function TwoFactorStep({ onVerify, onCancel }) {
         <div>
           <h1 style={{ fontSize: 'var(--text-xl)', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>Two-factor sign-in</h1>
           <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)', marginTop: 'var(--space-1)' }}>
-            {useRecovery ? 'Enter one of the recovery codes you saved when you turned on two-factor sign-in. Each code works once.' : 'Open your authenticator app and enter the 6-digit code for Kcretio.'}
+            {useRecovery ? 'Enter one of the recovery codes you saved when you turned on two-factor sign-in. Each code works once.' : 'Open your authenticator app and enter the 6-digit code for Kcreatio.'}
           </p>
         </div>
       </div>

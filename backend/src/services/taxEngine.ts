@@ -1,4 +1,4 @@
-// Kcretio tax engine — single source of truth for income-tax maths.
+// Kcreatio tax engine — single source of truth for income-tax maths.
 // MIRRORED in frontend/src/utils/taxCalc.js. Both copies are checked against
 // backend/src/services/__tests__/taxCases.json — change them together.
 //

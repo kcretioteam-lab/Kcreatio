@@ -1,6 +1,6 @@
-# Kcretio — Backend
+# Kcreatio — Backend
 
-Express 4 + TypeScript API for the Kcretio frontend.
+Express 4 + TypeScript API for the Kcreatio frontend.
 
 ---
 
@@ -94,7 +94,7 @@ The authenticated `/estimate` uses the same rules via `calcTax()` (new regime 87
 Server-side PDF rendering via `services/puppeteerPdfService.ts`.
 
 - `GET /api/v1/invoices/:id/pdf` — generates and streams a PDF
-- **Plan gating:** Basic users get a faint diagonal Kcretio logo plus a "Kcretio.in — upgrade for watermark-free invoices" footer. Starter and above get clean PDFs.
+- **Plan gating:** Basic users get a faint diagonal Kcreatio logo plus a "kcreatio.com — upgrade for watermark-free invoices" footer. Starter and above get clean PDFs.
 - The watermark is injected as `body::before` / `body::after` CSS in the HTML template, not post-processed — so it prints correctly at any scale. The frontend Blob fallback uses the same watermark.
 
 ---

@@ -318,7 +318,7 @@ function buildClassicHTML(inv, user, t, plan) {
   @page { margin: 0; size: A4 portrait; }
   * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; }
   @media print { body { padding: 16px 24px; } .hdr { border-radius: 0; } .body { border-radius: 0; } }
-  ${plan === 'basic' ? `body::before{content:'';position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-45deg);width:65%;height:65%;background:url('data:image/svg+xml;base64,${_WMARK_B64}') no-repeat center/contain;opacity:.07;pointer-events:none;z-index:9999;}body::after{content:'Made with ease on kcretio.in';position:fixed;bottom:10px;left:0;right:0;text-align:center;font-size:8px;color:#a0aec0;font-family:Arial,sans-serif;letter-spacing:.04em;pointer-events:none;z-index:9999;}` : ''}
+  ${plan === 'basic' ? `body::before{content:'';position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-45deg);width:65%;height:65%;background:url('data:image/svg+xml;base64,${_WMARK_B64}') no-repeat center/contain;opacity:.07;pointer-events:none;z-index:9999;}body::after{content:'Made with ease on kcreatio.com';position:fixed;bottom:10px;left:0;right:0;text-align:center;font-size:8px;color:#a0aec0;font-family:Arial,sans-serif;letter-spacing:.04em;pointer-events:none;z-index:9999;}` : ''}
 </style>
 </head><body>
 <div class="hdr">
@@ -417,7 +417,7 @@ function buildClassicHTML(inv, user, t, plan) {
       </div>
     </div>
   </div>` : ''}
-  <div class="footer">GST-compliant invoice &nbsp;·&nbsp; kcretio.in &nbsp;·&nbsp; Subject to GST as applicable</div>
+  <div class="footer">GST-compliant invoice &nbsp;·&nbsp; kcreatio.com &nbsp;·&nbsp; Subject to GST as applicable</div>
 </div>
 </body></html>`;
 }
@@ -473,7 +473,7 @@ function buildCorporateHTML(inv, user, t, plan) {
   @page { margin: 0; size: A4 portrait; }
   * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; }
   @media print { body { padding: 16px 24px; } }
-  ${plan === 'basic' ? `body::before{content:'';position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-45deg);width:65%;height:65%;background:url('data:image/svg+xml;base64,${_WMARK_B64}') no-repeat center/contain;opacity:.07;pointer-events:none;z-index:9999;}body::after{content:'Made with ease on kcretio.in';position:fixed;bottom:10px;left:0;right:0;text-align:center;font-size:8px;color:#a0aec0;font-family:Arial,sans-serif;letter-spacing:.04em;pointer-events:none;z-index:9999;}` : ''}
+  ${plan === 'basic' ? `body::before{content:'';position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-45deg);width:65%;height:65%;background:url('data:image/svg+xml;base64,${_WMARK_B64}') no-repeat center/contain;opacity:.07;pointer-events:none;z-index:9999;}body::after{content:'Made with ease on kcreatio.com';position:fixed;bottom:10px;left:0;right:0;text-align:center;font-size:8px;color:#a0aec0;font-family:Arial,sans-serif;letter-spacing:.04em;pointer-events:none;z-index:9999;}` : ''}
 </style>
 </head><body>
 <div class="hdr">
@@ -579,7 +579,7 @@ ${inv.include_terms && inv.terms_text ? `
   <strong>Terms &amp; Conditions:</strong>
   <div style="margin-top:4px;white-space:pre-line;color:#666;font-size:9px">${inv.terms_text}</div>
 </div>` : ''}
-<div style="margin-top:16px;text-align:center;font-size:8px;color:#ccc">GST-compliant invoice · kcretio.in · Subject to GST as applicable</div>
+<div style="margin-top:16px;text-align:center;font-size:8px;color:#ccc">GST-compliant invoice · kcreatio.com · Subject to GST as applicable</div>
 </body></html>`;
 }
 
@@ -630,7 +630,7 @@ function buildMinimalHTML(inv, user, t, plan) {
   @page { margin: 0; size: A4 portrait; }
   * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; }
   @media print { body { padding: 16px 24px; } }
-  ${plan === 'basic' ? `body::before{content:'';position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-45deg);width:65%;height:65%;background:url('data:image/svg+xml;base64,${_WMARK_B64}') no-repeat center/contain;opacity:.07;pointer-events:none;z-index:9999;}body::after{content:'Made with ease on kcretio.in';position:fixed;bottom:10px;left:0;right:0;text-align:center;font-size:8px;color:#a0aec0;font-family:Arial,sans-serif;letter-spacing:.04em;pointer-events:none;z-index:9999;}` : ''}
+  ${plan === 'basic' ? `body::before{content:'';position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-45deg);width:65%;height:65%;background:url('data:image/svg+xml;base64,${_WMARK_B64}') no-repeat center/contain;opacity:.07;pointer-events:none;z-index:9999;}body::after{content:'Made with ease on kcreatio.com';position:fixed;bottom:10px;left:0;right:0;text-align:center;font-size:8px;color:#a0aec0;font-family:Arial,sans-serif;letter-spacing:.04em;pointer-events:none;z-index:9999;}` : ''}
 </style>
 </head><body>
 <div class="top">
@@ -737,7 +737,7 @@ ${inv.include_terms && inv.terms_text ? `
   <strong>Terms &amp; Conditions:</strong>
   <div style="margin-top:4px;white-space:pre-line;color:#666;font-size:9px">${inv.terms_text}</div>
 </div>` : ''}
-<div style="margin-top:16px;text-align:center;font-size:8px;color:#ccc">GST-compliant invoice · kcretio.in · Subject to GST as applicable</div>
+<div style="margin-top:16px;text-align:center;font-size:8px;color:#ccc">GST-compliant invoice · kcreatio.com · Subject to GST as applicable</div>
 </body></html>`;
 }
 
@@ -873,7 +873,7 @@ function CompliancePanel({ form, user }) {
     { key: 'signatory',          label: 'Signature included' },
   ];
   if (!form.includeSignatory) errors.signatory = 'Rule 46 requires a signature';
-  // Always printed by Kcretio: amount in words, reverse charge line, state codes next to addresses.
+  // Always printed by Kcreatio: amount in words, reverse charge line, state codes next to addresses.
   const passed = checks.filter(c => !errors[c.key]).length;
   const allPass = passed === checks.length;
 
@@ -1027,6 +1027,7 @@ export default function InvoicePage({ initialView }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [debouncedSearch, setDebouncedSearch] = useState('');
+  const lastSearchRef = useRef('');
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(searchQuery.trim()), 300);
     return () => clearTimeout(t);
@@ -1269,7 +1270,11 @@ export default function InvoicePage({ initialView }) {
     const cacheKey = `invoices:${JSON.stringify(params)}`;
     const cached = readCache(cacheKey);
     if (cached) { setInvoices(cached.invoices); setTotalCount(cached.total); setListLoading(false); }
-    api.get('/invoices', { params })
+    // Search-as-you-type must not raise the blocking loader — it would pull focus out of the
+    // search box mid-word. The list shows its own "Loading invoices…" state instead.
+    const searchChanged = lastSearchRef.current !== debouncedSearch;
+    lastSearchRef.current = debouncedSearch;
+    api.get('/invoices', { params, silent: searchChanged })
       .then(res => {
         setInvoices(res.data.invoices || []);
         setTotalCount(res.data.total || 0);
@@ -1755,7 +1760,7 @@ export default function InvoicePage({ initialView }) {
                   <span style={{ display: 'block', fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>Up to 3 reminders, a week apart. Needs the brand’s email.</span>
                 </span>
               </label>
-              <SField id="recurring" label="Repeat this invoice" value={form.recurring} onChange={e => update('recurring', e.target.value)} tooltip="For retainers: Kcretio drafts the next invoice on the same date and emails you to review and send it.">
+              <SField id="recurring" label="Repeat this invoice" value={form.recurring} onChange={e => update('recurring', e.target.value)} tooltip="For retainers: Kcreatio drafts the next invoice on the same date and emails you to review and send it.">
                 <option value="">Don’t repeat</option>
                 <option value="monthly">Every month</option>
                 <option value="quarterly">Every quarter</option>
@@ -2810,7 +2815,7 @@ function ClassicPreview({ form, calc, invoiceNumber, user, template }) {
         )}
 
         <div style={{ marginTop: 16, textAlign: 'center', fontSize: 8, color: '#ccc' }}>
-          Computer-generated invoice · Kcretio · Subject to GST as applicable
+          Computer-generated invoice · Kcreatio · Subject to GST as applicable
         </div>
       </div>
 
@@ -2921,7 +2926,7 @@ function CorporatePreview({ form, calc, invoiceNumber, user, template }) {
           </div>
         )}
         <ComplianceLines form={form} calc={calc} />
-        <div style={{ marginTop: 8, fontSize: 8, color: '#ccc', textAlign: 'center' }}>Computer-generated invoice · Kcretio · Subject to GST as applicable</div>
+        <div style={{ marginTop: 8, fontSize: 8, color: '#ccc', textAlign: 'center' }}>Computer-generated invoice · Kcreatio · Subject to GST as applicable</div>
       </div>
     </div>
   );
@@ -3017,7 +3022,7 @@ function MinimalPreview({ form, calc, invoiceNumber, user, template }) {
         </div>
       )}
       <ComplianceLines form={form} calc={calc} />
-      <div style={{ marginTop: 8, fontSize: 7, color: '#ccc', textAlign: 'center' }}>Computer-generated invoice · Kcretio · Subject to GST as applicable</div>
+      <div style={{ marginTop: 8, fontSize: 7, color: '#ccc', textAlign: 'center' }}>Computer-generated invoice · Kcreatio · Subject to GST as applicable</div>
     </div>
   );
 }

@@ -1,4 +1,4 @@
-# Kcretio — Frontend
+# Kcreatio — Frontend
 
 React 18 + Vite app for Indian content creators to manage GST invoices, TDS, brand deals, and advance tax planning.
 

@@ -518,7 +518,7 @@ export default function SmartInboxWidget({ user, onManualPaste, onPendingCountCh
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
           <Zap size={15} style={{ color: 'var(--accent)' }} />
           <span style={{ fontWeight: 700, fontSize: 'var(--text-sm)', color: 'var(--text-primary)' }}>Smart Inbox</span>
-          <span title="Google is still reviewing Kcretio’s Gmail access, so you may see an “unverified app” screen when connecting." style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', padding: '1px 6px', borderRadius: 'var(--radius-sm)', background: 'var(--warning-dim)', color: 'var(--warning-text)' }}>Beta</span>
+          <span title="Google is still reviewing Kcreatio’s Gmail access, so you may see an “unverified app” screen when connecting." style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', padding: '1px 6px', borderRadius: 'var(--radius-sm)', background: 'var(--warning-dim)', color: 'var(--warning-text)' }}>Beta</span>
           {pendingCount > 0 && (
             <span style={{
               background: 'var(--accent-dim)', color: 'var(--accent)',

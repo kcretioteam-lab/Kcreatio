@@ -32,7 +32,7 @@ export default function SessionsCard() {
   }
 
   async function signOutEverywhere() {
-    if (!window.confirm('Sign out of Kcretio on every device, including this one?')) return;
+    if (!window.confirm('Sign out of Kcreatio on every device, including this one?')) return;
     try {
       await api.post('/auth/sessions/revoke-all');
       await logout();

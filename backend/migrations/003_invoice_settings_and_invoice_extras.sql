@@ -1,4 +1,4 @@
--- Kcretio — Migration 003
+-- Kcreatio — Migration 003
 -- Extends invoices table + adds invoice_settings table
 -- Run AFTER 001_initial_schema.sql and 002_seed_test_user.sql
 

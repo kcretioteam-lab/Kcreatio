@@ -8,6 +8,13 @@
 
 # Redirect rules are matched top to bottom — keep the SPA fallback last.
 
+# The live site is kcreatio.com — send the old Netlify address there so search engines index one site
+[[redirects]]
+  from   = "https://kcretio.netlify.app/*"
+  to     = "https://kcreatio.com/:splat"
+  status = 301
+  force  = true
+
 # The old /v2 preview of the landing page now lives at /
 [[redirects]]
   from   = "/v2"
@@ -35,11 +42,11 @@
   status = 200
 
 # Security headers for every page. HSTS is already added by Netlify on HTTPS.
-# connect-src must list the backend host — update it if the API moves (e.g. to api.kcretio.in).
+# connect-src must list the backend host — update it if the API moves (e.g. to api.kcreatio.com).
 [[headers]]
   for = "/*"
   [headers.values]
-    Content-Security-Policy = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://*.supabase.co https://lh3.googleusercontent.com; font-src 'self' data:; connect-src 'self' https://*.onrender.com https://api.kcretio.in https://*.supabase.co; frame-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self' https://accounts.google.com; frame-ancestors 'none'; upgrade-insecure-requests"
+    Content-Security-Policy = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://*.supabase.co https://lh3.googleusercontent.com; font-src 'self' data:; connect-src 'self' https://*.onrender.com https://api.kcreatio.com https://*.supabase.co; frame-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self' https://accounts.google.com; frame-ancestors 'none'; upgrade-insecure-requests"
     X-Frame-Options = "DENY"
     X-Content-Type-Options = "nosniff"
     Referrer-Policy = "strict-origin-when-cross-origin"

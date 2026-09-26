@@ -1,4 +1,4 @@
--- Kcretio — Migration 017
+-- Kcreatio — Migration 017
 -- Two-factor login (authenticator app), signed-in sessions, and an invoice audit log.
 
 -- ─── 2FA ────────────────────────────────────────────────────────────────────

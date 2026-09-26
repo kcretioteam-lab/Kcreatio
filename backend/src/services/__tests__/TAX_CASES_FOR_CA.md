@@ -1,6 +1,6 @@
 # Tax engine test cases — for CA sign-off
 
-**Status: PENDING CA SIGN-OFF.** Kcretio uses these cases to check its tax calculations on every deploy. Please confirm each expected value, or mark the correct figure next to it.
+**Status: PENDING CA SIGN-OFF.** Kcreatio uses these cases to check its tax calculations on every deploy. Please confirm each expected value, or mark the correct figure next to it.
 
 ## Rules applied (tax year 2026-27, Income-tax Act 2025)
 

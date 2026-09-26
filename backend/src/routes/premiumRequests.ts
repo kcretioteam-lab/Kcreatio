@@ -30,7 +30,7 @@ const esc = (v: string) => v.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt
 function approvalPage(title: string, body: string): string {
   return `<!doctype html><html><head><meta charset="utf-8"><title>${title}</title></head>
 <body style="font-family:Inter,Arial,sans-serif;background:#07080F;color:#F0F1F8;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;">
-<div style="max-width:420px;padding:32px;text-align:center;"><div style="font-size:22px;font-weight:700;color:#E8921A;margin-bottom:12px;">Kcretio</div>
+<div style="max-width:420px;padding:32px;text-align:center;"><div style="font-size:22px;font-weight:700;color:#E8921A;margin-bottom:12px;">Kcreatio</div>
 <h2 style="margin:0 0 8px;">${title}</h2><p style="color:#94a3b8;">${body}</p></div></body></html>`;
 }
 

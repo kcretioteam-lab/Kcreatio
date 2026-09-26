@@ -4,7 +4,7 @@ import LogoMark from '../components/ui/LogoMark.jsx';
 const SECTIONS = [
   {
     title: '1. What This Covers',
-    body: 'This policy explains what Kcretio collects, why, and who it is shared with. Kcretio provides GST invoicing, TDS tracking, advance tax planning, and brand-deal management — using it means giving us your business and financial details, so we take that seriously.',
+    body: 'This policy explains what Kcreatio collects, why, and who it is shared with. Kcreatio provides GST invoicing, TDS tracking, advance tax planning, and brand-deal management — using it means giving us your business and financial details, so we take that seriously.',
   },
   {
     title: '2. Information You Provide',
@@ -20,7 +20,7 @@ const SECTIONS = [
   },
   {
     title: '5. Payment Information',
-    body: 'Kcretio does not currently take payments. When paid plans launch, subscription payments will be processed by Razorpay. Kcretio does not receive or store your card, UPI PIN, or bank login details — Razorpay handles that directly and shares back only your subscription status and plan.',
+    body: 'Kcreatio does not currently take payments. When paid plans launch, subscription payments will be processed by Razorpay. Kcreatio does not receive or store your card, UPI PIN, or bank login details — Razorpay handles that directly and shares back only your subscription status and plan.',
   },
   {
     title: '6. Cookies & Sessions',
@@ -32,7 +32,7 @@ const SECTIONS = [
   },
   {
     title: '8. Who We Share It With',
-    body: 'We do not sell your data. It is shared only with the services that run Kcretio on our behalf: Supabase (database and file storage), Render (backend hosting), Netlify (frontend hosting), Resend (transactional email delivery), Razorpay (subscription payments), and Google (sign-in, and Gmail access only if you connect it). Each of these processes data solely to provide their part of the service, under their own privacy and security terms.',
+    body: 'We do not sell your data. It is shared only with the services that run Kcreatio on our behalf: Supabase (database and file storage), Render (backend hosting), Netlify (frontend hosting), Resend (transactional email delivery), Razorpay (subscription payments), and Google (sign-in, and Gmail access only if you connect it). Each of these processes data solely to provide their part of the service, under their own privacy and security terms.',
   },
   {
     title: '9. Where Your Data Lives',
@@ -44,7 +44,7 @@ const SECTIONS = [
   },
   {
     title: '11. Your Rights',
-    body: 'Under the Digital Personal Data Protection Act, 2023 you can: see a summary of the personal data we hold and how we use it; correct, complete or update it (most of it directly in Settings); erase it by deleting your account; and have your grievances addressed. Email grievance@kcretio.in and we will respond within 30 days.',
+    body: 'Under the Digital Personal Data Protection Act, 2023 you can: see a summary of the personal data we hold and how we use it; correct, complete or update it (most of it directly in Settings); erase it by deleting your account; and have your grievances addressed. Email grievance@kcreatio.com and we will respond within 30 days.',
   },
   {
     title: '12. Withdrawing Consent',
@@ -52,7 +52,7 @@ const SECTIONS = [
   },
   {
     title: '13. Nominating Someone',
-    body: 'You may nominate another person to exercise your rights over your data if you die or become unable to do so. Email grievance@kcretio.in from your registered email address with the nominee’s name and contact details.',
+    body: 'You may nominate another person to exercise your rights over your data if you die or become unable to do so. Email grievance@kcreatio.com from your registered email address with the nominee’s name and contact details.',
   },
   {
     title: '14. Security and Data Breaches',
@@ -60,7 +60,7 @@ const SECTIONS = [
   },
   {
     title: '15. Children',
-    body: "Kcretio is a business and financial tool for adults and is not directed at, or intended for use by, anyone under 18.",
+    body: "Kcreatio is a business and financial tool for adults and is not directed at, or intended for use by, anyone under 18.",
   },
   {
     title: '16. Changes to This Policy',
@@ -68,11 +68,11 @@ const SECTIONS = [
   },
   {
     title: '17. Who We Are and Grievance Officer',
-    body: 'Kcretio is operated by [LEGAL ENTITY NAME], [REGISTERED ADDRESS]. Grievance Officer: [NAME], grievance@kcretio.in. We acknowledge grievances within 48 hours and resolve them within 30 days. If you are not satisfied with our response, you may complain to the Data Protection Board of India.',
+    body: 'Kcreatio is operated by [LEGAL ENTITY NAME], [REGISTERED ADDRESS]. Grievance Officer: [NAME], grievance@kcreatio.com. We acknowledge grievances within 48 hours and resolve them within 30 days. If you are not satisfied with our response, you may complain to the Data Protection Board of India.',
   },
   {
     title: '18. Contact',
-    body: 'Questions about this policy can be sent to support@kcretio.in. Requests about your data and complaints go to grievance@kcretio.in.',
+    body: 'Questions about this policy can be sent to support@kcreatio.com. Requests about your data and complaints go to grievance@kcreatio.com.',
   },
 ];
 
@@ -82,7 +82,7 @@ export default function PrivacyPage() {
       <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: 'var(--space-5) var(--space-6)', borderBottom: '1px solid var(--border)' }}>
         <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', color: 'var(--text-primary)', fontWeight: 600, textDecoration: 'none' }}>
           <LogoMark size={28} />
-          Kcretio
+          Kcreatio
         </Link>
         <Link to="/register" style={{ fontSize: 'var(--text-sm)', color: 'var(--accent)', fontWeight: 600, textDecoration: 'none' }}>← Back to sign up</Link>
       </header>

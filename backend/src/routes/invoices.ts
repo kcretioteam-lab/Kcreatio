@@ -106,7 +106,7 @@ router.get('/confirm-payment/:token', async (req: ExpressRequest, res: Response)
     }).catch(() => null);
   }
 
-  res.status(200).send(`<!DOCTYPE html><html><body style="font-family:sans-serif;max-width:480px;margin:80px auto;text-align:center;background:#07080F;color:#F0F1F8;padding:32px;"><div style="font-size:48px;margin-bottom:16px;">✓</div><h2 style="color:#22c55e;margin-bottom:8px;">Thanks for confirming</h2><p style="color:#94a3b8;">We've told the creator that invoice ${inv.invoice_number} has been paid.</p><p style="margin-top:32px;font-size:12px;color:#64748b;">Powered by Kcretio</p></body></html>`);
+  res.status(200).send(`<!DOCTYPE html><html><body style="font-family:sans-serif;max-width:480px;margin:80px auto;text-align:center;background:#07080F;color:#F0F1F8;padding:32px;"><div style="font-size:48px;margin-bottom:16px;">✓</div><h2 style="color:#22c55e;margin-bottom:8px;">Thanks for confirming</h2><p style="color:#94a3b8;">We've told the creator that invoice ${inv.invoice_number} has been paid.</p><p style="margin-top:32px;font-size:12px;color:#64748b;">Powered by Kcreatio</p></body></html>`);
 });
 
 // All routes below require authentication
@@ -713,7 +713,7 @@ router.post('/:id/send', async (req: AuthRequest, res: Response): Promise<void> 
       <h2 style="font-size:18px;font-weight:600;margin:0 0 8px;">GST Invoice ${inv.invoice_number}</h2>
       <p style="color:#94a3b8;margin:0 0 8px;">Dear ${inv.brand_name},</p>
       <p style="color:#94a3b8;margin:0 0 24px;">Please find the GST invoice for <strong style="color:#F0F1F8;">${amount}</strong> for services rendered. Kindly process payment at your earliest convenience.</p>
-      <p style="color:#64748b;font-size:12px;margin:0;">This is a GST-compliant invoice generated via Kcretio.</p>
+      <p style="color:#64748b;font-size:12px;margin:0;">This is a GST-compliant invoice generated via Kcreatio.</p>
     </div>`;
 
   try {

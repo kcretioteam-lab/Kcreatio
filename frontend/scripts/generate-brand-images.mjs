@@ -43,7 +43,7 @@ const og = `<!doctype html><html><head><style>
   .pills div{border:1px solid #2A2E3F;border-radius:999px;padding:10px 22px;font-size:22px;color:#D5D8E3}
 </style></head><body>
   <div class="glow"></div>
-  <div class="brand"><img src="${svgData('logo/mark.svg')}"><span>Kcretio</span></div>
+  <div class="brand"><img src="${svgData('logo/mark.svg')}"><span>Kcreatio</span></div>
   <h1>GST, TDS &amp; advance tax for <em>Indian creators</em></h1>
   <p>Invoices, brand deals and taxes — in one place.</p>
   <div class="pills"><div>GST invoices</div><div>TDS tracker</div><div>Advance tax planner</div></div>

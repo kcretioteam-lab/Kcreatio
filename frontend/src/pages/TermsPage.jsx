@@ -4,11 +4,11 @@ import LogoMark from '../components/ui/LogoMark.jsx';
 const SECTIONS = [
   {
     title: '1. Acceptance of Terms',
-    body: 'By creating a Kcretio account, or by using Kcretio through Google sign-in, you agree to these Terms of Service. If you do not agree, do not create an account or use the service.',
+    body: 'By creating a Kcreatio account, or by using Kcreatio through Google sign-in, you agree to these Terms of Service. If you do not agree, do not create an account or use the service.',
   },
   {
     title: '2. Service Description',
-    body: 'Kcretio provides GST-compliant invoicing, TDS tracking, advance tax planning, and brand-deal management tools, built primarily for Indian content creators and equally usable by any freelancer or small business that needs to raise a compliant GST invoice.',
+    body: 'Kcreatio provides GST-compliant invoicing, TDS tracking, advance tax planning, and brand-deal management tools, built primarily for Indian content creators and equally usable by any freelancer or small business that needs to raise a compliant GST invoice.',
   },
   {
     title: '3. Your Account',
@@ -16,15 +16,15 @@ const SECTIONS = [
   },
   {
     title: '4. Accuracy of Information',
-    body: 'You are responsible for the accuracy of the business, GSTIN, PAN, invoice, and financial information you enter. Kcretio performs calculations based on the data you provide and on prevailing tax rules — it does not independently verify your GSTIN, PAN, or business details with government authorities.',
+    body: 'You are responsible for the accuracy of the business, GSTIN, PAN, invoice, and financial information you enter. Kcreatio performs calculations based on the data you provide and on prevailing tax rules — it does not independently verify your GSTIN, PAN, or business details with government authorities.',
   },
   {
     title: '5. Not Tax or Legal Advice',
-    body: 'Kcretio is a record-keeping and calculation tool, not a licensed Chartered Accountant, tax advisor, or legal service. GST, TDS, and advance-tax figures shown in the product are estimates based on the information you enter and the rules in effect at the time — always confirm with a qualified CA before filing returns or making tax payments.',
+    body: 'Kcreatio is a record-keeping and calculation tool, not a licensed Chartered Accountant, tax advisor, or legal service. GST, TDS, and advance-tax figures shown in the product are estimates based on the information you enter and the rules in effect at the time — always confirm with a qualified CA before filing returns or making tax payments.',
   },
   {
     title: '6. Payments & Subscriptions',
-    body: 'Kcretio does not currently charge for any plan. When paid plans launch, they will be billed through Razorpay, renew automatically at the end of each billing period until cancelled, and cancelling will stop future renewals without refunding the current billing period unless required by law.',
+    body: 'Kcreatio does not currently charge for any plan. When paid plans launch, they will be billed through Razorpay, renew automatically at the end of each billing period until cancelled, and cancelling will stop future renewals without refunding the current billing period unless required by law.',
   },
   {
     title: '7. Premium Access',
@@ -32,15 +32,15 @@ const SECTIONS = [
   },
   {
     title: '8. Acceptable Use',
-    body: 'You agree not to use Kcretio to generate fraudulent invoices, misrepresent GST/TDS figures to evade tax, impersonate another business, or attempt to disrupt or gain unauthorized access to the service.',
+    body: 'You agree not to use Kcreatio to generate fraudulent invoices, misrepresent GST/TDS figures to evade tax, impersonate another business, or attempt to disrupt or gain unauthorized access to the service.',
   },
   {
     title: '9. Optional Gmail Connection',
-    body: 'If you choose to connect Gmail from Settings, Kcretio reads your inbox to automatically detect brand-deal, payment, and TDS-related emails, and can send invoice emails on your behalf. This is entirely optional and can be disconnected at any time from Settings.',
+    body: 'If you choose to connect Gmail from Settings, Kcreatio reads your inbox to automatically detect brand-deal, payment, and TDS-related emails, and can send invoice emails on your behalf. This is entirely optional and can be disconnected at any time from Settings.',
   },
   {
     title: '10. Intellectual Property',
-    body: 'The Kcretio name, product design, and software are the property of [LEGAL ENTITY NAME], which operates Kcretio. The invoices, financial records, and business data you enter remain yours.',
+    body: 'The Kcreatio name, product design, and software are the property of [LEGAL ENTITY NAME], which operates Kcreatio. The invoices, financial records, and business data you enter remain yours.',
   },
   {
     title: '11. Termination',
@@ -48,7 +48,7 @@ const SECTIONS = [
   },
   {
     title: '12. Disclaimer of Warranty',
-    body: 'Kcretio is provided "as is." While we take reasonable care to keep calculations accurate and the service available, we do not guarantee uninterrupted access or that every tax scenario is covered.',
+    body: 'Kcreatio is provided "as is." While we take reasonable care to keep calculations accurate and the service available, we do not guarantee uninterrupted access or that every tax scenario is covered.',
   },
   {
     title: '13. Governing Law',
@@ -56,11 +56,11 @@ const SECTIONS = [
   },
   {
     title: '14. Changes to These Terms',
-    body: 'We may update these terms as the product evolves. Continued use of Kcretio after an update constitutes acceptance of the revised terms.',
+    body: 'We may update these terms as the product evolves. Continued use of Kcreatio after an update constitutes acceptance of the revised terms.',
   },
   {
     title: '15. Contact',
-    body: 'Kcretio is operated by [LEGAL ENTITY NAME], [REGISTERED ADDRESS]. Questions about these terms can be sent to support@kcretio.in.',
+    body: 'Kcreatio is operated by [LEGAL ENTITY NAME], [REGISTERED ADDRESS]. Questions about these terms can be sent to support@kcreatio.com.',
   },
 ];
 
@@ -70,7 +70,7 @@ export default function TermsPage() {
       <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: 'var(--space-5) var(--space-6)', borderBottom: '1px solid var(--border)' }}>
         <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', color: 'var(--text-primary)', fontWeight: 600, textDecoration: 'none' }}>
           <LogoMark size={28} />
-          Kcretio
+          Kcreatio
         </Link>
         <Link to="/register" style={{ fontSize: 'var(--text-sm)', color: 'var(--accent)', fontWeight: 600, textDecoration: 'none' }}>← Back to sign up</Link>
       </header>

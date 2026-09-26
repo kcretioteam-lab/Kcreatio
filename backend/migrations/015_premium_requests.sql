@@ -1,4 +1,4 @@
--- Kcretio — Migration 015
+-- Kcreatio — Migration 015
 -- Premium access by request: users ask for 28 days of Pro, admin approves via emailed link.
 -- Replaces paid upgrades while payments are disabled.
 CREATE TABLE IF NOT EXISTS premium_requests (
