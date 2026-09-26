@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: kcretio-backend
+    name: kcreatio-backend
     runtime: node
     # Most users are in India — singapore is much closer than oregon (changing region needs a new service).
     # On the free plan the service sleeps when idle; use a paid plan (plan: starter) for always-on,

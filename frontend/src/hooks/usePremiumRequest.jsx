@@ -15,7 +15,7 @@ export function PremiumRequestProvider({ children }) {
 
   const refresh = useCallback(async () => {
     try {
-      const res = await api.get('/premium-requests/me');
+      const res = await api.get('/premium-requests/me', { silent: true }); // background refresh — never block the screen
       setRequest(res.data?.request || null);
     } catch { /* backend unavailable in dev — keep last known state */ }
   }, []);

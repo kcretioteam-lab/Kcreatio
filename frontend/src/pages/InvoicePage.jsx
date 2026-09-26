@@ -1027,6 +1027,7 @@ export default function InvoicePage({ initialView }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [debouncedSearch, setDebouncedSearch] = useState('');
+  const lastSearchRef = useRef('');
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(searchQuery.trim()), 300);
     return () => clearTimeout(t);
@@ -1269,7 +1270,11 @@ export default function InvoicePage({ initialView }) {
     const cacheKey = `invoices:${JSON.stringify(params)}`;
     const cached = readCache(cacheKey);
     if (cached) { setInvoices(cached.invoices); setTotalCount(cached.total); setListLoading(false); }
-    api.get('/invoices', { params })
+    // Search-as-you-type must not raise the blocking loader — it would pull focus out of the
+    // search box mid-word. The list shows its own "Loading invoices…" state instead.
+    const searchChanged = lastSearchRef.current !== debouncedSearch;
+    lastSearchRef.current = debouncedSearch;
+    api.get('/invoices', { params, silent: searchChanged })
       .then(res => {
         setInvoices(res.data.invoices || []);
         setTotalCount(res.data.total || 0);

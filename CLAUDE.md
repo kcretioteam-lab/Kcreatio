@@ -22,7 +22,8 @@ cd backend && node -r dotenv/config dist/server.js   # http://localhost:4000
 - Backend: `src/routes/` + `src/services/` + `src/middleware/`
 - DB: Supabase PostgreSQL — run migrations in `backend/migrations/` in order (001→011, see SETUP.md)
 - Product name is **Kcreatio**, matching the domain https://kcreatio.com (API: `api.kcreatio.com`, email: `@kcreatio.com`). The old spelling "Kcretio" is retired
-- Internal identifiers that deliberately keep `kcretio` (renaming breaks things): `kcretio-totp:` salt in `totp.ts` (decrypts stored 2FA secrets), localStorage keys `kcretio:cache:` / `kcretio:invoice_draft`, Render service `kcretio-backend`, host `kcretio.netlify.app`, dev login `admin@kcretio.in`
+- Internal identifiers that deliberately keep `kcretio` (renaming breaks things): `kcretio-totp:` salt in `totp.ts` (decrypts stored 2FA secrets), localStorage keys `kcretio:cache:` / `kcretio:invoice_draft`, host `kcretio.netlify.app` (301s to kcreatio.com), dev login `admin@kcretio.in`
+- Live backend: https://kcreatio-backend.onrender.com (Render service `kcreatio-backend`, API at `/api/v1`)
 - Storage: Supabase bucket `invoice-signatures` for avatars, signatures, UPI QR images
 
 ## Critical rules

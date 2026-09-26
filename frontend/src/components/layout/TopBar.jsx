@@ -44,7 +44,7 @@ export default function TopBar({ pageTitle }) {
   const fetchBellCount = useCallback(async () => {
     if (!user) return;
     try {
-      const res = await api.get('/email-detections?status=pending_review&limit=1');
+      const res = await api.get('/email-detections?status=pending_review&limit=1', { silent: true }); // background badge — never block the screen
       setBellCount(res.data.pending_count ?? 0);
     } catch {
       // non-critical
