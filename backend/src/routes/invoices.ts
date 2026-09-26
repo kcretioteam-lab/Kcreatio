@@ -134,7 +134,7 @@ const CreateInvoiceSchema = z.object({
   templateId: z.string().max(20).default('classic'),
   paymentTerms: z.string().max(100).default('Net 30'),
   purchaseOrderNumber: z.string().max(100).nullish(),
-  discountValue: z.number().min(0).nullish(),
+  discountValue: z.number().min(0).max(9999999).nullish(),
   discountType: z.enum(['flat', 'percent']).nullish(),
   // Bank details
   includeBankDetails: z.boolean().default(false),

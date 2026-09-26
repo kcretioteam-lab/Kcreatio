@@ -3,6 +3,7 @@
  */
 import { useState, useEffect, useRef } from 'react';
 import { quickTaxEstimate } from '../utils/taxCalc.js';
+import { sanitizeNumber } from '../utils/limits.js';
 import { Link } from 'react-router-dom';
 import {
   FileText, TrendingDown, Calendar, Briefcase,
@@ -896,12 +897,8 @@ function inrFmt(n) {
 const MAX_MONTHLY = 100000000;
 const MAX_BRANDS = 50;
 
-// Text inputs (no number spinners) that accept whole numbers only and refuse keystrokes past `max`
-function clampDigits(raw, max) {
-  const digits = raw.replace(/\D/g, '').replace(/^0+(?=\d)/, '');
-  if (digits === '') return '';
-  return Number(digits) > max ? null : digits;
-}
+// Whole numbers only; keystrokes past `max` are refused (null)
+const clampDigits = (raw, max) => sanitizeNumber(raw, { max, decimals: 0 });
 
 export function TaxRiskCalculator() {
   const [monthly, setMonthly] = useState('');

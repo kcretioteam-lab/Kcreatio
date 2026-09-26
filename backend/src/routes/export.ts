@@ -197,6 +197,7 @@ router.get('/annual', checkPlan('pro'), async (req: AuthRequest, res: Response):
       ${row('Tax on slabs', inr(tax.baseTax))}
       ${tax.rebate ? row('Less: rebate (Sec 87A)', inr(tax.rebate)) : ''}
       ${tax.marginalRelief ? row('Less: marginal relief', inr(tax.marginalRelief)) : ''}
+      ${tax.surcharge ? row(`Add: surcharge (${Math.round(tax.surchargeRate * 100)}%)`, inr(tax.surcharge)) : ''}
       ${row('Health and education cess (4%)', inr(tax.cess))}
       ${row('Total tax liability', inr(tax.totalTax), true)}
       ${row('Less: TDS deducted by brands', inr(totalTds))}
@@ -209,7 +210,7 @@ router.get('/annual', checkPlan('pro'), async (req: AuthRequest, res: Response):
       ${row('GST charged on invoices', inr(gstCollected))}
       ${row('TDS entries', `${tds.length} (Form 16A received: ${tds.filter(t => t.form_16a_status === 'received').length})`)}
     </table>
-    <p class="note">These figures come from the records entered in Kcreatio and are estimates. They are not tax advice — please check them against Form 26AS / AIS and the underlying documents before filing.${tax.surchargeNotApplied ? ' Surcharge on income above ₹50 lakh is not included.' : ''}</p>
+    <p class="note">These figures come from the records entered in Kcreatio and are estimates. They are not tax advice — please check them against Form 26AS / AIS and the underlying documents before filing.</p>
   </body></html>`;
 
   // ── Invoice PDFs (rendered one by one; if the PDF engine is down, the rest are listed as missing)

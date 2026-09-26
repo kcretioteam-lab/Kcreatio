@@ -10,6 +10,7 @@ import { taxYearLabel } from '../utils/taxLabels.js';
 import Badge from '../components/ui/Badge.jsx';
 import Modal from '../components/ui/Modal.jsx';
 import Input from '../components/ui/Input.jsx';
+import { LIMITS, sanitizeNumber } from '../utils/limits.js';
 import { TrendingUp, PartyPopper } from 'lucide-react';
 import PlanGate from '../components/ui/PlanGate.jsx';
 import InfoTip from '../components/ui/InfoTip.jsx';
@@ -117,7 +118,7 @@ export default function TaxPlannerPage() {
         )}
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
           <label htmlFor="manual-estimate" style={{ fontSize: 'var(--text-sm)', color: 'var(--text-body)', whiteSpace: 'nowrap' }}>Override estimate:</label>
-          <input id="manual-estimate" type="number" value={manualEstimate} onChange={e => setManualEstimate(e.target.value)} placeholder={estimate ? String(Math.round(estimate.projectedAnnual)) : '0'} style={{ padding: 'var(--space-2) var(--space-3)', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', color: 'var(--text-primary)', fontFamily: 'inherit', width: 180, fontVariantNumeric: 'tabular-nums' }} />
+          <input id="manual-estimate" type="text" inputMode="numeric" value={manualEstimate} onChange={e => { const v = sanitizeNumber(e.target.value, { max: LIMITS.ANNUAL_ESTIMATE, decimals: 0 }); if (v !== null) setManualEstimate(v); }} placeholder={estimate ? String(Math.round(estimate.projectedAnnual)) : '0'} style={{ padding: 'var(--space-2) var(--space-3)', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', color: 'var(--text-primary)', fontFamily: 'inherit', width: 180, fontVariantNumeric: 'tabular-nums' }} />
         </div>
       </div>
 
@@ -229,6 +230,7 @@ export default function TaxPlannerPage() {
               ['Tax on slabs', formatINR(taxData.baseTax)],
               taxData.rebate > 0 && ['Rebate (Sec 87A)', `− ${formatINR(taxData.rebate)}`],
               taxData.marginalRelief > 0 && ['Marginal relief', `− ${formatINR(taxData.marginalRelief)}`],
+              taxData.surcharge > 0 && [`Surcharge (${Math.round(taxData.surchargeRate * 100)}%)`, formatINR(taxData.surcharge)],
               ['Health + Education Cess (4%)', formatINR(taxData.cess)],
               ['Total tax liability', formatINR(taxData.totalTax)],
               ['TDS already deducted', `− ${formatINR(taxData.tdsDeducted)}`],
@@ -246,13 +248,13 @@ export default function TaxPlannerPage() {
       )}
 
       <p style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', padding: 'var(--space-3)', background: 'var(--surface-2)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', marginBottom: 'var(--space-5)' }}>
-        Estimates use tax year {CURRENT_FY} rules under the Income-tax Act 2025.{taxData?.surchargeNotApplied ? ' Surcharge on income above ₹50L is not included.' : ''} Always verify with your CA before filing.
+        Estimates use tax year {CURRENT_FY} rules under the Income-tax Act 2025. Always verify with your CA before filing.
       </p>
       </PlanGate>
 
       <Modal isOpen={payOpen} onClose={() => setPayOpen(false)} title={`Mark ${payingQ} as Paid`}>
         <form onSubmit={handleMarkPaid} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }} noValidate>
-          <Input id="pay-amount" label="Amount Paid (₹) *" type="number" value={payForm.amountPaid} onChange={e => setPayForm(p => ({...p, amountPaid: e.target.value}))} style={{ fontVariantNumeric: 'tabular-nums' }} />
+          <Input id="pay-amount" label="Amount Paid (₹) *" type="number" max={LIMITS.MONEY_LARGE} value={payForm.amountPaid} onChange={e => setPayForm(p => ({...p, amountPaid: e.target.value}))} style={{ fontVariantNumeric: 'tabular-nums' }} />
           <Input id="pay-date" label="Payment Date *" type="date" value={payForm.paidDate} onChange={e => setPayForm(p => ({...p, paidDate: e.target.value}))} />
           <Input id="pay-challan" label="Challan Number (optional)" value={payForm.challanNumber} onChange={e => setPayForm(p => ({...p, challanNumber: e.target.value}))} placeholder="BSR code or CIN" />
           <button type="submit" disabled={saving} style={{ padding: 'var(--space-3)', background: 'var(--accent)', color: '#fff', borderRadius: 'var(--radius-md)', fontWeight: 600, cursor: 'pointer', border: 'none' }}>

@@ -43,5 +43,10 @@
 | 23 | ₹15L with ₹1L TDS → below ₹10k, no advance tax | receipts ₹15,00,000, new regime, TDS ₹1,00,000 | ₹15,00,000 | ₹1,09,200 | ₹9,200 | ₹0 | ₹0 / ₹0 / ₹0 / ₹0 | |
 | 24 | ₹20L with ₹2L TDS → below ₹10k, no advance tax | receipts ₹20,00,000, new regime, TDS ₹2,00,000 | ₹20,00,000 | ₹2,08,000 | ₹8,000 | ₹0 | ₹0 / ₹0 / ₹0 / ₹0 | |
 | 25 | ₹20L with ₹1L TDS → 15/45/75/100 instalments | receipts ₹20,00,000, new regime, TDS ₹1,00,000 | ₹20,00,000 | ₹2,08,000 | ₹1,08,000 | ₹0 | ₹16,200 / ₹32,400 / ₹32,400 / ₹27,000 | |
+| 26 | ₹50L exactly → no surcharge | receipts ₹50,00,000, new regime | ₹50,00,000 | ₹11,23,200 | ₹11,23,200 | ₹0 | — | |
+| 27 | ₹50.1L → surcharge ₹7,000 (marginal relief; full 10% would be ₹1,08,300) | receipts ₹50,10,000, new regime | ₹50,10,000 | ₹11,33,600 | ₹11,33,600 | ₹0 | — | |
+| 28 | ₹60L → 10% surcharge ₹1,38,000 | receipts ₹60,00,000, new regime | ₹60,00,000 | ₹15,78,720 | ₹15,78,720 | ₹0 | — | |
+| 29 | ₹6Cr → surcharge capped at 25% (₹43,95,000) | receipts ₹6,00,00,000, new regime | ₹6,00,00,000 | ₹2,28,54,000 | ₹2,28,54,000 | ₹0 | — | |
+| 30 | ₹6Cr old regime → 37% surcharge (₹65,90,625) | receipts ₹6,00,00,000, old regime | ₹6,00,00,000 | ₹2,53,79,250 | ₹2,53,79,250 | ₹0 | — | |
 
 Reviewed by: ______________________  Membership no.: __________  Date: __________

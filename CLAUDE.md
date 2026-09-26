@@ -35,6 +35,8 @@ cd backend && node -r dotenv/config dist/server.js   # http://localhost:4000
 - Plans: Basic (free, unlimited watermarked invoices) / Starter ₹299 / Pro ₹599. Business plan is paused (commented out)
 - Payments disabled: signup = Basic; users request 28 days of Pro via `usePremiumRequest().openRequest()` → `premium_requests` table + admin email with Approve link (sets plan='trial'). Never link to Razorpay checkout until payments are re-enabled
 - All API inputs validated with Zod before touching DB
+- Numeric fields: `<Input type="number" max={LIMITS.X}>` (default max ₹99,99,999, `decimals`, `currency` props) or `sanitizeNumber()` from `frontend/src/utils/limits.js` — never a raw `<input type="number">` (ESLint blocks it). Every `LIMITS` value mirrors a backend Zod `.max()`; change both together
+- Formatted fields: `<Input format="gstin|pan|tan|ifsc|mobile|phone|account|upi|email">` (`frontend/src/utils/fieldFormats.js`) strips invalid characters as you type and validates on blur. Every new field of these kinds must use it
 - Every DB query scoped with `user_id` filter
 - CSS: use `var(--token)` always — no hardcoded hex or px values
 - Icons: Lucide only — never mix libraries

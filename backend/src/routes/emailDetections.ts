@@ -202,7 +202,7 @@ router.post('/paste', authenticate, validateBody(PasteSchema), async (req: AuthR
 // User accepts a detection — creates the linked record
 const AcceptSchema = z.object({
   brand_name: z.string().max(200).optional(),
-  amount: z.number().positive().optional(),
+  amount: z.number().positive().max(9999999).optional(),
   tds_rate: z.number().min(0).max(100).optional(),
   tan: z.string().max(20).optional(),
   description: z.string().max(500).optional(),

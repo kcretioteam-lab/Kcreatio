@@ -16,6 +16,7 @@ import { CURRENT_FY } from '../utils/financialYear.js';
 import MarkPaidDialog from '../components/features/payment/MarkPaidDialog.jsx';
 import CreditNoteDialog from '../components/features/invoice/CreditNoteDialog.jsx';
 import Input from '../components/ui/Input.jsx';
+import { LIMITS, sanitizeNumber } from '../utils/limits.js';
 import Badge from '../components/ui/Badge.jsx';
 import Modal from '../components/ui/Modal.jsx';
 import InvoiceList from '../components/features/invoice/InvoiceList.jsx';
@@ -1589,11 +1590,11 @@ export default function InvoicePage({ initialView }) {
                 </button>
               </div>
               <Input id="brandName" label="Brand / Company Name *" value={form.brandName} onChange={e => update('brandName', e.target.value)} onBlur={() => touch('brandName')} error={showErr('brandName')} placeholder="Glowleaf Naturals Pvt Ltd" tooltip="Legal name of the brand or company you are billing. Must match their GST registration exactly for B2B invoices." />
-              <Input id="brandGstin" label="Brand GSTIN" value={form.brandGstin} onChange={e => update('brandGstin', e.target.value.toUpperCase().slice(0,15))} onBlur={() => touch('brandGstin')} error={showErr('brandGstin')} placeholder="27ABCDE1234F1Z0" hint={form.brandGstin.length === 15 && !gstinError(form.brandGstin) ? '✓ GSTIN checks out' : 'Mandatory for B2B input tax credit'} maxLength={15} tooltip="15-digit GST Identification Number of the brand. Format: 2 digits state code + 10 digit PAN + 1 digit entity number + Z + 1 check digit. Required for B2B input tax credit." style={form.brandGstin.length === 15 && !gstinError(form.brandGstin) ? { borderColor: 'var(--success)', boxShadow: '0 0 0 3px var(--success-dim)' } : {}} />
-              <Input id="brandPan" label="Brand PAN" value={form.brandPan} onChange={e => update('brandPan', e.target.value.toUpperCase().slice(0,10))} onBlur={() => touch('brandPan')} error={showErr('brandPan')} placeholder="ABCDE1234F" maxLength={10} tooltip="10-character Permanent Account Number of the brand. Optional but useful for TDS reconciliation and Form 26AS." />
+              <Input id="brandGstin" format="gstin" label="Brand GSTIN" value={form.brandGstin} onChange={e => update('brandGstin', e.target.value.toUpperCase().slice(0,15))} onBlur={() => touch('brandGstin')} error={showErr('brandGstin')} placeholder="27ABCDE1234F1Z0" hint={form.brandGstin.length === 15 && !gstinError(form.brandGstin) ? '✓ GSTIN checks out' : 'Mandatory for B2B input tax credit'} maxLength={15} tooltip="15-digit GST Identification Number of the brand. Format: 2 digits state code + 10 digit PAN + 1 digit entity number + Z + 1 check digit. Required for B2B input tax credit." style={form.brandGstin.length === 15 && !gstinError(form.brandGstin) ? { borderColor: 'var(--success)', boxShadow: '0 0 0 3px var(--success-dim)' } : {}} />
+              <Input id="brandPan" format="pan" label="Brand PAN" value={form.brandPan} onChange={e => update('brandPan', e.target.value.toUpperCase().slice(0,10))} onBlur={() => touch('brandPan')} error={showErr('brandPan')} placeholder="ABCDE1234F" maxLength={10} tooltip="10-character Permanent Account Number of the brand. Optional but useful for TDS reconciliation and Form 26AS." />
               <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 'var(--space-3)' }}>
-                <Input id="brandEmail" label="Brand Email (optional)" type="email" value={form.brandEmail} onChange={e => update('brandEmail', e.target.value)} placeholder="accounts@brand.com" tooltip="Brand's billing or accounts email address. Optional — appears on invoice for reference." />
-                <Input id="brandPhone" label="Brand Contact No. (optional)" type="tel" value={form.brandPhone} onChange={e => update('brandPhone', e.target.value)} placeholder="+91 XXXXX XXXXX" tooltip="Brand contact number. Optional — appears on invoice for reference." />
+                <Input id="brandEmail" format="email" label="Brand Email (optional)" type="email" value={form.brandEmail} onChange={e => update('brandEmail', e.target.value)} placeholder="accounts@brand.com" tooltip="Brand's billing or accounts email address. Optional — appears on invoice for reference." />
+                <Input id="brandPhone" format="phone" label="Brand Contact No. (optional)" type="tel" value={form.brandPhone} onChange={e => update('brandPhone', e.target.value)} placeholder="+91 XXXXX XXXXX" tooltip="Brand contact number. Optional — appears on invoice for reference." />
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
@@ -1656,7 +1657,7 @@ export default function InvoicePage({ initialView }) {
                             <Tooltip text="Taxable value before GST for this service line." />
                           </div>
                           <input type="text" inputMode="decimal" value={line.amount} onBlur={() => touch('baseAmount')}
-                            onChange={e => { const v=e.target.value.replace(/[^0-9.]/g,'').replace(/(\..*)\./g,'$1'); const lines=[...form.serviceLines]; lines[idx]={...lines[idx],amount:v}; update('serviceLines',lines); if(idx===0) update('baseAmount',v); }}
+                            onChange={e => { const v=sanitizeNumber(e.target.value); if(v===null) return; const lines=[...form.serviceLines]; lines[idx]={...lines[idx],amount:v}; update('serviceLines',lines); if(idx===0) update('baseAmount',v); }}
                             placeholder="45000"
                             style={{ padding: 'var(--space-2)', background: 'var(--surface)', border: (!line.amount && touched.baseAmount ? '1px solid var(--danger)' : '1px solid var(--border)'), borderRadius: 'var(--radius-md)', color: 'var(--text-primary)', fontSize: 'var(--text-sm)', fontFamily: 'inherit', fontVariantNumeric: 'tabular-nums', outline: 'none' }}
                           />
@@ -1696,7 +1697,7 @@ export default function InvoicePage({ initialView }) {
               {/* Discount input */}
               <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'flex-end', marginBottom: 'var(--space-3)' }}>
                 <div style={{ flex: 1 }}>
-                  <Input id="discountValue" label="Discount (optional)" type="number" min="0" value={form.discountValue || ''} onChange={e => update('discountValue', e.target.value)} placeholder={form.discountType === 'percent' ? 'e.g. 10' : 'e.g. 500'} tooltip="Apply a discount before GST calculation. Choose flat INR amount or percentage." />
+                  <Input id="discountValue" label="Discount (optional)" type="number" max={form.discountType === 'percent' ? LIMITS.PERCENT : LIMITS.MONEY} currency={form.discountType !== 'percent'} value={form.discountValue || ''} onChange={e => update('discountValue', e.target.value)} placeholder={form.discountType === 'percent' ? 'e.g. 10' : 'e.g. 500'} tooltip="Apply a discount before GST calculation. Choose flat INR amount or percentage." />
                 </div>
                 <div style={{ display: 'flex', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', overflow: 'hidden', marginBottom: '1px' }}>
                   {[['flat', '₹'], ['percent', '%']].map(([val, lbl]) => (
@@ -1842,8 +1843,8 @@ export default function InvoicePage({ initialView }) {
                         <Input id="accountHolderName" label="Account Holder Name" value={form.accountHolderName} onChange={e => update('accountHolderName', e.target.value)} placeholder="Your full name or business name" />
                       </div>
                       <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 'var(--space-3)' }}>
-                        <Input id="accountNumber" label="Account Number" value={form.accountNumber} onChange={e => update('accountNumber', e.target.value)} placeholder="1234567890" tooltip="Your bank account number for NEFT/RTGS/IMPS transfers" />
-                        <Input id="ifscCode" label="IFSC Code" value={form.ifscCode} onChange={e => update('ifscCode', e.target.value.toUpperCase())} placeholder="HDFC0001234" tooltip="11-character bank branch code for NEFT/RTGS" maxLength={11} />
+                        <Input id="accountNumber" format="account" label="Account Number" value={form.accountNumber} onChange={e => update('accountNumber', e.target.value)} placeholder="1234567890" tooltip="Your bank account number for NEFT/RTGS/IMPS transfers" />
+                        <Input id="ifscCode" format="ifsc" label="IFSC Code" value={form.ifscCode} onChange={e => update('ifscCode', e.target.value.toUpperCase())} placeholder="HDFC0001234" tooltip="11-character bank branch code for NEFT/RTGS" maxLength={11} />
                       </div>
                     </>
                   )}
@@ -1857,8 +1858,8 @@ export default function InvoicePage({ initialView }) {
                           <Input id="accountHolderName2" label="Account Holder" value={form.accountHolderName} onChange={e => update('accountHolderName', e.target.value)} placeholder="Your Name" />
                         </div>
                         <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 'var(--space-3)' }}>
-                          <Input id="accountNumber2" label="Account Number" value={form.accountNumber} onChange={e => update('accountNumber', e.target.value)} placeholder="1234567890" />
-                          <Input id="ifscCode2" label="IFSC Code" value={form.ifscCode} onChange={e => update('ifscCode', e.target.value.toUpperCase())} placeholder="HDFC0001234" maxLength={11} />
+                          <Input id="accountNumber2" format="account" label="Account Number" value={form.accountNumber} onChange={e => update('accountNumber', e.target.value)} placeholder="1234567890" />
+                          <Input id="ifscCode2" format="ifsc" label="IFSC Code" value={form.ifscCode} onChange={e => update('ifscCode', e.target.value.toUpperCase())} placeholder="HDFC0001234" maxLength={11} />
                         </div>
                       </div>
                     </details>
@@ -1906,7 +1907,7 @@ export default function InvoicePage({ initialView }) {
                   {/* Manual UPI entry */}
                   {(savedUpiIds.length === 0 || selectedUpiId === 'manual' || !selectedUpiId) && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-                      <Input id="upiId" label="UPI ID" value={form.upiId} onChange={e => update('upiId', e.target.value)} placeholder="yourname@okicici" tooltip="UPI ID for instant payment" />
+                      <Input id="upiId" format="upi" label="UPI ID" value={form.upiId} onChange={e => update('upiId', e.target.value)} placeholder="yourname@okicici" tooltip="UPI ID for instant payment" />
                       {/* UPI QR Scanner upload */}
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>

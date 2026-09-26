@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../hooks/useAuth.jsx';
 import { useNavigate, Link, useSearchParams, useLocation } from 'react-router-dom';
 import { nextPathFrom } from '../utils/redirect.js';
+import { FORMATS } from '../utils/fieldFormats.js';
 import { Eye, EyeOff, FileText, Receipt, Calculator, CheckCircle2, Loader2, ArrowLeft, Sun, Moon } from 'lucide-react';
 import { useIsMobile } from '../hooks/useIsMobile.js';
 import Input from '../components/ui/Input.jsx';
@@ -352,7 +353,7 @@ export default function AuthPage({ defaultMode = 'register' }) {
                   id="email"
                   type={mode === 'login' ? 'text' : 'email'}
                   value={email}
-                  onChange={e => { setEmail(e.target.value); setOtpVerified(false); setOtpStep(false); setVerificationToken(''); }}
+                  onChange={e => { setEmail(mode === 'register' ? FORMATS.email.clean(e.target.value) : e.target.value); setOtpVerified(false); setOtpStep(false); setVerificationToken(''); }}
                   autoComplete="email"
                   placeholder={mode === 'login' ? 'you@example.com or +91 XXXXX XXXXX' : 'you@example.com'}
                   style={{
@@ -424,7 +425,7 @@ export default function AuthPage({ defaultMode = 'register' }) {
 
             {/* Phone (register only) */}
             {mode === 'register' && (
-              <Input id="phone" label="Mobile number (optional)" type="tel" value={phone} onChange={e => setPhone(e.target.value)} placeholder="+91 XXXXX XXXXX" hint="Used for login and invoice contact" />
+              <Input id="phone" format="mobile" label="Mobile number (optional)" type="tel" value={phone} onChange={e => setPhone(e.target.value)} placeholder="+91 XXXXX XXXXX" hint="Used for login and invoice contact" />
             )}
 
             {/* Password */}

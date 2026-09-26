@@ -41,7 +41,7 @@ export default function CreditNoteDialog({ invoice, onClose, onDone }) {
         <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)', margin: 0 }}>
           Use a credit note when a deal is cancelled or its value is reduced after the invoice was issued. Don’t edit or delete the original invoice.
         </p>
-        <Input id="cn-amount" label="Amount to credit, before GST (₹) *" type="number" inputMode="decimal" value={amount} onChange={e => setAmount(e.target.value)}
+        <Input id="cn-amount" label="Amount to credit, before GST (₹) *" type="number" value={amount} onChange={e => setAmount(e.target.value)}
           hint={`Invoice taxable value: ${formatINRDecimal(base)}`} style={{ fontVariantNumeric: 'tabular-nums' }} />
         <Input id="cn-reason" label="Reason *" value={reason} onChange={e => setReason(e.target.value)} placeholder="Deal cancelled / deliverables reduced" maxLength={300} />
         <Input id="cn-date" label="Credit note date" type="date" value={noteDate} max={today()} onChange={e => setNoteDate(e.target.value)} />

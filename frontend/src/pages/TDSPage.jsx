@@ -334,7 +334,7 @@ export default function TDSPage() {
       <Modal isOpen={addOpen} onClose={() => setAddOpen(false)} title="Add TDS Record">
         <form onSubmit={handleAdd} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }} noValidate>
           <Input id="tds-brand" label="Brand Name *" value={form.brandName} onChange={e => setForm(p => ({...p, brandName: e.target.value}))} placeholder="Glowleaf Naturals Pvt Ltd" />
-          <Input id="tds-tan" label="Brand TAN (optional)" value={form.brandTan} onChange={e => setForm(p => ({...p, brandTan: e.target.value.toUpperCase()}))} placeholder="BLRA12345B" maxLength={10} />
+          <Input id="tds-tan" format="tan" label="Brand TAN (optional)" value={form.brandTan} onChange={e => setForm(p => ({...p, brandTan: e.target.value.toUpperCase()}))} placeholder="BLRA12345B" maxLength={10} />
           <Input id="tds-amount" label="Taxable value, before GST (₹) *" type="number" value={form.invoiceAmount} onChange={e => setForm(p => ({...p, invoiceAmount: e.target.value, tdsAmount: ''}))} placeholder="45000" hint="TDS is worked out on the amount before GST." style={{ fontVariantNumeric: 'tabular-nums' }} />
           <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 'var(--space-3)' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>

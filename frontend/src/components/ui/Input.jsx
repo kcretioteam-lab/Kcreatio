@@ -1,6 +1,8 @@
 import { useState, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { HelpCircle } from 'lucide-react';
+import { LIMITS, sanitizeNumber, overLimitMessage } from '../../utils/limits';
+import { FORMATS } from '../../utils/fieldFormats';
 
 export function InlineTooltip({ text }) {
   const [pos, setPos] = useState(null);
@@ -42,6 +44,14 @@ export function InlineTooltip({ text }) {
   );
 }
 
+// type="number" renders a text field with the numeric keypad instead: no spinner arrows,
+// digits and one decimal point only, and keystrokes that would go past `max` are refused.
+//   max      — upper limit (default LIMITS.MONEY, ₹99,99,999)
+//   decimals — decimal places allowed (default 2; 0 for whole numbers)
+//   currency — prefix the limit message with ₹ (default true)
+// format="gstin" | "pan" | "tan" | "ifsc" | "mobile" | "phone" | "account" | "upi" | "email"
+// (utils/fieldFormats.js) strips characters the field can't contain as you type, and
+// checks the finished value when the field loses focus.
 export default function Input({
   label,
   id,
@@ -51,8 +61,39 @@ export default function Input({
   style: extra,
   containerStyle,
   onBlur: outerBlur,
+  type,
+  max = LIMITS.MONEY,
+  decimals = 2,
+  currency = true,
+  onChange,
+  format,
+  min,    // negatives are always refused; a min above 0 is validated on submit
+  step,   // not used: decimals controls precision
   ...props
 }) {
+  const numeric = type === 'number';
+  const fmt = format ? FORMATS[format] : null;
+  const [limitMsg, setLimitMsg] = useState('');
+  const [formatMsg, setFormatMsg] = useState('');
+
+  const handleChange = numeric
+    ? (e) => {
+        const next = sanitizeNumber(e.target.value, { max: Number(max), decimals });
+        if (next === null) { setLimitMsg(overLimitMessage(max, currency)); return; }
+        setLimitMsg('');
+        e.target.value = next;
+        onChange?.(e);
+      }
+    : fmt
+      ? (e) => {
+          e.target.value = fmt.clean(e.target.value);
+          setFormatMsg('');
+          onChange?.(e);
+        }
+      : onChange;
+
+  const shownError = error || limitMsg || formatMsg;
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)', ...containerStyle }}>
       {label && (
@@ -68,10 +109,15 @@ export default function Input({
       )}
       <input
         id={id}
+        type={numeric ? 'text' : type}
+        {...(numeric && { inputMode: decimals > 0 ? 'decimal' : 'numeric', autoComplete: 'off' })}
+        {...(fmt?.inputMode && { inputMode: fmt.inputMode })}
+        {...(fmt && !fmt.inputMode && { autoCapitalize: 'characters', spellCheck: false })}
+        onChange={handleChange}
         style={{
           padding: 'var(--space-2) var(--space-3)',
           background: 'var(--surface-2)',
-          border: `1px solid ${error ? 'var(--danger)' : 'var(--border)'}`,
+          border: `1px solid ${shownError ? 'var(--danger)' : 'var(--border)'}`,
           borderRadius: 'var(--radius-md)',
           color: 'var(--text-primary)',
           fontSize: 'var(--text-base)',
@@ -85,18 +131,20 @@ export default function Input({
           e.target.style.boxShadow = '0 0 0 3px var(--accent-dim)';
         }}
         onBlur={(e) => {
-          e.target.style.borderColor = error ? 'var(--danger)' : 'var(--border)';
+          e.target.style.borderColor = shownError ? 'var(--danger)' : 'var(--border)';
           e.target.style.boxShadow = 'none';
+          setLimitMsg('');
+          if (fmt) setFormatMsg(e.target.value ? (fmt.validate(e.target.value) || '') : '');
           if (outerBlur) outerBlur(e);
         }}
         {...props}
       />
-      {error && (
+      {shownError && (
         <span role="alert" style={{ fontSize: 'var(--text-xs)', color: 'var(--danger-text)', marginTop: '2px' }}>
-          {error}
+          {shownError}
         </span>
       )}
-      {hint && !error && (
+      {hint && !shownError && (
         <span style={{ fontSize: 'var(--text-xs)', color: hint.startsWith('✓') ? 'var(--success-text)' : 'var(--text-muted)' }}>{hint}</span>
       )}
     </div>

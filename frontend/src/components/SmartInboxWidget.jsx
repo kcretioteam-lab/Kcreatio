@@ -7,6 +7,7 @@ import {
 import { format, isToday, isYesterday, formatDistanceToNow } from 'date-fns';
 import api, { getErrorMessage } from '../utils/api.js';
 import { canAccess } from '../utils/planConfig.js';
+import { LIMITS, sanitizeNumber } from '../utils/limits.js';
 import { useToast } from '../hooks/useToast.jsx';
 import { usePremiumRequest } from '../hooks/usePremiumRequest.jsx';
 
@@ -328,8 +329,8 @@ function EditAcceptModal({ detection, onConfirm, onClose }) {
             <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
               <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)' }}>Amount (₹)</span>
               <input
-                type="number" value={form.amount}
-                onChange={e => setForm(f => ({ ...f, amount: e.target.value }))}
+                type="text" inputMode="decimal" value={form.amount}
+                onChange={e => { const v = sanitizeNumber(e.target.value); if (v !== null) setForm(f => ({ ...f, amount: v })); }}
                 style={{ padding: '8px 10px', background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', color: 'var(--text-primary)', fontSize: 'var(--text-sm)' }}
               />
             </label>
@@ -349,8 +350,8 @@ function EditAcceptModal({ detection, onConfirm, onClose }) {
               <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                 <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)' }}>TDS Rate (%)</span>
                 <input
-                  type="number" value={form.tds_rate} min={0} max={100}
-                  onChange={e => setForm(f => ({ ...f, tds_rate: e.target.value }))}
+                  type="text" inputMode="decimal" value={form.tds_rate}
+                  onChange={e => { const v = sanitizeNumber(e.target.value, { max: LIMITS.PERCENT }); if (v !== null) setForm(f => ({ ...f, tds_rate: v })); }}
                   style={{ padding: '8px 10px', background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', color: 'var(--text-primary)', fontSize: 'var(--text-sm)' }}
                 />
               </label>

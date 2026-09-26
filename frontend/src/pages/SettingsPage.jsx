@@ -310,8 +310,8 @@ function InvoiceSettingsSection({ user }) {
               <Input id="bank-holder" label="Account Holder Name *" value={bankForm.accountHolderName} onChange={e => setBankForm(p => ({...p, accountHolderName: e.target.value}))} placeholder="Your full name" />
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 'var(--space-3)' }}>
-              <Input id="bank-acctno" label="Account Number *" value={bankForm.accountNumber} onChange={e => setBankForm(p => ({...p, accountNumber: e.target.value}))} placeholder="1234567890" />
-              <Input id="bank-ifsc" label="IFSC Code *" value={bankForm.ifscCode} onChange={e => setBankForm(p => ({...p, ifscCode: e.target.value.toUpperCase()}))} placeholder="HDFC0001234" maxLength={11} />
+              <Input id="bank-acctno" format="account" label="Account Number *" value={bankForm.accountNumber} onChange={e => setBankForm(p => ({...p, accountNumber: e.target.value}))} placeholder="1234567890" />
+              <Input id="bank-ifsc" format="ifsc" label="IFSC Code *" value={bankForm.ifscCode} onChange={e => setBankForm(p => ({...p, ifscCode: e.target.value.toUpperCase()}))} placeholder="HDFC0001234" maxLength={11} />
             </div>
             <label style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', cursor: 'pointer', fontSize: 'var(--text-sm)' }}>
               <input type="checkbox" checked={bankForm.isDefault} onChange={e => setBankForm(p => ({...p, isDefault: e.target.checked}))} style={{ accentColor: 'var(--accent)' }} />
@@ -370,7 +370,7 @@ function InvoiceSettingsSection({ user }) {
           <div style={{ marginTop: 'var(--space-3)', padding: 'var(--space-4)', background: 'var(--surface-2)', border: '1px solid var(--accent)', borderRadius: 'var(--radius-lg)', display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
             <h4 style={{ fontSize: 'var(--text-sm)', fontWeight: 700, color: 'var(--text-primary)' }}>{editingUpi ? 'Edit UPI' : 'Add UPI ID'}</h4>
             <Input id="upi-label" label="Label (optional)" value={upiForm.name} onChange={e => setUpiForm(p => ({...p, name: e.target.value}))} placeholder="Primary UPI" hint="A nickname for this UPI ID" />
-            <Input id="upi-id" label="UPI ID *" value={upiForm.upiId} onChange={e => setUpiForm(p => ({...p, upiId: e.target.value}))} placeholder="yourname@okicici" />
+            <Input id="upi-id" format="upi" label="UPI ID *" value={upiForm.upiId} onChange={e => setUpiForm(p => ({...p, upiId: e.target.value}))} placeholder="yourname@okicici" />
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
               <label style={{ fontSize: 'var(--text-sm)', fontWeight: 500, color: 'var(--text-body)' }}>QR Scanner Image (optional)</label>
               {upiForm.scannerImageUrl ? (
@@ -1737,7 +1737,7 @@ export default function SettingsPage() {
                     <div style={{ padding: 'var(--space-2) var(--space-3)', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', fontSize: 'var(--text-sm)', color: 'var(--text-disabled)' }}>{user?.email}</div>
                     <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Email cannot be changed</div>
                   </div>
-                  <Input id="p-phone" label="Phone Number" type="tel" value={personalForm.phone} onChange={e => setPersonalForm(p => ({...p, phone: e.target.value}))} placeholder="+91 XXXXX XXXXX" />
+                  <Input id="p-phone" format="mobile" label="Phone Number" type="tel" value={personalForm.phone} onChange={e => setPersonalForm(p => ({...p, phone: e.target.value}))} placeholder="+91 XXXXX XXXXX" />
                   <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-2)' }}>
                     <button onClick={savePersonal} disabled={savingPersonal} style={{ padding: 'var(--space-2) var(--space-4)', background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 'var(--radius-md)', fontWeight: 600, fontSize: 'var(--text-sm)', cursor: 'pointer', fontFamily: 'inherit' }}>
                       {savingPersonal ? 'Saving…' : 'Save'}
@@ -1764,8 +1764,8 @@ export default function SettingsPage() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
                   <Input id="b-bname" label="Business / Channel Name" value={businessForm.business_name} onChange={e => setBusinessForm(p => ({...p, business_name: e.target.value}))} />
                   <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 'var(--space-3)' }}>
-                    <Input id="b-gstin" label="GSTIN" value={businessForm.gstin} onChange={e => setGstin(e.target.value)} placeholder="29ABCDE1234F1ZW" maxLength={15} error={businessForm.gstin.length === 15 ? gstinProblem : undefined} hint="Fills in your state and PAN" />
-                    <Input id="b-pan" label="PAN" value={businessForm.pan} onChange={e => setBusinessForm(p => ({...p, pan: e.target.value.toUpperCase()}))} placeholder="ABCDE1234F" maxLength={10} />
+                    <Input id="b-gstin" format="gstin" label="GSTIN" value={businessForm.gstin} onChange={e => setGstin(e.target.value)} placeholder="29ABCDE1234F1ZW" maxLength={15} error={businessForm.gstin.length === 15 ? gstinProblem : undefined} hint="Fills in your state and PAN" />
+                    <Input id="b-pan" format="pan" label="PAN" value={businessForm.pan} onChange={e => setBusinessForm(p => ({...p, pan: e.target.value.toUpperCase()}))} placeholder="ABCDE1234F" maxLength={10} />
                   </div>
                   <Input id="b-addr" label="Business Address" value={businessForm.business_address} onChange={e => setBusinessForm(p => ({...p, business_address: e.target.value}))} />
                   <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 'var(--space-3)' }}>
@@ -1816,7 +1816,7 @@ export default function SettingsPage() {
               onChange={v => setBusinessForm(p => ({ ...p, gst_registered: v }))}
             />
             {businessForm.gst_registered && (
-              <Input id="gstin" label="GSTIN" value={businessForm.gstin} onChange={(e) => setGstin(e.target.value)} maxLength={15} placeholder="29ABCDE1234F1ZW"
+              <Input id="gstin" format="gstin" label="GSTIN" value={businessForm.gstin} onChange={(e) => setGstin(e.target.value)} maxLength={15} placeholder="29ABCDE1234F1ZW"
                 error={businessForm.gstin.length === 15 ? gstinProblem : undefined}
                 hint={businessForm.gstin && !gstinProblem ? `✓ ${stateLabel(businessForm.gstin.slice(0, 2))}` : 'Your state and PAN are filled in from it'} />
             )}
@@ -1825,7 +1825,7 @@ export default function SettingsPage() {
               <Input id="trade_name" label="Trade name (optional)" value={businessForm.trade_name} onChange={(e) => setBusinessForm(p => ({...p, trade_name: e.target.value}))} hint="Your channel or brand name, if different" />
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 'var(--space-3)' }}>
-              <Input id="pan" label="PAN" value={businessForm.pan} onChange={(e) => setBusinessForm(p => ({...p, pan: e.target.value.toUpperCase()}))} maxLength={10} placeholder="ABCDE1234F" disabled={Boolean(businessForm.gst_registered && businessForm.gstin && !gstinProblem)} />
+              <Input id="pan" format="pan" label="PAN" value={businessForm.pan} onChange={(e) => setBusinessForm(p => ({...p, pan: e.target.value.toUpperCase()}))} maxLength={10} placeholder="ABCDE1234F" disabled={Boolean(businessForm.gst_registered && businessForm.gstin && !gstinProblem)} />
               <StateSelect id="state_code" value={businessForm.state_code} lockedByGstin={Boolean(businessForm.gst_registered && businessForm.gstin && !gstinProblem)} onChange={v => setBusinessForm(p => ({...p, state_code: v}))} />
             </div>
             <Input id="business_address" label="Business address" value={businessForm.business_address} onChange={(e) => setBusinessForm(p => ({...p, business_address: e.target.value}))} />

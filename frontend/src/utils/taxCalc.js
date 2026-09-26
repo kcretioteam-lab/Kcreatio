@@ -28,6 +28,30 @@ const REBATE = { new: { limit: 1200000, max: 60000 }, old: { limit: 500000, max:
 const PRESUMPTIVE_RATE = { '44ADA': 0.5, '44AD': 0.06 }; // 44AD: 6% for digital receipts
 export const ADVANCE_TAX_THRESHOLD = 10000;
 
+// Surcharge on income-tax when taxable income exceeds each threshold. The new regime caps it at 25%.
+export const SURCHARGE_BANDS = [
+  { above: 50000000, rate: { new: 0.25, old: 0.37 } },
+  { above: 20000000, rate: { new: 0.25, old: 0.25 } },
+  { above: 10000000, rate: { new: 0.15, old: 0.15 } },
+  { above: 5000000,  rate: { new: 0.10, old: 0.10 } },
+];
+
+function surchargeRate(taxable, regime) {
+  const band = SURCHARGE_BANDS.find(b => taxable > b.above);
+  return band ? band.rate[regime] : 0;
+}
+
+// Surcharge with marginal relief: tax + surcharge may not exceed the tax + surcharge at the
+// threshold just crossed by more than the income above that threshold.
+export function surchargeOn(taxable, tax, regime) {
+  const band = SURCHARGE_BANDS.find(b => taxable > b.above);
+  if (!band || tax <= 0) return 0;
+  const full = tax * band.rate[regime];
+  const taxAtThreshold = slabTax(band.above, regime);
+  const cap = taxAtThreshold * (1 + surchargeRate(band.above, regime)) + (taxable - band.above);
+  return Math.round(Math.max(0, Math.min(full, cap - tax)));
+}
+
 export const INSTALMENT_SCHEDULE = [
   { quarter: 'Q1', dueDate: 'Jun 15', dueMonth: 5,  dueDay: 15, cumPct: 0.15 },
   { quarter: 'Q2', dueDate: 'Sep 15', dueMonth: 8,  dueDay: 15, cumPct: 0.45 },
@@ -71,8 +95,9 @@ export function computeTax(input) {
     marginalRelief = Math.max(0, baseTax - (taxableIncome - limit));
   }
   const taxAfterRebate = baseTax - rebate - marginalRelief;
-  const cess = Math.round(taxAfterRebate * 0.04);
-  const totalTax = taxAfterRebate + cess;
+  const surcharge = surchargeOn(taxableIncome, taxAfterRebate, regime);
+  const cess = Math.round((taxAfterRebate + surcharge) * 0.04);
+  const totalTax = taxAfterRebate + surcharge + cess;
 
   const afterTds = totalTax - tdsPaid;
   const netPayable = Math.max(0, afterTds);
@@ -91,10 +116,9 @@ export function computeTax(input) {
   return {
     regime, presumptive,
     grossReceipts: gross, businessIncome, salaryIncome: salary, standardDeduction, taxableIncome,
-    baseTax, rebate, marginalRelief, cess, totalTax,
+    baseTax, rebate, marginalRelief, surcharge, surchargeRate: surchargeRate(taxableIncome, regime), cess, totalTax,
     tdsPaid, netPayable, refund,
     advanceTaxRequired, advanceTaxPaid, balanceDue: Math.max(0, netPayable - advanceTaxPaid),
-    surchargeNotApplied: taxableIncome > 5000000,
     instalments,
   };
 }

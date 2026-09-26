@@ -9,6 +9,7 @@ import { formatINR, formatINRCompact } from '../utils/formatINR.js';
 import Badge from '../components/ui/Badge.jsx';
 import Modal from '../components/ui/Modal.jsx';
 import Input from '../components/ui/Input.jsx';
+import { LIMITS } from '../utils/limits.js';
 import { SkeletonTableRow } from '../components/ui/Skeleton.jsx';
 import EmptyState from '../components/ui/EmptyState.jsx';
 import PlanGate from '../components/ui/PlanGate.jsx';
@@ -246,8 +247,8 @@ export default function IncomePage() {
           {isForeign ? (
             <>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)' }}>
-                <Input id="inc-foreign" label={`Amount (${form.currency}) *`} type="number" value={form.foreignAmount} onChange={e => setForm(p => ({...p, foreignAmount: e.target.value}))} style={{ fontVariantNumeric: 'tabular-nums' }} />
-                <Input id="inc-fx" label={`₹ per 1 ${form.currency} *`} type="number" value={form.fxRate} onChange={e => setForm(p => ({...p, fxRate: e.target.value}))} hint="Rate your bank credited at" style={{ fontVariantNumeric: 'tabular-nums' }} />
+                <Input id="inc-foreign" label={`Amount (${form.currency}) *`} type="number" max={LIMITS.FOREIGN_AMOUNT} value={form.foreignAmount} onChange={e => setForm(p => ({...p, foreignAmount: e.target.value}))} style={{ fontVariantNumeric: 'tabular-nums' }} />
+                <Input id="inc-fx" label={`₹ per 1 ${form.currency} *`} type="number" max={LIMITS.FX_RATE} decimals={4} value={form.fxRate} onChange={e => setForm(p => ({...p, fxRate: e.target.value}))} hint="Rate your bank credited at" style={{ fontVariantNumeric: 'tabular-nums' }} />
               </div>
               {convertedAmount && <div style={{ fontSize: 'var(--text-sm)', color: 'var(--text-body)' }}>Logged as <strong style={{ fontVariantNumeric: 'tabular-nums' }}>{formatINR(convertedAmount)}</strong></div>}
               <label style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'flex-start', fontSize: 'var(--text-sm)', color: 'var(--text-body)', cursor: 'pointer' }}>
