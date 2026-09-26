@@ -12,6 +12,12 @@ const PROFILE_FIELDS = 'id, name, email, plan, trial_ends_at, gstin, pan, busine
 import { authenticate, AuthRequest } from '../middleware/auth.js';
 import { isDisposableEmail } from '../lib/disposableEmail.js';
 import { getFrontendUrl } from '../lib/env.js';
+import { signTokens, setTokenCookies, clearTokenCookies, startSession, touchSession, revokeSession, currentSessionId, RefreshPayload } from '../services/sessionService.js';
+
+// Short-lived proof that the password step passed, exchanged for a session at /auth/2fa/verify
+export function signTwoFactorChallenge(userId: string, plan: string): string {
+  return jwt.sign({ sub: userId, plan, purpose: '2fa' }, process.env.JWT_ACCESS_SECRET!, { expiresIn: '5m' });
+}
 
 const router = Router();
 
@@ -24,23 +30,10 @@ const authRateLimit = rateLimit({
 });
 
 const BCRYPT_ROUNDS = 12;
-const ACCESS_EXPIRY = '15m';
-const REFRESH_EXPIRY = '30d';
 const TRIAL_DAYS = 28; // unused while auto-trial is disabled — premium grants use PREMIUM_DAYS in premiumRequests.ts
 const MAX_FAILED_ATTEMPTS = 5;
 const OTP_EXPIRY_MINUTES = 10;
 const RESET_TOKEN_EXPIRY_MINUTES = 60;
-
-// Frontend (Netlify) and backend (Render) live on different domains in production —
-// that's cross-site, so cookies need SameSite=None (paired with Secure) to survive
-// the trip. Locally, frontend/backend share "localhost" (same-site), so Strict is
-// fine and safer there.
-const COOKIE_OPTIONS = {
-  httpOnly: true,
-  secure: process.env.NODE_ENV === 'production',
-  sameSite: (process.env.NODE_ENV === 'production' ? 'none' : 'strict') as 'none' | 'strict',
-  path: '/',
-};
 
 // Password complexity: 8+ chars, uppercase, lowercase, special char
 const passwordSchema = z.string()
@@ -49,25 +42,6 @@ const passwordSchema = z.string()
   .regex(/[A-Z]/, 'Password must contain at least one uppercase letter')
   .regex(/[a-z]/, 'Password must contain at least one lowercase letter')
   .regex(/[^A-Za-z0-9]/, 'Password must contain at least one special character');
-
-function signTokens(userId: string, plan: string, tokenVersion: number = 0) {
-  const accessToken = jwt.sign(
-    { sub: userId, plan, tv: tokenVersion },
-    process.env.JWT_ACCESS_SECRET!,
-    { expiresIn: ACCESS_EXPIRY }
-  );
-  const refreshToken = jwt.sign(
-    { sub: userId, tv: tokenVersion },
-    process.env.JWT_REFRESH_SECRET!,
-    { expiresIn: REFRESH_EXPIRY }
-  );
-  return { accessToken, refreshToken };
-}
-
-function setTokenCookies(res: Response, accessToken: string, refreshToken: string) {
-  res.cookie('access_token', accessToken, { ...COOKIE_OPTIONS, maxAge: 15 * 60 * 1000 });
-  res.cookie('refresh_token', refreshToken, { ...COOKIE_OPTIONS, maxAge: 30 * 24 * 60 * 60 * 1000 });
-}
 
 function generateOtp(): string {
   return Math.floor(100000 + Math.random() * 900000).toString();
@@ -244,8 +218,7 @@ router.post('/register', authRateLimit, validateBody(RegisterSchema), async (req
     return;
   }
 
-  const { accessToken, refreshToken } = signTokens(user.id, user.plan, user.token_version || 0);
-  setTokenCookies(res, accessToken, refreshToken);
+  await startSession(req, res, user, user.plan, user.token_version || 0);
 
   const { token_version, ...safeUser } = user;
   res.status(201).json({ user: safeUser });
@@ -264,14 +237,14 @@ router.post('/login', authRateLimit, validateBody(LoginSchema), async (req: Requ
   const identifierLower = identifier.toLowerCase();
   let { data: user } = await supabase
     .from('users')
-    .select('id, name, email, password_hash, plan, trial_ends_at, gstin, pan, business_name, business_address, state_code, invoice_prefix, failed_login_attempts, locked_until, token_version')
+    .select('id, name, email, password_hash, plan, trial_ends_at, gstin, pan, business_name, business_address, state_code, invoice_prefix, failed_login_attempts, locked_until, token_version, totp_enabled')
     .eq('email', identifierLower)
     .maybeSingle();
 
   if (!user) {
     const { data: byPhone } = await supabase
       .from('users')
-      .select('id, name, email, password_hash, plan, trial_ends_at, gstin, pan, business_name, business_address, state_code, invoice_prefix, failed_login_attempts, locked_until, token_version')
+      .select('id, name, email, password_hash, plan, trial_ends_at, gstin, pan, business_name, business_address, state_code, invoice_prefix, failed_login_attempts, locked_until, token_version, totp_enabled')
       .eq('phone', identifier)
       .maybeSingle();
     user = byPhone;
@@ -317,17 +290,28 @@ router.post('/login', authRateLimit, validateBody(LoginSchema), async (req: Requ
     await supabase.from('users').update({ plan: 'basic' }).eq('id', user.id);
   }
 
-  const { accessToken, refreshToken } = signTokens(user.id, plan, user.token_version || 0);
-  setTokenCookies(res, accessToken, refreshToken);
+  // Password was right — with 2FA on, ask for the authenticator code before signing in
+  if (user.totp_enabled) {
+    res.json({ requires2fa: true, challenge: signTwoFactorChallenge(user.id, plan) });
+    return;
+  }
 
-  const { password_hash, failed_login_attempts, locked_until, token_version, ...safeUser } = user;
+  await startSession(req, res, user, plan, user.token_version || 0);
+
+  const { password_hash, failed_login_attempts, locked_until, token_version, totp_enabled, ...safeUser } = user;
   res.json({ user: { ...safeUser, plan } });
 });
 
 // POST /auth/logout
-router.post('/logout', (req: Request, res: Response): void => {
-  res.clearCookie('access_token', COOKIE_OPTIONS);
-  res.clearCookie('refresh_token', COOKIE_OPTIONS);
+router.post('/logout', async (req: Request, res: Response): Promise<void> => {
+  const token = req.cookies?.refresh_token;
+  if (token) {
+    try {
+      const payload = jwt.verify(token, process.env.JWT_REFRESH_SECRET!, { algorithms: ['HS256'] }) as RefreshPayload;
+      if (payload.sid) await revokeSession(payload.sid, payload.sub);
+    } catch { /* expired or invalid — nothing to revoke */ }
+  }
+  clearTokenCookies(res);
   res.json({ success: true });
 });
 
@@ -340,7 +324,7 @@ router.post('/refresh', async (req: Request, res: Response): Promise<void> => {
   }
 
   try {
-    const payload = jwt.verify(token, process.env.JWT_REFRESH_SECRET!, { algorithms: ['HS256'] }) as { sub: string; tv?: number };
+    const payload = jwt.verify(token, process.env.JWT_REFRESH_SECRET!, { algorithms: ['HS256'] }) as RefreshPayload;
 
     const { data: user } = await supabase
       .from('users')
@@ -359,7 +343,14 @@ router.post('/refresh', async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    const { accessToken, refreshToken } = signTokens(user.id, user.plan, user.token_version || 0);
+    // Signed out from another device ("Sign out" on the sessions list)
+    if (payload.sid && !(await touchSession(payload.sid, user.id))) {
+      clearTokenCookies(res);
+      res.status(401).json({ error: 'TOKEN_REVOKED', message: 'This session was signed out. Please log in again.', statusCode: 401 });
+      return;
+    }
+
+    const { accessToken, refreshToken } = signTokens(user.id, user.plan, user.token_version || 0, payload.sid);
     setTokenCookies(res, accessToken, refreshToken);
     res.json({ success: true });
   } catch {
@@ -494,7 +485,7 @@ router.put('/change-password', authenticate, validateBody(ChangePasswordSchema),
 
   // Issue new tokens with updated version
   const { data: updated } = await supabase.from('users').select('plan').eq('id', req.userId!).maybeSingle();
-  const { accessToken, refreshToken } = signTokens(req.userId!, updated?.plan || 'basic', newVersion);
+  const { accessToken, refreshToken } = signTokens(req.userId!, updated?.plan || 'basic', newVersion, currentSessionId(req));
   setTokenCookies(res, accessToken, refreshToken);
 
   res.json({ success: true });
@@ -659,8 +650,7 @@ router.delete('/account', authenticate, async (req: AuthRequest, res: Response):
     return;
   }
 
-  res.clearCookie('access_token', COOKIE_OPTIONS);
-  res.clearCookie('refresh_token', COOKIE_OPTIONS);
+  clearTokenCookies(res);
   res.json({ message: 'Account permanently deleted' });
 });
 
@@ -739,14 +729,14 @@ router.get('/google/callback', async (req: Request, res: Response): Promise<void
     // Try to find existing user by google_id OR email
     let { data: user } = await supabase
       .from('users')
-      .select('id, plan, trial_ends_at, token_version')
+      .select('id, name, email, plan, trial_ends_at, token_version, totp_enabled')
       .eq('google_id', googleId)
       .maybeSingle();
 
     if (!user) {
       const { data: byEmail } = await supabase
         .from('users')
-        .select('id, plan, trial_ends_at, token_version')
+        .select('id, name, email, plan, trial_ends_at, token_version, totp_enabled')
         .eq('email', email.toLowerCase())
         .maybeSingle();
 
@@ -773,7 +763,7 @@ router.get('/google/callback', async (req: Request, res: Response): Promise<void
             is_email_verified: true,
             terms_accepted_at: new Date().toISOString(),
           })
-          .select('id, plan, trial_ends_at, token_version')
+          .select('id, name, email, plan, trial_ends_at, token_version, totp_enabled')
           .single();
         user = newUser;
       }
@@ -791,8 +781,11 @@ router.get('/google/callback', async (req: Request, res: Response): Promise<void
       await supabase.from('users').update({ plan: 'basic' }).eq('id', user.id);
     }
 
-    const { accessToken, refreshToken } = signTokens(user.id, plan, user.token_version || 0);
-    setTokenCookies(res, accessToken, refreshToken);
+    if (user.totp_enabled) {
+      res.redirect(`${frontendUrl}/login?twofa=${encodeURIComponent(signTwoFactorChallenge(user.id, plan))}`);
+      return;
+    }
+    await startSession(req, res, user, plan, user.token_version || 0);
     res.redirect(`${frontendUrl}/dashboard`);
   } catch (err) {
     console.error('Google OAuth error:', err);

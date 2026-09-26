@@ -5,6 +5,7 @@ import cookieParser from 'cookie-parser';
 import rateLimit from 'express-rate-limit';
 import emailDetectionsRoutes from './routes/emailDetections.js';
 import authRoutes from './routes/auth.js';
+import securityRoutes from './routes/security.js';
 import invoiceRoutes from './routes/invoices.js';
 import invoiceSettingsRoutes from './routes/invoiceSettings.js';
 import uploadRoutes from './routes/upload.js';
@@ -84,7 +85,10 @@ const authLimiter = rateLimit({
   max: 10,
   standardHeaders: true,
   legacyHeaders: false,
-  message: { error: 'RATE_LIMITED', message: 'Too many auth attempts', statusCode: 429 },
+  message: { error: 'RATE_LIMITED', message: 'Too many sign-in attempts. Please wait 15 minutes and try again.', statusCode: 429 },
+  // Session checks run on every page load and must not lock signed-in users out;
+  // they're still covered by the global limit above.
+  skip: (req) => ['/me', '/refresh', '/profile', '/logout', '/sessions'].some(p => req.path === p || req.path.startsWith(p + '/')),
 });
 
 // Razorpay webhook needs raw body BEFORE express.json() parses it
@@ -100,6 +104,7 @@ app.get('/api/health', (_, res) => res.json({ status: 'ok', timestamp: new Date(
 
 // Routes
 app.use('/api/v1/auth', authLimiter, authRoutes);
+app.use('/api/v1/auth', authLimiter, securityRoutes);
 app.use('/api/v1/invoices', invoiceRoutes);
 app.use('/api/v1/invoice-settings', invoiceSettingsRoutes);
 app.use('/api/v1/upload', uploadRoutes);

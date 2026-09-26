@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Check, Clock } from 'lucide-react';
 import Modal from './Modal.jsx';
 import Input from './Input.jsx';
-import api from '../../utils/api.js';
+import api, { getErrorMessage } from '../../utils/api.js';
 import { useToast } from '../../hooks/useToast.jsx';
 
 const FEATURE_OPTIONS = [
@@ -42,7 +42,7 @@ export default function RequestPremiumModal({ isOpen, onClose, isPending, onSubm
       toast.success('Request sent — we’ll email you once it’s approved');
       onClose();
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Could not send request. Please try again.');
+      toast.error(getErrorMessage(err, 'Could not send request. Please try again.'));
     } finally {
       setSubmitting(false);
     }

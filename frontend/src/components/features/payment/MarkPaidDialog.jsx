@@ -4,6 +4,7 @@ import Input from '../../ui/Input.jsx';
 import { formatINRDecimal } from '../../../utils/formatINR.js';
 import { tdsSectionLabel } from '../../../utils/taxLabels.js';
 import { getFinancialYear } from '../../../utils/financialYear.js';
+import { getErrorMessage } from '../../../utils/api.js';
 
 // Common TDS rates on creator income. The user can always type the exact amount the brand deducted.
 const TDS_OPTIONS = [
@@ -75,7 +76,7 @@ export default function MarkPaidDialog({ isOpen, onClose, title, brandName, taxa
         tdsSection: tdsNum > 0 && section !== 'none' ? tdsSectionLabel(code, getFinancialYear(new Date(paymentDate))).replace(/^Sec /, '') : undefined,
       });
     } catch (err) {
-      setError(err?.response?.data?.message || 'Couldn’t record the payment. Please try again.');
+      setError(getErrorMessage(err, 'Couldn’t record the payment. Please try again.'));
     } finally {
       setSaving(false);
     }

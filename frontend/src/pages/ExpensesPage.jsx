@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import { Plus, ShoppingBag, Pencil } from 'lucide-react';
-import api from '../utils/api.js';
+import api, { getErrorMessage } from '../utils/api.js';
 import { useToast } from '../hooks/useToast.jsx';
 import { useIsMobile } from '../hooks/useIsMobile.js';
 import { formatINR } from '../utils/formatINR.js';
@@ -13,6 +13,7 @@ import EmptyState from '../components/ui/EmptyState.jsx';
 import PlanGate from '../components/ui/PlanGate.jsx';
 import { CURRENT_FY, PREVIOUS_FY as PREV_FY } from '../utils/financialYear.js';
 import { taxYearLabel } from '../utils/taxLabels.js';
+import { readCache, writeCache } from '../utils/listCache.js';
 
 const CATEGORIES = ['equipment', 'software', 'travel', 'props', 'marketing', 'team', 'subscription', 'other'];
 const CAT_LABELS = { equipment: 'Equipment', software: 'Software', travel: 'Travel', props: 'Props', marketing: 'Marketing', team: 'Team', subscription: 'Subscription', other: 'Other' };
@@ -31,7 +32,11 @@ export default function ExpensesPage() {
   useEffect(() => { loadData(); }, [fy]);
 
   async function loadData() {
-    setLoading(true);
+    // Show the last copy straight away, then refresh
+    const cacheKey = `expenses:${fy}`;
+    const cached = readCache(cacheKey);
+    if (cached) { setExpenses(cached.list); setSummary(cached.summary); setLoading(false); }
+    else setLoading(true);
     try {
       const [exp, sum] = await Promise.all([
         api.get('/expenses', { params: { fy } }),
@@ -39,7 +44,8 @@ export default function ExpensesPage() {
       ]);
       setExpenses(exp.data.expenses || []);
       setSummary(sum.data);
-    } catch { toast.error('Failed to load expenses'); }
+      writeCache(cacheKey, { list: exp.data.expenses || [], summary: sum.data });
+    } catch (err) { if (!cached) toast.error(getErrorMessage(err, 'Failed to load expenses')); }
     finally { setLoading(false); }
   }
 
@@ -53,7 +59,7 @@ export default function ExpensesPage() {
       setAddOpen(false);
       setForm({ category: 'software', amount: '', description: '', expenseDate: format(new Date(), 'yyyy-MM-dd') });
       loadData();
-    } catch (err) { toast.error(err?.response?.data?.message || 'Failed to log expense'); }
+    } catch (err) { toast.error(getErrorMessage(err, 'Failed to log expense')); }
     finally { setSaving(false); }
   }
 
@@ -67,7 +73,7 @@ export default function ExpensesPage() {
       setEditingEntry(null);
       setForm({ category: 'software', amount: '', description: '', expenseDate: format(new Date(), 'yyyy-MM-dd') });
       loadData();
-    } catch (err) { toast.error(err?.response?.data?.message || 'Failed to update expense'); }
+    } catch (err) { toast.error(getErrorMessage(err, 'Failed to update expense')); }
     finally { setSaving(false); }
   }
 

@@ -5,7 +5,7 @@ import {
   CreditCard, Handshake, FileText, ShoppingBag, Eye, Lock
 } from 'lucide-react';
 import { format, isToday, isYesterday, formatDistanceToNow } from 'date-fns';
-import api from '../utils/api.js';
+import api, { getErrorMessage } from '../utils/api.js';
 import { canAccess } from '../utils/planConfig.js';
 import { useToast } from '../hooks/useToast.jsx';
 import { usePremiumRequest } from '../hooks/usePremiumRequest.jsx';
@@ -468,7 +468,7 @@ export default function SmartInboxWidget({ user, onManualPaste, onPendingCountCh
         toast('All clear — nothing new found', 'info');
       }
     } catch (err) {
-      const msg = err.response?.data?.message ?? 'Scan failed';
+      const msg = getErrorMessage(err, 'Scan failed');
       toast(msg, 'error');
     } finally {
       setScanning(false);
@@ -518,6 +518,7 @@ export default function SmartInboxWidget({ user, onManualPaste, onPendingCountCh
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
           <Zap size={15} style={{ color: 'var(--accent)' }} />
           <span style={{ fontWeight: 700, fontSize: 'var(--text-sm)', color: 'var(--text-primary)' }}>Smart Inbox</span>
+          <span title="Google is still reviewing Kcretio’s Gmail access, so you may see an “unverified app” screen when connecting." style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', padding: '1px 6px', borderRadius: 'var(--radius-sm)', background: 'var(--warning-dim)', color: 'var(--warning-text)' }}>Beta</span>
           {pendingCount > 0 && (
             <span style={{
               background: 'var(--accent-dim)', color: 'var(--accent)',

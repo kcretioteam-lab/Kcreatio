@@ -173,7 +173,7 @@ function buildInvoiceHtml(inv: InvoiceForPdf, user: UserForPdf, plan?: string): 
   .footer { margin-top: 20px; text-align: center; font-size: 8px; color: #ccc; }
   @page { margin: 0; size: A4 portrait; }
   * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; }
-  ${plan === 'basic' ? `body::before{content:'';position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-45deg);width:65%;height:65%;background:url('data:image/svg+xml;base64,${LOGO_B64}') no-repeat center/contain;opacity:.07;pointer-events:none;z-index:9999;}body::after{content:'Made with ease on Kcretio.com';position:fixed;bottom:10px;left:0;right:0;text-align:center;font-size:8px;color:#a0aec0;font-family:Arial,sans-serif;letter-spacing:.04em;pointer-events:none;z-index:9999;}` : ''}
+  ${plan === 'basic' ? `body::before{content:'';position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-45deg);width:65%;height:65%;background:url('data:image/svg+xml;base64,${LOGO_B64}') no-repeat center/contain;opacity:.07;pointer-events:none;z-index:9999;}body::after{content:'Made with ease on kcretio.in';position:fixed;bottom:10px;left:0;right:0;text-align:center;font-size:8px;color:#a0aec0;font-family:Arial,sans-serif;letter-spacing:.04em;pointer-events:none;z-index:9999;}` : ''}
 </style>
 </head><body>
 <div class="hdr">
@@ -272,7 +272,7 @@ function buildInvoiceHtml(inv: InvoiceForPdf, user: UserForPdf, plan?: string): 
       </div>
     </div>
   </div>` : ''}
-  <div class="footer">GST-compliant invoice &nbsp;·&nbsp; Kcretio.com &nbsp;·&nbsp; Subject to GST as applicable</div>
+  <div class="footer">GST-compliant invoice &nbsp;·&nbsp; kcretio.in &nbsp;·&nbsp; Subject to GST as applicable</div>
 </div>
 </body></html>`;
 }
@@ -344,6 +344,25 @@ export async function generateInvoicePdfWithPuppeteer(
       pdfCache.set(effectiveCacheKey, { buffer, timestamp: Date.now() });
     }
     return buffer;
+  } finally {
+    if (page) await page.close().catch(() => {});
+    pageInUse = false;
+  }
+}
+
+// Renders any HTML document to an A4 PDF (used for the CA export summary).
+export async function renderHtmlToPdf(html: string): Promise<Buffer> {
+  while (pageInUse) {
+    await new Promise<void>(resolve => setTimeout(resolve, 50));
+  }
+  pageInUse = true;
+  let page = null;
+  try {
+    const browser = await getBrowser();
+    page = await browser.newPage();
+    await page.setContent(html, { waitUntil: 'load', timeout: 30000 });
+    const pdf = await page.pdf({ format: 'A4', printBackground: true, margin: { top: '14mm', right: '12mm', bottom: '14mm', left: '12mm' } });
+    return Buffer.from(pdf);
   } finally {
     if (page) await page.close().catch(() => {});
     pageInUse = false;

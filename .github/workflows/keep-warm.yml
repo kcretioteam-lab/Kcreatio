@@ -1,0 +1,19 @@
+name: Keep backend warm
+
+# Render's free tier sleeps after ~15 minutes idle, and the first request then takes
+# several seconds. This pings the health route during Indian daytime hours.
+# Set the repository variable BACKEND_URL (e.g. https://kcretio-backend.onrender.com) to enable it.
+# A paid always-on instance makes this unnecessary.
+
+on:
+  schedule:
+    - cron: '*/10 1-18 * * *'   # every 10 min, 06:30–00:30 IST
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    if: ${{ vars.BACKEND_URL != '' }}
+    steps:
+      - name: Ping /api/health
+        run: curl --fail --silent --show-error --max-time 60 "${{ vars.BACKEND_URL }}/api/health"

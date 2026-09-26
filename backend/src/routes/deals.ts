@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase.js';
 import { authenticate, AuthRequest } from '../middleware/auth.js';
 import { validateBody } from '../middleware/validateBody.js';
 import { markPaid, MarkPaidSchema } from '../services/paymentService.js';
+import { logInvoiceEvent } from '../services/auditLog.js';
 
 const router = Router();
 router.use(authenticate);
@@ -147,6 +148,9 @@ router.post('/:id/mark-paid', validateBody(MarkPaidSchema), async (req: AuthRequ
     ? await markPaid('invoice', req.userId!, invoice.id, req.body)
     : await markPaid('deal', req.userId!, deal.id, req.body);
   if (!result.ok) { res.status(result.status).json({ error: result.error, message: result.message }); return; }
+  if (invoice) {
+    await logInvoiceEvent(req, req.userId!, { id: invoice.id }, 'paid', { via: 'deal', deal_id: deal.id, amount_received: req.body.amountReceived, tds: req.body.tdsDeducted });
+  }
 
   // Send payment confirmation emails (non-blocking)
   try {

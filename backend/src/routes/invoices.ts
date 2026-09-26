@@ -6,6 +6,7 @@ import { authenticate, AuthRequest } from '../middleware/auth.js';
 import { validateBody } from '../middleware/validateBody.js';
 import { getFrontendUrl } from '../lib/env.js';
 import { markPaid, MarkPaidSchema } from '../services/paymentService.js';
+import { logInvoiceEvent } from '../services/auditLog.js';
 import {
   calculateInvoiceTotals,
   getFinancialYear,
@@ -87,6 +88,7 @@ router.get('/confirm-payment/:token', async (req: ExpressRequest, res: Response)
     payment_confirm_token: null,
     payment_confirmed_by_brand: true,
   }).eq('id', inv.id);
+  await logInvoiceEvent(null, inv.user_id, inv, 'brand_confirmed');
 
   const user = await getUser(inv.user_id);
   if (user) {
@@ -142,7 +144,7 @@ const CreateInvoiceSchema = z.object({
   includeTerms: z.boolean().default(false),
   termsText: z.string().max(5000).nullish(),
   // Signatory
-  includeSignatory: z.boolean().default(false),
+  includeSignatory: z.boolean().default(true),
   signatoryName: z.string().max(200).nullish(),
   signatoryImageUrl: z.string().nullish().refine(isValidImageField, { message: 'signatoryImageUrl must be a base64 data URL or Supabase storage URL' }),
   sellerBusinessName: z.string().max(200).nullish(),
@@ -395,6 +397,8 @@ router.post('/', validateBody(CreateInvoiceSchema), async (req: AuthRequest, res
       .eq('id', body.dealId).eq('user_id', req.userId!).in('status', ['inquiry', 'negotiating', 'active', 'delivered']);
   }
 
+  await logInvoiceEvent(req, req.userId!, invoice, 'created', { total_amount: invoice.total_amount, deal_id: invoice.deal_id });
+
   res.status(201).json({
     ...invoice,
     supplyType: gst.supplyType,
@@ -603,7 +607,8 @@ router.put('/:id', validateBody(CreateInvoiceSchema.partial()), async (req: Auth
     .select()
     .single();
 
-  if (error) { res.status(500).json({ error: 'INTERNAL_ERROR', message: error.message }); return; }
+  if (error) { res.status(500).json({ error: 'INTERNAL_ERROR', message: 'Couldn’t save the invoice. Please try again.' }); return; }
+  await logInvoiceEvent(req, req.userId!, data, 'updated', { fields: Object.keys(updates).filter(k => k !== 'updated_at') });
   res.json(data);
 });
 
@@ -611,7 +616,7 @@ router.put('/:id', validateBody(CreateInvoiceSchema.partial()), async (req: Auth
 router.delete('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
   const { data: existing } = await supabase
     .from('invoices')
-    .select('id, status')
+    .select('id, status, invoice_number, total_amount')
     .eq('id', req.params.id)
     .eq('user_id', req.userId!)
     .maybeSingle();
@@ -628,7 +633,8 @@ router.delete('/:id', async (req: AuthRequest, res: Response): Promise<void> => 
     .eq('id', req.params.id)
     .eq('user_id', req.userId!);
 
-  if (error) { res.status(500).json({ error: 'INTERNAL_ERROR', message: error.message }); return; }
+  if (error) { res.status(500).json({ error: 'INTERNAL_ERROR', message: 'Couldn’t delete the invoice. Please try again.' }); return; }
+  await logInvoiceEvent(req, req.userId!, existing, 'deleted', { total_amount: existing.total_amount });
   res.status(204).send();
 });
 
@@ -714,6 +720,7 @@ router.post('/:id/send', async (req: AuthRequest, res: Response): Promise<void> 
       await supabase.from('invoices').update({ status: 'sent', sent_at: new Date().toISOString() }).eq('id', inv.id);
     }
 
+    await logInvoiceEvent(req, req.userId!, inv, 'sent', { to: inv.brand_email });
     res.json({ success: true, sentTo: inv.brand_email });
   } catch (err: any) {
     res.status(500).json({ error: 'EMAIL_FAILED', message: 'Failed to send email. Check your email configuration.', statusCode: 500 });
@@ -725,6 +732,9 @@ router.post('/:id/mark-paid', validateBody(MarkPaidSchema), async (req: AuthRequ
   const result = await markPaid('invoice', req.userId!, String(req.params.id), req.body);
   if (!result.ok) { res.status(result.status).json({ error: result.error, message: result.message }); return; }
   const { data } = await supabase.from('invoices').select('*').eq('id', result.id).eq('user_id', req.userId!).single();
+  await logInvoiceEvent(req, req.userId!, data || { id: result.id }, 'paid', {
+    payment_date: req.body.paymentDate, amount_received: req.body.amountReceived, tds: req.body.tdsDeducted,
+  });
   res.json(data);
 });
 

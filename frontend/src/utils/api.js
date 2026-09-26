@@ -59,7 +59,9 @@ api.interceptors.response.use(
         return api(original);
       } catch (e) {
         processQueue(e);
-        window.location.href = '/login';
+        // Session really expired — send them to login, then back to this page
+        const here = window.location.pathname + window.location.search;
+        window.location.href = `/login?next=${encodeURIComponent(here)}`;
         return Promise.reject(e);
       } finally {
         isRefreshing = false;
@@ -68,5 +70,17 @@ api.interceptors.response.use(
     return Promise.reject(error);
   }
 );
+
+// User-facing text for a failed request. 4xx messages from our API are written for users;
+// 5xx and network errors are not, so those get a friendly fallback instead.
+export function getErrorMessage(err, fallback = 'Something went wrong. Please try again.') {
+  if (!err?.response) {
+    if (err?.code === 'ECONNABORTED') return 'Kcretio is taking too long to respond. Please try again in a moment.';
+    return 'Can’t reach Kcretio — check your internet connection and try again.';
+  }
+  const { status, data } = err.response;
+  if (status >= 500) return fallback;
+  return (typeof data?.message === 'string' && data.message) || fallback;
+}
 
 export default api;

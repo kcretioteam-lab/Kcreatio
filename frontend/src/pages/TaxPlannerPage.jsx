@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import api from '../utils/api.js';
+import api, { getErrorMessage } from '../utils/api.js';
 import { useToast } from '../hooks/useToast.jsx';
 import { useIsMobile } from '../hooks/useIsMobile.js';
 import { formatINR } from '../utils/formatINR.js';
@@ -80,7 +80,7 @@ export default function TaxPlannerPage() {
       setPayOpen(false);
       setPayForm({ amountPaid: '', paidDate: '', challanNumber: '' });
       loadData();
-    } catch (err) { toast.error(err?.response?.data?.message || 'Failed to log payment'); }
+    } catch (err) { toast.error(getErrorMessage(err, 'Failed to log payment')); }
     finally { setSaving(false); }
   }
 
