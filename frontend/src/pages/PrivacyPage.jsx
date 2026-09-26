@@ -36,31 +36,43 @@ const SECTIONS = [
   },
   {
     title: '9. Where Your Data Lives',
-    body: 'Your account and financial data is stored in a Supabase-hosted PostgreSQL database. Uploaded images — your avatar, invoice signature, and UPI QR code — are stored in a private Supabase Storage bucket.',
+    body: 'Your account and financial data is stored in a Supabase-hosted PostgreSQL database in [DATA REGION — e.g. Mumbai, India (ap-south-1)]. Uploaded images — your avatar, invoice signature, and UPI QR code — are stored in Supabase Storage in the same region. Some of the service providers listed above may process data outside India; we only use providers with appropriate security safeguards.',
   },
   {
     title: '10. Data Retention',
-    body: 'We keep your account and financial records for as long as your account is active, so your invoice and TDS history stays available across financial years. If you delete your account from Settings, your data is permanently removed from our systems, except where we are legally required to retain financial records for a longer period.',
+    body: 'We keep your account and financial records for as long as your account is active, so your invoice and TDS history stays available across tax years. If you delete your account from Settings, your data is permanently removed within 30 days, except records we must keep by law (for example, GST law requires invoice records to be kept for at least 6 years), which we delete once that period ends.',
   },
   {
     title: '11. Your Rights',
-    body: 'You can view and edit your profile and business details from Settings at any time, and permanently delete your account and data from Settings. To request a copy of your data or ask a question about this policy, email kcretioteam@gmail.com.',
+    body: 'Under the Digital Personal Data Protection Act, 2023 you can: see a summary of the personal data we hold and how we use it; correct, complete or update it (most of it directly in Settings); erase it by deleting your account; and have your grievances addressed. Email grievance@kcretio.in and we will respond within 30 days.',
   },
   {
-    title: '12. Security',
-    body: 'Passwords are hashed with bcrypt, authentication uses httpOnly, secure cookies, and all traffic between your browser and Kcretio is encrypted with HTTPS. No online service can guarantee absolute security, but we do not store payment card details, and access to production data is limited to what is needed to operate the service.',
+    title: '12. Withdrawing Consent',
+    body: 'You can withdraw your consent at any time, as easily as you gave it: disconnect Gmail or Google sign-in in Settings, turn off marketing emails in Settings → Notifications, or delete your account. Withdrawing consent does not affect processing that happened before you withdrew it. If you withdraw consent for data we need to run the service, we may no longer be able to provide it.',
   },
   {
-    title: '13. Children',
-    body: "Kcretio is a business and financial tool and is not directed at, or intended for use by, children.",
+    title: '13. Nominating Someone',
+    body: 'You may nominate another person to exercise your rights over your data if you die or become unable to do so. Email grievance@kcretio.in from your registered email address with the nominee’s name and contact details.',
   },
   {
-    title: '14. Changes to This Policy',
-    body: 'If this policy changes in a material way, we will update the "last updated" date below and, where appropriate, notify you by email.',
+    title: '14. Security and Data Breaches',
+    body: 'Passwords are hashed with bcrypt, authentication uses httpOnly, secure cookies, all traffic is encrypted with HTTPS, and database access is restricted with row-level security. No online service can guarantee absolute security. If a personal data breach affects you, we will tell you and the Data Protection Board of India without delay, explain what happened and its likely impact, and tell you what we are doing and what you can do to protect yourself.',
   },
   {
-    title: '15. Contact',
-    body: 'Questions about this policy, or requests about your data, can be sent to kcretioteam@gmail.com.',
+    title: '15. Children',
+    body: "Kcretio is a business and financial tool for adults and is not directed at, or intended for use by, anyone under 18.",
+  },
+  {
+    title: '16. Changes to This Policy',
+    body: 'If this policy changes in a material way, we will update the "last updated" date below and notify you by email before the change takes effect.',
+  },
+  {
+    title: '17. Who We Are and Grievance Officer',
+    body: 'Kcretio is operated by [LEGAL ENTITY NAME], [REGISTERED ADDRESS]. Grievance Officer: [NAME], grievance@kcretio.in. We acknowledge grievances within 48 hours and resolve them within 30 days. If you are not satisfied with our response, you may complain to the Data Protection Board of India.',
+  },
+  {
+    title: '18. Contact',
+    body: 'Questions about this policy can be sent to support@kcretio.in. Requests about your data and complaints go to grievance@kcretio.in.',
   },
 ];
 

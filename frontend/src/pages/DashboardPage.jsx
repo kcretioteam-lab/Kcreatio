@@ -19,8 +19,9 @@ import { canAccess } from '../utils/planConfig.js';
 import SmartInboxWidget from '../components/SmartInboxWidget.jsx';
 import ManualPasteModal from '../components/ManualPasteModal.jsx';
 import { usePremiumRequest } from '../hooks/usePremiumRequest.jsx';
+import { CURRENT_FY } from '../utils/financialYear.js';
+import { taxYearLabel } from '../utils/taxLabels.js';
 
-const CURRENT_FY = (() => { const n = new Date(), y = n.getFullYear(), m = n.getMonth()+1; return m>=4?`${y}-${String(y+1).slice(-2)}`:`${y-1}-${String(y).slice(-2)}`; })();
 
 export default function DashboardPage() {
   const { user, trialDaysLeft } = useAuth();
@@ -45,7 +46,7 @@ export default function DashboardPage() {
         api.get('/invoices', { params: { limit: 5 } }),
         api.get('/deals'),
       ]);
-      setData({ incSummary: incSummary.data, tdsSum: tdsSum.data, deadlines: deadlines.data.deadlines, recentInvoices: invoices.data.invoices, deals: deals.data.deals });
+      setData({ incSummary: incSummary.data, tdsSum: tdsSum.data, deadlines: deadlines.data.deadlines, gstThreshold: deadlines.data.gstThreshold, recentInvoices: invoices.data.invoices, deals: deals.data.deals });
     } catch {
       // Dashboard loads partial data gracefully
     } finally {
@@ -111,7 +112,7 @@ export default function DashboardPage() {
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', flexWrap: 'wrap' }}>
             <span style={{ fontSize: 'var(--text-sm)', fontWeight: 700, color: 'var(--accent)' }}>
-              FY {CURRENT_FY} closes in {daysToMar31} days
+              {taxYearLabel(CURRENT_FY)} closes in {daysToMar31} days
             </span>
             {daysToMar15 > 0 && (
               <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-body)', background: 'var(--surface)', borderRadius: 'var(--radius-full)', padding: '2px 8px', border: '1px solid var(--border)' }}>
@@ -143,7 +144,7 @@ export default function DashboardPage() {
             padding: '2px 8px',
           }}>
             <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--success)', animation: 'pulse-dot 2s ease-in-out infinite', display: 'inline-block' }} aria-hidden="true" />
-            FY {CURRENT_FY}
+            {taxYearLabel(CURRENT_FY)}
           </span>
         </div>
         <p style={{ color: 'var(--text-muted)', fontSize: 'var(--text-sm)', marginTop: 'var(--space-1)' }}>
@@ -192,7 +193,7 @@ export default function DashboardPage() {
             </div>
             <div style={{ fontFamily: "'Instrument Serif', Georgia, serif", fontSize: isMobile ? 'var(--text-2xl)' : 'clamp(28px, 3vw, 40px)', fontWeight: 400, color: 'var(--text-primary)', lineHeight: 1.1, fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.01em' }}>
               {thisMonth > 0 ? (
-                <AnimatedCounter to={Math.round(thisMonth / 100)} suffix={`₹${(thisMonth % 100) > 0 ? ` (${formatINR(thisMonth)})` : ''}`} duration={1200} />
+                <AnimatedCounter to={Math.round(thisMonth)} format={formatINR} duration={1200} />
               ) : formatINR(thisMonth)}
             </div>
             {deltaText && (
@@ -259,6 +260,13 @@ export default function DashboardPage() {
         {/* Deadlines widget */}
         <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: 'var(--space-5)' }}>
           <div className="label" style={{ marginBottom: 'var(--space-4)' }}>Upcoming Deadlines</div>
+          {data?.gstThreshold && (
+            <div role="alert" style={{ marginBottom: 'var(--space-4)', padding: 'var(--space-3)', background: data.gstThreshold.crossed ? 'var(--danger-dim)' : 'var(--warning-dim)', border: `1px solid ${data.gstThreshold.crossed ? 'var(--danger)' : 'var(--warning)'}`, borderRadius: 'var(--radius-md)', fontSize: 'var(--text-sm)', color: 'var(--text-primary)' }}>
+              {data.gstThreshold.crossed
+                ? <>Your income this year is {formatINR(data.gstThreshold.income)} — above the ₹20 lakh limit. You need to register for GST within 30 days. <Link to="/settings?section=Tax%20Profile" style={{ color: 'var(--accent)' }}>Update Tax Profile</Link></>
+                : <>Your income this year is {formatINR(data.gstThreshold.income)}. Once it crosses ₹20 lakh you must register for GST — talk to your CA now.</>}
+            </div>
+          )}
           {loading ? <SkeletonCard rows={3} style={{ border: 'none', padding: 0, background: 'transparent' }} />
           : (data?.deadlines || []).length === 0 ? <p style={{ color: 'var(--text-muted)', fontSize: 'var(--text-sm)' }}>No upcoming deadlines.</p>
           : (
@@ -267,7 +275,7 @@ export default function DashboardPage() {
                 <div key={d.name} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: 'var(--space-2) 0', borderBottom: '1px solid var(--border)' }}>
                   <div>
                     <div style={{ fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--text-primary)' }}>{d.name}</div>
-                    <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', marginTop: 1 }}>{format(new Date(d.dueDate), 'd MMM yyyy')}</div>
+                    <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', marginTop: 1 }}>{format(new Date(d.dueDate + 'T00:00:00'), 'd MMM yyyy')}{d.detail ? ` · ${d.detail}` : ''}</div>
                   </div>
                   <Badge variant={d.urgency === 'danger' ? 'danger' : d.urgency === 'warning' ? 'warning' : 'success'}>
                     {d.daysUntil}d

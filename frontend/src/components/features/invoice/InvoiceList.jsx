@@ -1,13 +1,15 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
-import { Eye, Pencil, Download, FileJson, Trash2, ChevronUp, ChevronDown, ChevronsUpDown, CheckCircle, Send, Copy } from 'lucide-react';
+import { Eye, Pencil, Download, FileJson, Trash2, ChevronUp, ChevronDown, ChevronsUpDown, CheckCircle, Send, Copy, MoreHorizontal, FileMinus } from 'lucide-react';
 import Badge from '../../ui/Badge.jsx';
 import { formatINR } from '../../../utils/formatINR.js';
-import api from '../../../utils/api.js';
+import api, { getErrorMessage } from '../../../utils/api.js';
 import { useToast } from '../../../hooks/useToast.jsx';
 
-const STATUS_VARIANT = { draft: 'muted', sent: 'info', paid: 'success', overdue: 'danger' };
+const STATUS_VARIANT = { draft: 'muted', sent: 'info', partially_paid: 'warning', paid: 'success', overdue: 'danger', cancelled: 'muted' };
+const STATUS_LABEL = { draft: 'Draft', sent: 'Sent', partially_paid: 'Part paid', paid: 'Paid', overdue: 'Overdue', cancelled: 'Cancelled' };
+const PAYABLE = ['draft', 'sent', 'overdue', 'partially_paid'];
 
 const COLS = [
   { key: 'invoice_number', label: 'Invoice #', sortable: true },
@@ -20,7 +22,7 @@ const COLS = [
   { key: 'actions',        label: 'Actions',   sortable: false },
 ];
 
-export default function InvoiceList({ invoices, loading, onDownload, onExportJson, onDelete, onRefresh, onMarkPaid, sortCol, sortDir, onSort, isFiltered }) {
+export default function InvoiceList({ invoices, loading, onDownload, onExportJson, onDelete, onRefresh, onMarkPaid, onCreditNote, sortCol, sortDir, onSort, isFiltered }) {
   const navigate = useNavigate();
   const toast = useToast();
   const [viewModalId, setViewModalId] = useState(null);
@@ -33,7 +35,7 @@ export default function InvoiceList({ invoices, loading, onDownload, onExportJso
       await api.post(`/invoices/${inv.id}/send`);
       toast.success(`Invoice sent to ${inv.brand_email}`);
       onRefresh?.();
-    } catch (err) { toast.error(err?.response?.data?.message || 'Failed to send invoice'); }
+    } catch (err) { toast.error(getErrorMessage(err, 'Failed to send invoice')); }
     finally { setSendingId(null); }
   }
 
@@ -123,49 +125,33 @@ export default function InvoiceList({ invoices, loading, onDownload, onExportJso
                   </td>
                   <td style={{ padding: 'var(--space-3)' }}>
                     <Badge variant={STATUS_VARIANT[inv.status] || 'muted'}>
-                      {(inv.status || 'draft').charAt(0).toUpperCase() + (inv.status || 'draft').slice(1)}
+                      {STATUS_LABEL[inv.status] || 'Draft'}
                     </Badge>
                   </td>
                   <td style={{ padding: 'var(--space-3)', fontSize: 'var(--text-xs)', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
                     {inv.invoice_date ? format(new Date(inv.invoice_date + (inv.invoice_date.includes('T') ? '' : 'T00:00:00')), 'd MMM yyyy') : '—'}
                   </td>
                   <td style={{ padding: 'var(--space-3)' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3 }}>
-                      {/* VIEW */}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 3, whiteSpace: 'nowrap' }}>
                       <ActionBtn icon={<Eye size={13}/>} label="View invoice" title="View"
                         onClick={e => { e.stopPropagation(); setViewModalId(inv.id); }} />
-                      {/* EDIT — only draft */}
-                      {inv.status === 'draft' && (
-                        <ActionBtn icon={<Pencil size={13}/>} label="Edit invoice" title="Edit"
-                          onClick={e => { e.stopPropagation(); navigate(`/invoices/${inv.id}/edit`); }} />
-                      )}
-                      {/* SEND TO BRAND */}
-                      {['draft','sent'].includes(inv.status) && (
-                        <ActionBtn icon={<Send size={13}/>} label={inv.brand_email ? `Send to ${inv.brand_email}` : 'Add brand email to enable sending'} title="Send"
-                          onClick={e => { e.stopPropagation(); handleSend(inv); }}
-                          disabled={sendingId === inv.id || !inv.brand_email} info />
-                      )}
-                      {/* DUPLICATE */}
-                      <ActionBtn icon={<Copy size={13}/>} label="Duplicate invoice" title="Duplicate"
-                        onClick={e => { e.stopPropagation(); navigate('/invoices/new', { state: { duplicate: inv } }); }} />
-                      {/* MARK PAID */}
-                      {['draft','sent'].includes(inv.status) && (
-                        <ActionBtn icon={<CheckCircle size={13}/>} label="Mark as paid — logs TDS + income" title="Mark Paid"
+                      {PAYABLE.includes(inv.status) && (
+                        <ActionBtn icon={<CheckCircle size={13}/>} label={inv.status === 'partially_paid' ? 'Record another payment' : 'Mark as paid — logs income and TDS'} title="Mark paid"
                           onClick={e => { e.stopPropagation(); onMarkPaid?.(inv); }} success />
                       )}
-                      {/* DOWNLOAD */}
                       <ActionBtn icon={<Download size={13}/>} label="Download PDF" title="PDF"
                         onClick={e => { e.stopPropagation(); onDownload(inv); }} accent />
-                      {/* JSON EXPORT */}
-                      {onExportJson && (
-                        <ActionBtn icon={<FileJson size={13}/>} label="Export as JSON (for accountant)" title="JSON"
-                          onClick={e => { e.stopPropagation(); onExportJson(inv); }} />
-                      )}
-                      {/* DELETE — only draft */}
-                      {inv.status === 'draft' && (
-                        <ActionBtn icon={<Trash2 size={13}/>} label="Delete invoice" title="Delete"
-                          onClick={e => { e.stopPropagation(); onDelete(inv); }} danger />
-                      )}
+                      <MoreMenu label={`More actions for ${inv.invoice_number}`} items={[
+                        inv.status === 'draft' && { icon: Pencil, label: 'Edit', onClick: () => navigate(`/invoices/${inv.id}/edit`) },
+                        ['draft', 'sent', 'overdue', 'partially_paid'].includes(inv.status) && {
+                          icon: Send, label: inv.brand_email ? `Send to ${inv.brand_email}` : 'Send (add brand email first)',
+                          onClick: () => handleSend(inv), disabled: sendingId === inv.id || !inv.brand_email,
+                        },
+                        { icon: Copy, label: 'Duplicate', onClick: () => navigate('/invoices/new', { state: { duplicate: inv } }) },
+                        onCreditNote && !['draft', 'cancelled'].includes(inv.status) && { icon: FileMinus, label: 'Issue credit note', onClick: () => onCreditNote(inv) },
+                        onExportJson && { icon: FileJson, label: 'Export JSON', onClick: () => onExportJson(inv) },
+                        inv.status === 'draft' && { icon: Trash2, label: 'Delete', onClick: () => onDelete(inv), danger: true },
+                      ]} />
                     </div>
                   </td>
                 </tr>
@@ -317,3 +303,49 @@ function ActionBtn({ icon, label, title, onClick, accent, danger, success, info,
   );
 }
 
+// "⋯" menu for less common row actions, so the Actions column stays narrow.
+function MoreMenu({ label, items }) {
+  const [pos, setPos] = useState(null);   // fixed position — the table wrapper clips overflow
+  const open = Boolean(pos);
+  const ref = useRef(null);
+  const setOpen = (next) => {
+    const want = typeof next === 'function' ? next(open) : next;
+    if (!want) { setPos(null); return; }
+    const r = ref.current.getBoundingClientRect();
+    const below = window.innerHeight - r.bottom > 260;
+    setPos({ right: window.innerWidth - r.right, ...(below ? { top: r.bottom + 4 } : { bottom: window.innerHeight - r.top + 4 }) });
+  };
+  useEffect(() => {
+    if (!open) return;
+    const close = (e) => { if (!ref.current?.contains(e.target)) setPos(null); };
+    const esc = (e) => { if (e.key === 'Escape') setPos(null); };
+    const scroll = () => setPos(null);
+    document.addEventListener('mousedown', close);
+    document.addEventListener('keydown', esc);
+    window.addEventListener('scroll', scroll, true);
+    return () => { document.removeEventListener('mousedown', close); document.removeEventListener('keydown', esc); window.removeEventListener('scroll', scroll, true); };
+  }, [open]);
+  const visible = items.filter(Boolean);
+  if (!visible.length) return null;
+  return (
+    <div ref={ref}>
+      <ActionBtn icon={<MoreHorizontal size={13}/>} label={label} title="More" onClick={e => { e.stopPropagation(); setOpen(o => !o); }} />
+      {open && (
+        <div role="menu" style={{ position: 'fixed', ...pos, zIndex: 60, minWidth: 200, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', boxShadow: 'var(--card-shadow)', padding: 'var(--space-1)' }}>
+          {visible.map(item => {
+            const Icon = item.icon;
+            return (
+              <button key={item.label} role="menuitem" type="button" disabled={item.disabled}
+                onClick={e => { e.stopPropagation(); setOpen(false); item.onClick(); }}
+                style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', width: '100%', padding: 'var(--space-2) var(--space-3)', background: 'none', border: 'none', borderRadius: 'var(--radius-sm)', textAlign: 'left', fontSize: 'var(--text-sm)', fontFamily: 'inherit', color: item.danger ? 'var(--danger-text)' : 'var(--text-body)', cursor: item.disabled ? 'not-allowed' : 'pointer', opacity: item.disabled ? 0.5 : 1 }}
+                onMouseEnter={e => { if (!item.disabled) e.currentTarget.style.background = 'var(--surface-2)'; }}
+                onMouseLeave={e => { e.currentTarget.style.background = 'none'; }}>
+                <Icon size={14} aria-hidden="true" /> {item.label}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}

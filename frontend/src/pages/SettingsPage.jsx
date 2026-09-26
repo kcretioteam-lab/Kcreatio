@@ -5,10 +5,16 @@ import { useIsMobile } from '../hooks/useIsMobile.js';
 import Input from '../components/ui/Input.jsx';
 import Modal from '../components/ui/Modal.jsx';
 import { useToast } from '../hooks/useToast.jsx';
-import api from '../utils/api.js';
+import api, { getErrorMessage } from '../utils/api.js';
 // import { openSubscriptionCheckout } from '../utils/razorpay.js'; // Payments disabled — premium is granted on request
 import { usePremiumRequest } from '../hooks/usePremiumRequest.jsx';
 import { PLAN_DISPLAY, PLAN_HIERARCHY } from '../utils/planConfig.js';
+import { CURRENT_FY, PREVIOUS_FY } from '../utils/financialYear.js';
+import { taxYearLabel } from '../utils/taxLabels.js';
+import { INDIAN_STATES, gstinError, panFromGstin, stateLabel } from '../utils/gst.js';
+import TwoFactorCard from '../components/settings/TwoFactorCard.jsx';
+import SessionsCard from '../components/settings/SessionsCard.jsx';
+import InfoTip from '../components/ui/InfoTip.jsx';
 
 const SECTIONS = ['Profile', 'Tax Profile', 'Invoice Settings', 'Billing', 'Notifications', 'Security', 'Export', 'Integrations', 'Danger Zone'];
 
@@ -110,7 +116,7 @@ function InvoiceSettingsSection({ user }) {
       toast.success(editingBank ? 'Bank account updated' : 'Bank account added');
       setShowBankForm(false); setEditingBank(null);
       loadSettings();
-    } catch (err) { toast.error(err?.response?.data?.message || 'Failed to save'); }
+    } catch (err) { toast.error(getErrorMessage(err, 'Failed to save')); }
     finally { setSavingBank(false); }
   }
 
@@ -147,7 +153,7 @@ function InvoiceSettingsSection({ user }) {
       toast.success(editingTerms ? 'T&C updated' : 'T&C profile added');
       setShowTermsForm(false); setEditingTerms(null);
       loadSettings();
-    } catch (err) { toast.error(err?.response?.data?.message || 'Failed to save'); }
+    } catch (err) { toast.error(getErrorMessage(err, 'Failed to save')); }
     finally { setSavingTerms(false); }
   }
 
@@ -190,7 +196,7 @@ function InvoiceSettingsSection({ user }) {
       toast.success('Signatory saved');
       setShowSignatoryForm(false);
       loadSettings();
-    } catch (err) { toast.error(err?.response?.data?.message || 'Failed to save signatory'); }
+    } catch (err) { toast.error(getErrorMessage(err, 'Failed to save signatory')); }
     finally { setSavingSignatory(false); }
   }
 
@@ -224,7 +230,7 @@ function InvoiceSettingsSection({ user }) {
       toast.success(editingUpi ? 'UPI updated' : 'UPI added');
       setShowUpiForm(false); setEditingUpi(null);
       loadSettings();
-    } catch (err) { toast.error(err?.response?.data?.message || 'Failed to save'); }
+    } catch (err) { toast.error(getErrorMessage(err, 'Failed to save')); }
     finally { setSavingUpi(false); }
   }
   async function deleteUpi(id) {
@@ -719,7 +725,7 @@ const UPGRADE_FEATURES = {
 //         },
 //       });
 //     } catch (e) {
-//       toast.error(e.response?.data?.message || 'Failed to start the upgrade. Please try again.');
+//       toast.error(getErrorMessage(e, 'Failed to start the upgrade. Please try again.'));
 //       setActionLoading('');
 //     }
 //   };
@@ -731,7 +737,7 @@ const UPGRADE_FEATURES = {
 //       toast.success('Subscription will cancel at end of billing period.');
 //       await fetchStatus();
 //     } catch (e) {
-//       toast.error(e.response?.data?.message || 'Failed to cancel subscription');
+//       toast.error(getErrorMessage(e, 'Failed to cancel subscription'));
 //     } finally {
 //       setActionLoading('');
 //       setConfirmModal(null);
@@ -745,7 +751,7 @@ const UPGRADE_FEATURES = {
 //       toast.success('Subscription reactivated successfully.');
 //       await fetchStatus();
 //     } catch (e) {
-//       toast.error(e.response?.data?.message || 'Failed to reactivate');
+//       toast.error(getErrorMessage(e, 'Failed to reactivate'));
 //     } finally {
 //       setActionLoading('');
 //     }
@@ -1014,12 +1020,14 @@ function SocialLinksSection({ user, onSave }) {
     { key: 'youtube',   label: 'YouTube',   placeholder: 'https://youtube.com/@yourchannel' },
     { key: 'facebook',  label: 'Facebook',  placeholder: 'https://facebook.com/yourpage' },
     { key: 'x',         label: 'X (Twitter)', placeholder: 'https://x.com/yourhandle' },
-    { key: 'tiktok',    label: 'TikTok',    placeholder: 'https://tiktok.com/@yourhandle' },
+    { key: 'moj',       label: 'Moj',       placeholder: 'https://mojapp.in/@yourhandle' },
+    { key: 'josh',      label: 'Josh',      placeholder: 'https://share.myjosh.in/profile/yourhandle' },
+    { key: 'spotify',   label: 'Spotify (podcast)', placeholder: 'https://open.spotify.com/show/yourshow' },
     { key: 'snapchat',  label: 'Snapchat',  placeholder: 'https://snapchat.com/add/yourhandle' },
     { key: 'linkedin',  label: 'LinkedIn',  placeholder: 'https://linkedin.com/in/yourprofile' },
     { key: 'website',   label: 'Website',   placeholder: 'https://yourwebsite.com' },
   ];
-  const [links, setLinks] = useState(user?.social_links || {});
+  const [links, setLinks] = useState(() => { const { tiktok, ...rest } = user?.social_links || {}; return rest; });
   const [saving, setSaving] = useState(false);
   const toast = useToast();
 
@@ -1144,7 +1152,7 @@ function SecuritySection() {
       toast.success('Password changed successfully');
       setForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
     } catch (err) {
-      setErrors({ currentPassword: err?.response?.data?.message || 'Failed to change password' });
+      setErrors({ currentPassword: getErrorMessage(err, 'Failed to change password') });
     } finally { setSaving(false); }
   }
 
@@ -1189,8 +1197,8 @@ function SecuritySection() {
 function ExportSection({ user }) {
   const toast = useToast();
   const [downloading, setDownloading] = useState(false);
-  const currentFY = (() => { const n = new Date(), y = n.getFullYear(), m = n.getMonth()+1; return m>=4?`${y}-${String(y+1).slice(-2)}`:`${y-1}-${String(y).slice(-2)}`; })();
-  const prevFY = (() => { const n = new Date(), y = n.getFullYear(), m = n.getMonth()+1; const b = m>=4?y:y-1; return `${b-1}-${String(b).slice(-2)}`; })();
+  const currentFY = CURRENT_FY;
+  const prevFY = PREVIOUS_FY;
   const [selectedFY, setSelectedFY] = useState(currentFY);
 
   const isPro = user && ['pro', 'business', 'trial'].includes(user.plan);
@@ -1198,7 +1206,7 @@ function ExportSection({ user }) {
   async function download() {
     setDownloading(true);
     try {
-      const res = await api.get(`/export/annual?fy=${selectedFY}`, { responseType: 'blob', timeout: 120000 });
+      const res = await api.get(`/export/annual?fy=${selectedFY}`, { responseType: 'blob', timeout: 300000 });
       const url = URL.createObjectURL(res.data);
       const a = document.createElement('a');
       a.href = url;
@@ -1207,7 +1215,7 @@ function ExportSection({ user }) {
       URL.revokeObjectURL(url);
       toast.success('Export downloaded');
     } catch (err) {
-      toast.error(err?.response?.data?.message || 'Export failed. Ensure you have a Pro plan.');
+      toast.error(getErrorMessage(err, 'Export failed. Ensure you have a Pro plan.'));
     } finally { setDownloading(false); }
   }
 
@@ -1215,7 +1223,7 @@ function ExportSection({ user }) {
     <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: 'var(--space-6)' }}>
       <h2 style={{ fontSize: 'var(--text-md)', fontWeight: 700, color: 'var(--text-primary)', marginBottom: 'var(--space-2)' }}>CA Export</h2>
       <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)', marginBottom: 'var(--space-5)', lineHeight: 1.6 }}>
-        Download a ZIP file with all invoices, TDS records, income, expenses, and a P&amp;L summary — formatted for your CA's ITR-3/ITR-4 filing.
+        Download one ZIP for your CA: every invoice as a PDF, an Excel workbook with invoices, income, expenses, TDS and advance tax, and a one-page tax summary. It can take a minute if you have many invoices.
       </p>
       {!isPro && (
         <div style={{ padding: 'var(--space-3) var(--space-4)', background: 'var(--warning-dim)', border: '1px solid var(--warning)', borderRadius: 'var(--radius-md)', fontSize: 'var(--text-sm)', color: 'var(--warning-text)', marginBottom: 'var(--space-4)' }}>
@@ -1224,15 +1232,15 @@ function ExportSection({ user }) {
       )}
       <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
         <select value={selectedFY} onChange={e => setSelectedFY(e.target.value)} style={{ padding: 'var(--space-2) var(--space-3)', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', color: 'var(--text-body)', fontSize: 'var(--text-sm)', fontFamily: 'inherit' }}>
-          <option value={currentFY}>FY {currentFY}</option>
-          <option value={prevFY}>FY {prevFY}</option>
+          <option value={currentFY}>{taxYearLabel(currentFY)}</option>
+          <option value={prevFY}>{taxYearLabel(prevFY)}</option>
         </select>
         <button onClick={download} disabled={downloading || !isPro} style={{ padding: 'var(--space-2) var(--space-4)', background: isPro && !downloading ? 'var(--accent)' : 'var(--border-2)', color: '#fff', border: 'none', borderRadius: 'var(--radius-md)', fontWeight: 600, fontSize: 'var(--text-sm)', cursor: isPro && !downloading ? 'pointer' : 'not-allowed', fontFamily: 'inherit' }}>
           {downloading ? 'Downloading…' : '↓ Download Annual Summary'}
         </button>
       </div>
       <p style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', marginTop: 'var(--space-3)' }}>
-        Includes: invoices.csv · tds.csv · income.csv · expenses.csv · summary.txt
+        Includes: invoices/*.pdf · kcretio-&lt;year&gt;.xlsx · summary.pdf
       </p>
     </div>
   );
@@ -1291,7 +1299,7 @@ function IntegrationsSection({ user, onRefresh }) {
       toast.success(`Scan complete — ${res.data.new_detections} new items found`);
       onRefresh();
     } catch (err) {
-      toast.error(err.response?.data?.message ?? 'Scan failed');
+      toast.error(getErrorMessage(err, 'Scan failed'));
     } finally {
       setScanning(false);
     }
@@ -1315,6 +1323,7 @@ function IntegrationsSection({ user, onRefresh }) {
           <div style={{ flex: 1 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 'var(--space-1)' }}>
               <span style={{ fontWeight: 700, fontSize: 'var(--text-md)', color: 'var(--text-primary)' }}>Gmail</span>
+              <span title="Google is still reviewing Kcretio’s Gmail access, so you may see an “unverified app” screen when connecting." style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', padding: '1px 6px', borderRadius: 'var(--radius-sm)', background: 'var(--warning-dim)', color: 'var(--warning-text)' }}>Beta</span>
               {gmailConnected && (
                 <span style={{ padding: '1px 7px', background: 'var(--success-dim)', color: 'var(--success-text)', borderRadius: 'var(--radius-full)', fontSize: 10, fontWeight: 700 }}>CONNECTED</span>
               )}
@@ -1451,11 +1460,60 @@ function IntegrationsSection({ user, onRefresh }) {
 }
 
 // ── Main Settings Page ────────────────────────────────────────────────────────
+const SELECT_STYLE = { padding: 'var(--space-2) var(--space-3)', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', color: 'var(--text-primary)', fontFamily: 'inherit', fontSize: 'var(--text-sm)' };
+
+function profileToForm(user) {
+  return {
+    business_name: user?.business_name || '',
+    gstin: user?.gstin || '',
+    pan: user?.pan || '',
+    business_address: user?.business_address || '',
+    state_code: user?.state_code || '',
+    invoice_prefix: user?.invoice_prefix || 'INV',
+    gst_registered: user?.gst_registered ?? true,
+    legal_name: user?.legal_name || '',
+    trade_name: user?.trade_name || '',
+    tax_regime: user?.tax_regime || 'new',
+    presumptive: user?.presumptive || 'none',
+    lut_number: user?.lut_number || '',
+  };
+}
+
+function StateSelect({ id, value, onChange, lockedByGstin }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
+      <label htmlFor={id} style={{ fontSize: 'var(--text-sm)', fontWeight: 500, color: 'var(--text-body)' }}>State</label>
+      <select id={id} value={value} disabled={lockedByGstin} onChange={e => onChange(e.target.value)} style={SELECT_STYLE}>
+        <option value="">Select your state</option>
+        {INDIAN_STATES.map(st => <option key={st.code} value={st.code}>{st.code} — {st.name}</option>)}
+      </select>
+      {lockedByGstin && <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>Set by your GSTIN</span>}
+    </div>
+  );
+}
+
+function ToggleRow({ id, label, hint, checked, onChange }) {
+  return (
+    <label htmlFor={id} style={{ display: 'flex', alignItems: 'flex-start', gap: 'var(--space-3)', cursor: 'pointer' }}>
+      <input id={id} type="checkbox" checked={checked} onChange={e => onChange(e.target.checked)} style={{ marginTop: 3, width: 16, height: 16, accentColor: 'var(--accent)' }} />
+      <span style={{ fontSize: 'var(--text-sm)', color: 'var(--text-primary)' }}>
+        {label}
+        {hint && <span style={{ display: 'block', fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>{hint}</span>}
+      </span>
+    </label>
+  );
+}
+
+
 export default function SettingsPage() {
   const { user, fetchUser } = useAuth();
   const toast = useToast();
   const isMobile = useIsMobile();
-  const [activeSection, setActiveSection] = useState('Profile');
+  // Deep link from emails, e.g. /settings?section=Security
+  const [activeSection, setActiveSection] = useState(() => {
+    const requested = new URLSearchParams(window.location.search).get('section');
+    return SECTIONS.includes(requested) ? requested : 'Profile';
+  });
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
   const [deleting, setDeleting] = useState(false);
@@ -1467,13 +1525,14 @@ export default function SettingsPage() {
 
   // Business card state
   const [editingBusiness, setEditingBusiness] = useState(false);
-  const [businessForm, setBusinessForm] = useState({
-    business_name: user?.business_name || '',
-    gstin: user?.gstin || '',
-    pan: user?.pan || '',
-    business_address: user?.business_address || '',
-    state_code: user?.state_code || '',
-    invoice_prefix: user?.invoice_prefix || 'INV',
+  const [businessForm, setBusinessForm] = useState(() => profileToForm(user));
+  const gstinProblem = businessForm.gstin ? gstinError(businessForm.gstin) : null;
+  // A GSTIN fixes the state and PAN, so fill them in as soon as it checks out.
+  const setGstin = (value) => setBusinessForm(p => {
+    const gstin = value.toUpperCase().replace(/\s/g, '').slice(0, 15);
+    return gstin.length === 15 && !gstinError(gstin)
+      ? { ...p, gstin, state_code: gstin.slice(0, 2), pan: panFromGstin(gstin) }
+      : { ...p, gstin };
   });
   const [savingBusiness, setSavingBusiness] = useState(false);
 
@@ -1488,14 +1547,7 @@ export default function SettingsPage() {
   useEffect(() => {
     if (user) {
       setPersonalForm({ name: user.name || '', phone: user.phone || '' });
-      setBusinessForm({
-        business_name: user.business_name || '',
-        gstin: user.gstin || '',
-        pan: user.pan || '',
-        business_address: user.business_address || '',
-        state_code: user.state_code || '',
-        invoice_prefix: user.invoice_prefix || 'INV',
-      });
+      setBusinessForm(profileToForm(user));
     }
   }, [user]);
 
@@ -1511,13 +1563,16 @@ export default function SettingsPage() {
   };
 
   const saveBusiness = async () => {
+    if (businessForm.gst_registered && gstinProblem) { toast.error(gstinProblem); return; }
     setSavingBusiness(true);
     try {
-      await api.put('/auth/profile', businessForm);
+      const body = { ...businessForm };
+      if (!body.gst_registered) { body.gstin = ''; body.lut_number = ''; }
+      await api.put('/auth/profile', body);
       await fetchUser();
-      toast.success('Business info updated');
+      toast.success('Tax profile saved');
       setEditingBusiness(false);
-    } catch { toast.error('Failed to save'); }
+    } catch (err) { toast.error(getErrorMessage(err, 'Couldn’t save. Please try again.')); }
     finally { setSavingBusiness(false); }
   };
 
@@ -1709,19 +1764,19 @@ export default function SettingsPage() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
                   <Input id="b-bname" label="Business / Channel Name" value={businessForm.business_name} onChange={e => setBusinessForm(p => ({...p, business_name: e.target.value}))} />
                   <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 'var(--space-3)' }}>
-                    <Input id="b-gstin" label="GSTIN" value={businessForm.gstin} onChange={e => setBusinessForm(p => ({...p, gstin: e.target.value.toUpperCase()}))} placeholder="29ABCDE1234F1Z5" maxLength={15} hint="15-character GST ID" />
+                    <Input id="b-gstin" label="GSTIN" value={businessForm.gstin} onChange={e => setGstin(e.target.value)} placeholder="29ABCDE1234F1ZW" maxLength={15} error={businessForm.gstin.length === 15 ? gstinProblem : undefined} hint="Fills in your state and PAN" />
                     <Input id="b-pan" label="PAN" value={businessForm.pan} onChange={e => setBusinessForm(p => ({...p, pan: e.target.value.toUpperCase()}))} placeholder="ABCDE1234F" maxLength={10} />
                   </div>
                   <Input id="b-addr" label="Business Address" value={businessForm.business_address} onChange={e => setBusinessForm(p => ({...p, business_address: e.target.value}))} />
                   <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 'var(--space-3)' }}>
                     <Input id="b-prefix" label="Invoice Prefix" value={businessForm.invoice_prefix} onChange={e => setBusinessForm(p => ({...p, invoice_prefix: e.target.value.toUpperCase()}))} placeholder="INV" maxLength={5} hint="2–5 chars, used in invoice numbers" />
-                    <Input id="b-state" label="State Code" value={businessForm.state_code} onChange={e => setBusinessForm(p => ({...p, state_code: e.target.value}))} placeholder="29" maxLength={2} />
+                    <StateSelect id="b-state" value={businessForm.state_code} lockedByGstin={Boolean(businessForm.gstin) && !gstinProblem} onChange={v => setBusinessForm(p => ({...p, state_code: v}))} />
                   </div>
                   <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-2)' }}>
                     <button onClick={saveBusiness} disabled={savingBusiness} style={{ padding: 'var(--space-2) var(--space-4)', background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 'var(--radius-md)', fontWeight: 600, fontSize: 'var(--text-sm)', cursor: 'pointer', fontFamily: 'inherit' }}>
                       {savingBusiness ? 'Saving…' : 'Save'}
                     </button>
-                    <button onClick={() => { setEditingBusiness(false); setBusinessForm({ business_name: user?.business_name||'', gstin: user?.gstin||'', pan: user?.pan||'', business_address: user?.business_address||'', state_code: user?.state_code||'', invoice_prefix: user?.invoice_prefix||'INV' }); }} style={{ padding: 'var(--space-2) var(--space-4)', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', color: 'var(--text-body)', cursor: 'pointer', fontSize: 'var(--text-sm)', fontFamily: 'inherit' }}>
+                    <button onClick={() => { setEditingBusiness(false); setBusinessForm(profileToForm(user)); }} style={{ padding: 'var(--space-2) var(--space-4)', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', color: 'var(--text-body)', cursor: 'pointer', fontSize: 'var(--text-sm)', fontFamily: 'inherit' }}>
                       Cancel
                     </button>
                   </div>
@@ -1732,7 +1787,7 @@ export default function SettingsPage() {
                   <FieldRow label="GSTIN" value={user?.gstin} />
                   <FieldRow label="PAN" value={user?.pan} />
                   <FieldRow label="Business Address" value={user?.business_address} />
-                  <FieldRow label="State Code" value={user?.state_code} />
+                  <FieldRow label="State" value={user?.state_code ? stateLabel(user.state_code) : ''} />
                   <FieldRow label="Invoice Prefix" value={user?.invoice_prefix} />
                 </div>
               )}
@@ -1749,9 +1804,57 @@ export default function SettingsPage() {
         {activeSection === 'Tax Profile' && (
           <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: 'var(--space-6)', display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
             <h2 style={{ fontSize: 'var(--text-md)', fontWeight: 700, color: 'var(--text-primary)' }}>Tax Profile</h2>
-            <Input id="gstin" label="GSTIN" value={businessForm.gstin} onChange={(e) => setBusinessForm(p => ({...p, gstin: e.target.value.toUpperCase()}))} hint="15-character GST identification number" maxLength={15} placeholder="29ABCDE1234F1Z5" />
-            <Input id="pan" label="PAN" value={businessForm.pan} onChange={(e) => setBusinessForm(p => ({...p, pan: e.target.value.toUpperCase()}))} maxLength={10} placeholder="ABCDE1234F" />
+            <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)', marginTop: 'calc(-1 * var(--space-2))' }}>
+              Every GST and tax calculation in Kcretio uses these settings.
+            </p>
+
+            <ToggleRow
+              id="gst_registered"
+              label="I’m registered for GST"
+              hint="Turn off if you don’t have a GSTIN yet. You must register once your turnover crosses ₹20 lakh."
+              checked={businessForm.gst_registered}
+              onChange={v => setBusinessForm(p => ({ ...p, gst_registered: v }))}
+            />
+            {businessForm.gst_registered && (
+              <Input id="gstin" label="GSTIN" value={businessForm.gstin} onChange={(e) => setGstin(e.target.value)} maxLength={15} placeholder="29ABCDE1234F1ZW"
+                error={businessForm.gstin.length === 15 ? gstinProblem : undefined}
+                hint={businessForm.gstin && !gstinProblem ? `✓ ${stateLabel(businessForm.gstin.slice(0, 2))}` : 'Your state and PAN are filled in from it'} />
+            )}
+            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 'var(--space-3)' }}>
+              <Input id="legal_name" label="Legal name (as on PAN)" value={businessForm.legal_name} onChange={(e) => setBusinessForm(p => ({...p, legal_name: e.target.value}))} />
+              <Input id="trade_name" label="Trade name (optional)" value={businessForm.trade_name} onChange={(e) => setBusinessForm(p => ({...p, trade_name: e.target.value}))} hint="Your channel or brand name, if different" />
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 'var(--space-3)' }}>
+              <Input id="pan" label="PAN" value={businessForm.pan} onChange={(e) => setBusinessForm(p => ({...p, pan: e.target.value.toUpperCase()}))} maxLength={10} placeholder="ABCDE1234F" disabled={Boolean(businessForm.gst_registered && businessForm.gstin && !gstinProblem)} />
+              <StateSelect id="state_code" value={businessForm.state_code} lockedByGstin={Boolean(businessForm.gst_registered && businessForm.gstin && !gstinProblem)} onChange={v => setBusinessForm(p => ({...p, state_code: v}))} />
+            </div>
             <Input id="business_address" label="Business address" value={businessForm.business_address} onChange={(e) => setBusinessForm(p => ({...p, business_address: e.target.value}))} />
+
+            <fieldset style={{ border: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+              <legend style={{ fontSize: 'var(--text-sm)', fontWeight: 500, color: 'var(--text-body)', marginBottom: 'var(--space-2)' }}>Income-tax regime <InfoTip term="rebate87a" /></legend>
+              {[['new', 'New regime (default)', 'Lower slab rates, few deductions'], ['old', 'Old regime', 'Keeps deductions like 80C and HRA']].map(([v, label, hint]) => (
+                <label key={v} style={{ display: 'flex', alignItems: 'flex-start', gap: 'var(--space-2)', fontSize: 'var(--text-sm)', color: 'var(--text-primary)', cursor: 'pointer' }}>
+                  <input type="radio" name="tax_regime" value={v} checked={businessForm.tax_regime === v} onChange={() => setBusinessForm(p => ({ ...p, tax_regime: v }))} style={{ marginTop: 3 }} />
+                  <span>{label}<span style={{ display: 'block', color: 'var(--text-muted)', fontSize: 'var(--text-xs)' }}>{hint}</span></span>
+                </label>
+              ))}
+            </fieldset>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
+              <label htmlFor="presumptive" style={{ fontSize: 'var(--text-sm)', fontWeight: 500, color: 'var(--text-body)' }}>How your income is taxed <InfoTip term="presumptive" /></label>
+              <select id="presumptive" value={businessForm.presumptive} onChange={(e) => setBusinessForm(p => ({ ...p, presumptive: e.target.value }))} style={SELECT_STYLE}>
+                <option value="none">Regular books — tax on receipts minus expenses</option>
+                <option value="44ADA">Presumptive, professional (formerly 44ADA) — tax on 50% of receipts</option>
+                <option value="44AD">Presumptive, business (formerly 44AD) — tax on 6% of digital receipts</option>
+              </select>
+              <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>
+                Presumptive users pay all advance tax in one instalment by 15 March. Ask your CA which applies to you.
+              </span>
+            </div>
+
+            {businessForm.gst_registered && (
+              <Input id="lut_number" label="LUT reference (optional)" value={businessForm.lut_number} onChange={(e) => setBusinessForm(p => ({...p, lut_number: e.target.value}))} hint="Needed to invoice foreign clients without charging IGST" />
+            )}
             <Input id="invoice_prefix" label="Invoice prefix" value={businessForm.invoice_prefix} onChange={(e) => setBusinessForm(p => ({...p, invoice_prefix: e.target.value.toUpperCase()}))} hint="2–5 characters. Used in invoice numbers." maxLength={5} placeholder="INV" />
             <button onClick={saveBusiness} disabled={savingBusiness} style={{ alignSelf: 'flex-start', padding: 'var(--space-2) var(--space-4)', background: 'var(--accent)', color: '#fff', borderRadius: 'var(--radius-md)', fontWeight: 600, fontSize: 'var(--text-sm)', cursor: 'pointer', border: 'none', fontFamily: 'inherit' }}>
               {savingBusiness ? 'Saving…' : 'Save changes'}
@@ -1830,7 +1933,11 @@ export default function SettingsPage() {
 
         {/* ── Security Section ──────────────────────────────────────── */}
         {activeSection === 'Security' && (
-          <SecuritySection />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }}>
+            <SecuritySection />
+            <TwoFactorCard />
+            <SessionsCard />
+          </div>
         )}
 
         {/* ── Export Section ────────────────────────────────────────── */}

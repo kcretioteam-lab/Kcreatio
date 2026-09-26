@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../hooks/useAuth.jsx';
-import { useNavigate, Link, useSearchParams } from 'react-router-dom';
+import { useNavigate, Link, useSearchParams, useLocation } from 'react-router-dom';
+import { nextPathFrom } from '../utils/redirect.js';
 import { Eye, EyeOff, FileText, Receipt, Calculator, CheckCircle2, Loader2, ArrowLeft, Sun, Moon } from 'lucide-react';
 import { useIsMobile } from '../hooks/useIsMobile.js';
 import Input from '../components/ui/Input.jsx';
-import api from '../utils/api.js';
+import api, { getErrorMessage } from '../utils/api.js';
 import { useTheme } from '../App.jsx';
 import LogoMark from '../components/ui/LogoMark.jsx';
+import TwoFactorStep from '../components/auth/TwoFactorStep.jsx';
 
 const BRAND_BULLETS = [
   { icon: FileText,   text: 'GST-compliant invoices in 30 seconds' },
@@ -59,8 +61,13 @@ export default function AuthPage({ defaultMode = 'register' }) {
       : {}
   );
   const [loading, setLoading] = useState(false);
-  const { login, register } = useAuth();
+  const { login, register, verifyTwoFactor } = useAuth();
+  // Set when the password step passed on an account with two-factor sign-in (or after Google sign-in)
+  const [twoFactorChallenge, setTwoFactorChallenge] = useState(() => searchParams.get('twofa'));
   const navigate = useNavigate();
+  const location = useLocation();
+  const [nextParams] = useSearchParams();
+  const afterLogin = nextPathFrom(location, nextParams);
   const isMobile = useIsMobile(640);
   const { theme, toggleTheme } = useTheme();
 
@@ -116,7 +123,7 @@ export default function AuthPage({ defaultMode = 'register' }) {
       setOtpStep(true);
       setOtpCooldown(30);
     } catch (err) {
-      setErrors({ email: err?.response?.data?.message || 'Failed to send OTP' });
+      setErrors({ email: getErrorMessage(err, 'Failed to send OTP') });
     } finally {
       setOtpSending(false);
     }
@@ -133,7 +140,7 @@ export default function AuthPage({ defaultMode = 'register' }) {
       setOtpStep(false);
       setOtp('');
     } catch (err) {
-      setErrors({ otp: err?.response?.data?.message || 'Invalid or expired OTP' });
+      setErrors({ otp: getErrorMessage(err, 'Invalid or expired OTP') });
     } finally {
       setOtpVerifying(false);
     }
@@ -154,12 +161,13 @@ export default function AuthPage({ defaultMode = 'register' }) {
         marketingEmails,
       });
       setLoading(false);
-      if (result.success) navigate('/dashboard');
+      if (result.success) navigate(afterLogin, { replace: true });
       else setErrors({ form: result.error });
     } else {
       const result = await login(email.trim(), password);
       setLoading(false);
-      if (result.success) navigate('/dashboard');
+      if (result.success) navigate(afterLogin, { replace: true });
+      else if (result.requires2fa) { setErrors({}); setTwoFactorChallenge(result.challenge); }
       else {
         if (result.errorCode === 'ACCOUNT_LOCKED') {
           setErrors({ form: result.error + ' ' });
@@ -261,6 +269,17 @@ export default function AuthPage({ defaultMode = 'register' }) {
 
         {/* Right form panel */}
         <div style={{ padding: isMobile ? 'var(--space-6)' : 'var(--space-10)' }}>
+          {twoFactorChallenge ? (
+            <TwoFactorStep
+              onVerify={async (code) => {
+                const r = await verifyTwoFactor(twoFactorChallenge, code);
+                if (r.success) navigate(afterLogin, { replace: true });
+                else if (r.expired) { setTwoFactorChallenge(null); setErrors({ form: r.error }); }
+                return r;
+              }}
+              onCancel={() => { setTwoFactorChallenge(null); setPassword(''); }}
+            />
+          ) : (<>
           <h1 style={{ fontSize: 'var(--text-xl)', fontWeight: 700, color: 'var(--text-primary)', marginBottom: 'var(--space-1)' }}>
             {mode === 'register' ? 'Create your free account' : 'Welcome back'}
           </h1>
@@ -498,6 +517,7 @@ export default function AuthPage({ defaultMode = 'register' }) {
               {mode === 'register' ? 'Sign in' : 'Start free'}
             </Link>
           </p>
+          </>)}
         </div>
       </div>
 

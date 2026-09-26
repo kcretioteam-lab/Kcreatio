@@ -6,10 +6,11 @@ import api from '../../../utils/api.js';
 
 const STEPS = [
   { id: 'profile',  label: 'Set up your Tax Profile',    detail: 'Add GSTIN, PAN, business address',           href: '/settings' },
+  { id: 'signature', label: 'Upload your signature',     detail: 'GST invoices must be signed (Rule 46)',      href: '/settings' },
   { id: 'invoice',  label: 'Create your first invoice',   detail: 'GST-compliant in 30 seconds',                href: '/invoices/new' },
   { id: 'income',   label: 'Log your first income',       detail: 'Unlocks advance tax estimate & P&L chart',   href: '/income' },
   { id: 'deal',     label: 'Add a brand deal',            detail: 'Track from inquiry to payment',              href: '/deals' },
-  { id: 'tds',      label: 'Add a TDS record',            detail: 'Every brand deducts 10% — track it all',     href: '/tds' },
+  { id: 'tds',      label: 'Add a TDS record',            detail: 'Brands usually deduct 1–10% — track it all',     href: '/tds' },
 ];
 
 const STORAGE_KEY = 'ctos_onboarding_v1';
@@ -28,14 +29,16 @@ export default function OnboardingChecklist() {
 
   async function verifySteps() {
     try {
-      const [invoiceRes, incomeRes, dealRes, tdsRes] = await Promise.all([
+      const [invoiceRes, incomeRes, dealRes, tdsRes, settingsRes] = await Promise.all([
         api.get('/invoices', { params: { limit: 1 } }),
         api.get('/income', { params: { limit: 1 } }),
         api.get('/deals', { params: { limit: 1 } }),
         api.get('/tds', { params: { limit: 1 } }),
+        api.get('/invoice-settings').catch(() => ({ data: {} })),
       ]);
       const verified = {
-        profile: !!(user?.gstin),
+        profile: !!(user?.gstin || user?.state_code),
+        signature: (settingsRes.data?.settings || []).some(st => st.setting_type === 'signatory' && st.signatory_image_url),
         invoice: (invoiceRes.data?.invoices?.length || invoiceRes.data?.total || 0) > 0,
         income:  (incomeRes.data?.income?.length || 0) > 0,
         deal:    (dealRes.data?.deals?.length || 0) > 0,

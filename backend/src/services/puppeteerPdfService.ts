@@ -1,18 +1,7 @@
 import puppeteer, { Browser } from 'puppeteer-core';
 import { format } from 'date-fns';
 
-const STATE_MAP: Record<string, string> = {
-  '01': 'Jammu & Kashmir', '02': 'Himachal Pradesh', '03': 'Punjab', '04': 'Chandigarh',
-  '05': 'Uttarakhand', '06': 'Haryana', '07': 'Delhi', '08': 'Rajasthan',
-  '09': 'Uttar Pradesh', '10': 'Bihar', '11': 'Sikkim', '12': 'Arunachal Pradesh',
-  '13': 'Nagaland', '14': 'Manipur', '15': 'Mizoram', '16': 'Tripura',
-  '17': 'Meghalaya', '18': 'Assam', '19': 'West Bengal', '20': 'Jharkhand',
-  '21': 'Odisha', '22': 'Chhattisgarh', '23': 'Madhya Pradesh', '24': 'Gujarat',
-  '26': 'Dadra & Nagar Haveli and Daman & Diu', '27': 'Maharashtra',
-  '28': 'Andhra Pradesh (old)', '29': 'Karnataka', '30': 'Goa',
-  '31': 'Lakshadweep', '32': 'Kerala', '33': 'Tamil Nadu', '34': 'Puducherry',
-  '35': 'Andaman & Nicobar Islands', '36': 'Telangana', '37': 'Andhra Pradesh', '38': 'Ladakh',
-};
+import { STATE_CODES as STATE_MAP, supplierStateCode } from '../lib/gst.js';
 
 const ones = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine',
   'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
@@ -26,8 +15,11 @@ function numToWordsBelowThousand(n: number): string {
 }
 
 function amountInWords(amount: number): string {
-  const n = Math.round(amount);
-  if (n === 0) return 'INR Zero Only';
+  const totalPaise = Math.round(amount * 100);
+  const n = Math.floor(totalPaise / 100);
+  const paise = totalPaise % 100;
+  const paiseWords = paise ? ` and ${numToWordsBelowThousand(paise)} Paise` : '';
+  if (n === 0) return paise ? `INR ${numToWordsBelowThousand(paise)} Paise Only` : 'INR Zero Only';
   const crore = Math.floor(n / 10000000);
   const lakh = Math.floor((n % 10000000) / 100000);
   const thousand = Math.floor((n % 100000) / 1000);
@@ -37,7 +29,7 @@ function amountInWords(amount: number): string {
   if (lakh) words += numToWordsBelowThousand(lakh) + ' Lakh ';
   if (thousand) words += numToWordsBelowThousand(thousand) + ' Thousand ';
   if (remainder) words += numToWordsBelowThousand(remainder);
-  return 'INR ' + words.trim() + ' Only';
+  return 'INR ' + words.trim() + paiseWords + ' Only';
 }
 
 function fmt(d: string | null | undefined): string {
@@ -58,6 +50,7 @@ export interface InvoiceForPdf {
   purchase_order_number?: string | null;
   discount_value?: number | null;
   discount_type?: string | null;
+  line_items?: { description: string; sacCode?: string | null; amount: number; gstRate: number; taxableValue?: number; gstAmount?: number }[] | null;
   reverse_charge?: string | null;
   brand_name: string;
   brand_gstin?: string | null;
@@ -94,6 +87,9 @@ export interface InvoiceForPdf {
   seller_business_name?: string | null;
   template_id?: string | null;
   invoice_accent_color?: string | null;
+  is_export?: boolean | null;
+  export_currency?: string | null;
+  lut_number?: string | null;
 }
 
 export interface UserForPdf {
@@ -118,6 +114,29 @@ function buildInvoiceHtml(inv: InvoiceForPdf, user: UserForPdf, plan?: string): 
   const words = amountInWords(inv.total_amount || 0);
   const headerColor = inv.template_id === 'corporate' ? '#1E293B' : '#0D0F1A';
   const accentColor = inv.invoice_accent_color || '#E8921A';
+  const supplierState = supplierStateCode(user);
+  const placeOfSupply = inv.place_of_supply || inv.brand_state_code;
+
+  // Line items (multi-line invoices) or the single legacy line. Amounts are before discount.
+  const base = Number(inv.base_amount || 0);
+  const lines = inv.line_items?.length
+    ? inv.line_items.map(l => ({ ...l, amount: Number(l.amount), gstRate: Number(l.gstRate) }))
+    : [{ description: inv.service_description, sacCode: inv.sac_code, gstRate: Number(inv.gst_rate ?? 18),
+         taxableValue: base, gstAmount: Number(inv.gst_amount || 0),
+         amount: inv.discount_value && inv.discount_type === 'percent' && inv.discount_value < 100
+           ? Math.round(base / (1 - inv.discount_value / 100) * 100) / 100
+           : base + Number(inv.discount_value || 0) }];
+  const subtotal = lines.reduce((s, l) => s + l.amount, 0);
+  const discountAmount = Math.max(0, Math.round((subtotal - base) * 100) / 100);
+  // GST grouped by rate, so mixed-rate invoices show each rate separately
+  const gstByRate = Object.values(lines.reduce<Record<string, { rate: number; taxable: number; gst: number }>>((acc, l) => {
+    const k = String(l.gstRate);
+    acc[k] ??= { rate: l.gstRate, taxable: 0, gst: 0 };
+    acc[k].taxable += l.taxableValue ?? l.amount;
+    acc[k].gst += l.gstAmount ?? 0;
+    return acc;
+  }, {}));
+  if (!inv.line_items?.length) gstByRate[0].gst = Number(inv.gst_amount || 0);
 
   // Escape HTML entities to prevent XSS in PDF output
   const esc = (s: string | null | undefined): string => {
@@ -157,7 +176,7 @@ function buildInvoiceHtml(inv: InvoiceForPdf, user: UserForPdf, plan?: string): 
   .footer { margin-top: 20px; text-align: center; font-size: 8px; color: #ccc; }
   @page { margin: 0; size: A4 portrait; }
   * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; }
-  ${plan === 'basic' ? `body::before{content:'';position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-45deg);width:65%;height:65%;background:url('data:image/svg+xml;base64,${LOGO_B64}') no-repeat center/contain;opacity:.07;pointer-events:none;z-index:9999;}body::after{content:'Made with ease on Kcretio.com';position:fixed;bottom:10px;left:0;right:0;text-align:center;font-size:8px;color:#a0aec0;font-family:Arial,sans-serif;letter-spacing:.04em;pointer-events:none;z-index:9999;}` : ''}
+  ${plan === 'basic' ? `body::before{content:'';position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-45deg);width:65%;height:65%;background:url('data:image/svg+xml;base64,${LOGO_B64}') no-repeat center/contain;opacity:.07;pointer-events:none;z-index:9999;}body::after{content:'Made with ease on kcretio.in';position:fixed;bottom:10px;left:0;right:0;text-align:center;font-size:8px;color:#a0aec0;font-family:Arial,sans-serif;letter-spacing:.04em;pointer-events:none;z-index:9999;}` : ''}
 </style>
 </head><body>
 <div class="hdr">
@@ -183,7 +202,7 @@ function buildInvoiceHtml(inv: InvoiceForPdf, user: UserForPdf, plan?: string): 
       ${displayEmail ? `<div class="party-detail">Email: ${esc(displayEmail)}</div>` : ''}
       ${displayPhone ? `<div class="party-detail">Ph: ${esc(displayPhone)}</div>` : ''}
       ${user.business_address ? `<div class="party-detail" style="margin-top:4px;line-height:1.4">${esc(user.business_address)}</div>` : ''}
-      ${user.state_code ? `<div class="party-detail">State: ${esc(STATE_MAP[user.state_code] || '')} | Code: ${esc(user.state_code)}</div>` : ''}
+      ${supplierState ? `<div class="party-detail">State: ${esc(STATE_MAP[supplierState] || '')} | Code: ${esc(supplierState)}</div>` : ''}
     </div>
     <div>
       <div class="party-label">Recipient (Bill To)</div>
@@ -196,27 +215,28 @@ function buildInvoiceHtml(inv: InvoiceForPdf, user: UserForPdf, plan?: string): 
       ${inv.brand_state_code ? `<div class="party-detail">State: ${esc(STATE_MAP[inv.brand_state_code] || '')} | Code: ${esc(inv.brand_state_code)}</div>` : ''}
     </div>
   </div>
-  ${inv.place_of_supply ? `<div class="pos"><strong>Place of Supply:</strong> ${esc(STATE_MAP[inv.place_of_supply] || inv.place_of_supply)} (${esc(inv.place_of_supply)}) &nbsp;·&nbsp; <strong>Supply Type:</strong> ${inv.supply_type === 'intrastate' ? 'Intrastate (CGST + SGST)' : 'Interstate (IGST)'}</div>` : ''}
+  ${placeOfSupply ? `<div class="pos"><strong>Place of Supply:</strong> ${esc(STATE_MAP[placeOfSupply] || placeOfSupply)} (${esc(placeOfSupply)}) &nbsp;·&nbsp; <strong>Supply Type:</strong> ${inv.supply_type === 'intrastate' ? 'Intrastate (CGST + SGST)' : inv.supply_type === 'export' ? 'Export of services' : 'Interstate (IGST)'}</div>` : ''}
+  ${inv.is_export ? `<div class="pos"><strong>Supply meant for export under LUT without payment of IGST</strong>${inv.lut_number ? ` &nbsp;·&nbsp; LUT No. ${esc(inv.lut_number)}` : ''}${inv.export_currency ? ` &nbsp;·&nbsp; Billing currency: ${esc(inv.export_currency)}` : ''}</div>` : ''}
   <table>
     <thead><tr>
       <th>Description of Services</th><th>SAC/HSN</th><th>GST Rate</th><th class="r">Taxable Value</th>
     </tr></thead>
     <tbody>
-      <tr>
-        <td>${esc(inv.service_description)}</td>
-        <td>${esc(inv.sac_code || '998399')}</td>
-        <td>${inv.gst_rate || 18}%</td>
-        <td class="r"><strong>${inr(inv.base_amount)}</strong></td>
-      </tr>
+      ${lines.map(l => `<tr>
+        <td>${esc(l.description)}</td>
+        <td>${esc(l.sacCode || '998399')}</td>
+        <td>${l.gstRate}%</td>
+        <td class="r"><strong>${inr(l.amount)}</strong></td>
+      </tr>`).join('')}
     </tbody>
   </table>
   <div class="totals">
-    ${inv.discount_value ? `<div class="trow"><span>Subtotal</span><span>${inr((inv.base_amount||0) + (inv.discount_value||0))}</span></div><div class="trow" style="color:#c0392b"><span>Discount${inv.discount_type==='percent'?` (${inv.discount_value}%)`:''}</span><span>−${inr(inv.discount_value)}</span></div>` : ''}
+    ${discountAmount > 0 ? `<div class="trow"><span>Subtotal</span><span>${inr(subtotal)}</span></div><div class="trow" style="color:#c0392b"><span>Less: Discount${inv.discount_type==='percent'?` (${inv.discount_value}%)`:''}</span><span>−${inr(discountAmount)}</span></div>` : ''}
     <div class="trow"><span>Taxable Value</span><span>${inr(inv.base_amount)}</span></div>
-    ${inv.supply_type === 'intrastate' ? `
-    <div class="trow"><span>Add: CGST @ ${(inv.gst_rate || 18) / 2}%</span><span>${inr(inv.cgst_amount)}</span></div>
-    <div class="trow"><span>Add: SGST @ ${(inv.gst_rate || 18) / 2}%</span><span>${inr(inv.sgst_amount)}</span></div>
-    ` : `<div class="trow"><span>Add: IGST @ ${inv.gst_rate || 18}%</span><span>${inr(inv.igst_amount)}</span></div>`}
+    ${inv.supply_type === 'export' ? '<div class="trow"><span>IGST</span><span>Nil (export under LUT)</span></div>' : gstByRate.map(g => inv.supply_type === 'intrastate' ? `
+    <div class="trow"><span>Add: CGST @ ${g.rate / 2}%${gstByRate.length > 1 ? ` on ${inr(g.taxable)}` : ''}</span><span>${inr(g.gst / 2)}</span></div>
+    <div class="trow"><span>Add: SGST @ ${g.rate / 2}%${gstByRate.length > 1 ? ` on ${inr(g.taxable)}` : ''}</span><span>${inr(g.gst / 2)}</span></div>
+    ` : `<div class="trow"><span>Add: IGST @ ${g.rate}%${gstByRate.length > 1 ? ` on ${inr(g.taxable)}` : ''}</span><span>${inr(g.gst)}</span></div>`).join('')}
     <div class="tfinal"><span>Invoice Total</span><span>${inr(inv.total_amount)}</span></div>
   </div>
   <div style="margin-top:6px;font-size:9px;color:#555;font-style:italic">
@@ -256,7 +276,7 @@ function buildInvoiceHtml(inv: InvoiceForPdf, user: UserForPdf, plan?: string): 
       </div>
     </div>
   </div>` : ''}
-  <div class="footer">GST-compliant invoice &nbsp;·&nbsp; Kcretio.com &nbsp;·&nbsp; Subject to GST as applicable</div>
+  <div class="footer">GST-compliant invoice &nbsp;·&nbsp; kcretio.in &nbsp;·&nbsp; Subject to GST as applicable</div>
 </div>
 </body></html>`;
 }
@@ -328,6 +348,25 @@ export async function generateInvoicePdfWithPuppeteer(
       pdfCache.set(effectiveCacheKey, { buffer, timestamp: Date.now() });
     }
     return buffer;
+  } finally {
+    if (page) await page.close().catch(() => {});
+    pageInUse = false;
+  }
+}
+
+// Renders any HTML document to an A4 PDF (used for the CA export summary).
+export async function renderHtmlToPdf(html: string): Promise<Buffer> {
+  while (pageInUse) {
+    await new Promise<void>(resolve => setTimeout(resolve, 50));
+  }
+  pageInUse = true;
+  let page = null;
+  try {
+    const browser = await getBrowser();
+    page = await browser.newPage();
+    await page.setContent(html, { waitUntil: 'load', timeout: 30000 });
+    const pdf = await page.pdf({ format: 'A4', printBackground: true, margin: { top: '14mm', right: '12mm', bottom: '14mm', left: '12mm' } });
+    return Buffer.from(pdf);
   } finally {
     if (page) await page.close().catch(() => {});
     pageInUse = false;

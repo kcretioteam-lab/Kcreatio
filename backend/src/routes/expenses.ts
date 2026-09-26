@@ -2,6 +2,7 @@ import { Router, Response } from 'express';
 import { z } from 'zod';
 import { supabase } from '../lib/supabase.js';
 import { authenticate, AuthRequest, checkPlan } from '../middleware/auth.js';
+import { partialWithoutDefaults } from '../lib/zodUtils.js';
 import { validateBody } from '../middleware/validateBody.js';
 import { getFinancialYear } from '../services/invoiceService.js';
 
@@ -16,6 +17,13 @@ const CreateExpenseSchema = z.object({
   amount: z.number().positive().max(9999999),
   description: z.string().max(500).optional(),
   expenseDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  // GST on the purchase — claimable as input tax credit by GST-registered creators
+  gstPaid: z.number().min(0).max(9999999).optional(),
+  vendorGstin: z.string().trim().toUpperCase().regex(/^([0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z])?$/, 'Enter a valid vendor GSTIN').optional(),
+  receiptPath: z.string().max(300).nullable().optional(),
+  // Cameras, laptops etc. are depreciated over years, not expensed at once
+  isCapitalAsset: z.boolean().optional(),
+  assetClass: z.enum(['computer', 'camera_equipment', 'furniture', 'vehicle', 'other']).nullable().optional(),
 });
 
 // GET /expenses
@@ -73,6 +81,11 @@ router.post('/', validateBody(CreateExpenseSchema), async (req: AuthRequest, res
       description: body.description || null,
       expense_date: body.expenseDate,
       financial_year: fy,
+      gst_paid: body.gstPaid ?? 0,
+      vendor_gstin: body.vendorGstin || null,
+      receipt_url: body.receiptPath?.startsWith(`${req.userId!}/docs/`) ? body.receiptPath : null,
+      is_capital_asset: Boolean(body.isCapitalAsset),
+      asset_class: body.isCapitalAsset ? body.assetClass || 'other' : null,
     })
     .select()
     .single();
@@ -100,15 +113,19 @@ router.delete('/:id', async (req: AuthRequest, res: Response): Promise<void> => 
 export default router;
 
 // PUT /expenses/:id — edit expense entry
-router.put('/:id', validateBody(CreateExpenseSchema.partial()), async (req: AuthRequest, res: Response): Promise<void> => {
+router.put('/:id', validateBody(partialWithoutDefaults(CreateExpenseSchema)), async (req: AuthRequest, res: Response): Promise<void> => {
   const updates: Record<string, unknown> = {};
   if (req.body.category !== undefined) updates.category = req.body.category;
-  if (req.body.amount !== undefined) updates.amount = Math.round(req.body.amount * 100);
+  if (req.body.amount !== undefined) updates.amount = req.body.amount; // rupees, same as POST
   if (req.body.description !== undefined) updates.description = req.body.description || null;
+  if (req.body.gstPaid !== undefined) updates.gst_paid = req.body.gstPaid;
+  if (req.body.vendorGstin !== undefined) updates.vendor_gstin = req.body.vendorGstin || null;
+  if (req.body.receiptPath !== undefined) updates.receipt_url = req.body.receiptPath?.startsWith(`${req.userId!}/docs/`) ? req.body.receiptPath : null;
+  if (req.body.isCapitalAsset !== undefined) updates.is_capital_asset = req.body.isCapitalAsset;
+  if (req.body.assetClass !== undefined) updates.asset_class = req.body.assetClass;
   if (req.body.expenseDate !== undefined) {
     updates.expense_date = req.body.expenseDate;
-    const { getFinancialYear } = await import('../services/invoiceService.js').catch(() => ({ getFinancialYear: null }));
-    if (getFinancialYear) updates.financial_year = getFinancialYear(new Date(req.body.expenseDate + 'T00:00:00'));
+    updates.financial_year = getFinancialYear(new Date(req.body.expenseDate + 'T00:00:00'));
   }
   updates.updated_at = new Date().toISOString();
 

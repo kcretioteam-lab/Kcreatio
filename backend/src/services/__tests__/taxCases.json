@@ -1,0 +1,30 @@
+{
+  "_status": "PENDING CA SIGN-OFF — expected values hand-computed from the tax year 2026-27 rules; see TAX_CASES_FOR_CA.md",
+  "cases": [
+    { "name": "Zero income", "input": { "grossReceipts": 0 }, "expected": { "taxableIncome": 0, "totalTax": 0, "netPayable": 0, "refund": 0 } },
+    { "name": "New regime ₹4L (nil slab)", "input": { "grossReceipts": 400000 }, "expected": { "taxableIncome": 400000, "totalTax": 0, "netPayable": 0, "refund": 0 } },
+    { "name": "New regime ₹7L (full 87A rebate)", "input": { "grossReceipts": 700000 }, "expected": { "taxableIncome": 700000, "totalTax": 0, "netPayable": 0, "refund": 0 } },
+    { "name": "New regime ₹11.99L (full 87A rebate)", "input": { "grossReceipts": 1199000 }, "expected": { "taxableIncome": 1199000, "totalTax": 0, "netPayable": 0, "refund": 0 } },
+    { "name": "New regime ₹12L exactly (full 87A rebate)", "input": { "grossReceipts": 1200000 }, "expected": { "taxableIncome": 1200000, "totalTax": 0, "netPayable": 0, "refund": 0 } },
+    { "name": "New regime ₹12.1L (marginal relief)", "input": { "grossReceipts": 1210000 }, "expected": { "taxableIncome": 1210000, "totalTax": 10400, "netPayable": 10400, "refund": 0 } },
+    { "name": "New regime ₹12.5L (marginal relief)", "input": { "grossReceipts": 1250000 }, "expected": { "taxableIncome": 1250000, "totalTax": 52000, "netPayable": 52000, "refund": 0 } },
+    { "name": "New regime ₹12.75L (marginal relief no longer applies)", "input": { "grossReceipts": 1275000 }, "expected": { "taxableIncome": 1275000, "totalTax": 74100, "netPayable": 74100, "refund": 0 } },
+    { "name": "New regime ₹15L (no standard deduction on business income)", "input": { "grossReceipts": 1500000 }, "expected": { "taxableIncome": 1500000, "totalTax": 109200, "netPayable": 109200, "refund": 0 } },
+    { "name": "New regime ₹20L", "input": { "grossReceipts": 2000000 }, "expected": { "taxableIncome": 2000000, "totalTax": 208000, "netPayable": 208000, "refund": 0 } },
+    { "name": "New regime ₹30L", "input": { "grossReceipts": 3000000 }, "expected": { "taxableIncome": 3000000, "totalTax": 499200, "netPayable": 499200, "refund": 0 } },
+    { "name": "Old regime ₹5L (full 87A rebate)", "input": { "grossReceipts": 500000, "regime": "old" }, "expected": { "taxableIncome": 500000, "totalTax": 0, "netPayable": 0, "refund": 0 } },
+    { "name": "Old regime ₹10L", "input": { "grossReceipts": 1000000, "regime": "old" }, "expected": { "taxableIncome": 1000000, "totalTax": 117000, "netPayable": 117000, "refund": 0 } },
+    { "name": "Old regime ₹15L", "input": { "grossReceipts": 1500000, "regime": "old" }, "expected": { "taxableIncome": 1500000, "totalTax": 273000, "netPayable": 273000, "refund": 0 } },
+    { "name": "Regular books: ₹18L receipts − ₹3L expenses", "input": { "grossReceipts": 1800000, "expenses": 300000 }, "expected": { "taxableIncome": 1500000, "totalTax": 109200, "netPayable": 109200, "refund": 0 } },
+    { "name": "Presumptive (old 44ADA) ₹30L receipts → single 15 Mar instalment", "input": { "grossReceipts": 3000000, "presumptive": "44ADA" }, "expected": { "taxableIncome": 1500000, "totalTax": 109200, "netPayable": 109200, "refund": 0, "instalments": [0, 0, 0, 109200] } },
+    { "name": "Presumptive (old 44ADA) ₹24L receipts", "input": { "grossReceipts": 2400000, "presumptive": "44ADA" }, "expected": { "taxableIncome": 1200000, "totalTax": 0, "netPayable": 0, "refund": 0 } },
+    { "name": "Presumptive (old 44AD, 6% digital) ₹20L receipts", "input": { "grossReceipts": 2000000, "presumptive": "44AD" }, "expected": { "taxableIncome": 120000, "totalTax": 0, "netPayable": 0, "refund": 0 } },
+    { "name": "Salary ₹10L + business ₹5L (₹75k standard deduction on salary only)", "input": { "grossReceipts": 500000, "salaryIncome": 1000000 }, "expected": { "taxableIncome": 1425000, "totalTax": 97500, "netPayable": 97500, "refund": 0 } },
+    { "name": "Salary only ₹12.75L", "input": { "grossReceipts": 0, "salaryIncome": 1275000 }, "expected": { "taxableIncome": 1200000, "totalTax": 0, "netPayable": 0, "refund": 0 } },
+    { "name": "₹12L with ₹1.2L TDS → full refund", "input": { "grossReceipts": 1200000, "tdsPaid": 120000 }, "expected": { "taxableIncome": 1200000, "totalTax": 0, "netPayable": 0, "refund": 120000 } },
+    { "name": "₹15L with ₹1.5L TDS → partial refund", "input": { "grossReceipts": 1500000, "tdsPaid": 150000 }, "expected": { "taxableIncome": 1500000, "totalTax": 109200, "netPayable": 0, "refund": 40800 } },
+    { "name": "₹15L with ₹1L TDS → below ₹10k, no advance tax", "input": { "grossReceipts": 1500000, "tdsPaid": 100000 }, "expected": { "taxableIncome": 1500000, "totalTax": 109200, "netPayable": 9200, "refund": 0, "instalments": [0, 0, 0, 0] } },
+    { "name": "₹20L with ₹2L TDS → below ₹10k, no advance tax", "input": { "grossReceipts": 2000000, "tdsPaid": 200000 }, "expected": { "taxableIncome": 2000000, "totalTax": 208000, "netPayable": 8000, "refund": 0, "instalments": [0, 0, 0, 0] } },
+    { "name": "₹20L with ₹1L TDS → 15/45/75/100 instalments", "input": { "grossReceipts": 2000000, "tdsPaid": 100000 }, "expected": { "taxableIncome": 2000000, "totalTax": 208000, "netPayable": 108000, "refund": 0, "instalments": [16200, 32400, 32400, 27000] } }
+  ]
+}

@@ -3,6 +3,9 @@ import { supabase } from '../lib/supabase.js';
 import { sendAdvanceTaxReminder } from '../services/emailService.js';
 import { scanInbox } from '../services/gmailService.js';
 import { hasFeature } from '../config/plans.js';
+import { startInvoiceJobs } from './invoiceJobs.js';
+import { recordDetectedPayment } from '../services/paymentService.js';
+import { getFinancialYear } from '../services/invoiceService.js';
 
 // ── Advance Tax Reminder Cron ─────────────────────────────────────────────────
 // Runs daily at 9:00 AM — checks if any instalment is due in X days per user pref.
@@ -18,7 +21,8 @@ export function startAdvanceTaxReminderJob() {
 
       if (!prefs?.length) return;
 
-      const FY = new Date().getFullYear();
+      // Start year of the current tax year (Apr–Mar), not the calendar year.
+      const FY = parseInt(getFinancialYear(new Date()).split('-')[0], 10);
       const instalments = [
         { quarter: 'Q1', date: new Date(FY, 5, 15) },      // Jun 15
         { quarter: 'Q2', date: new Date(FY, 8, 15) },      // Sep 15
@@ -79,7 +83,7 @@ export function startInvoiceOverdueJob() {
       const { error } = await supabase
         .from('invoices')
         .update({ status: 'overdue' })
-        .eq('status', 'sent')
+        .in('status', ['sent', 'partially_paid'])
         .lt('due_date', today)
         .not('due_date', 'is', null);
 
@@ -184,43 +188,16 @@ async function applyDetectionBackground(
   const now = new Date().toISOString();
   const today = new Date();
   const todayStr = today.toISOString().split('T')[0];
-  const fy = today.getMonth() >= 3
-    ? `${today.getFullYear()}-${String(today.getFullYear() + 1).slice(-2)}`
-    : `${today.getFullYear() - 1}-${String(today.getFullYear()).slice(-2)}`;
-  const qtr = [0,1,2].includes(today.getMonth()) ? 'Q4' :
-              [3,4,5].includes(today.getMonth()) ? 'Q1' :
-              [6,7,8].includes(today.getMonth()) ? 'Q2' : 'Q3';
+  const fy = getFinancialYear(today);
 
   const updates: Record<string, any> = { status: 'auto_applied', reviewed_at: now };
 
   try {
     if (detectedType === 'payment_received' && data.amount) {
-      const paise = Math.round(data.amount * 100);
-      const { data: invoices } = await supabase
-        .from('invoices')
-        .select('id')
-        .eq('user_id', userId)
-        .eq('status', 'sent')
-        .gte('total_amount', paise - paise * 0.01)
-        .lte('total_amount', paise + paise * 0.01)
-        .limit(1);
-
-      if (invoices?.[0]) {
-        await supabase.from('invoices').update({ status: 'paid' }).eq('id', invoices[0].id);
-        updates.linked_invoice_id = invoices[0].id;
-      }
-
-      const { data: income } = await supabase.from('income').insert({
-        user_id: userId,
-        source: 'brand_deal',
-        amount: data.amount,
-        description: data.brand_name ?? 'Payment auto-detected via Smart Inbox',
-        income_date: todayStr,
-        financial_year: fy,
-        quarter: qtr,
-        extracted_data: { detection_id: detectionId },
-      }).select('id').single();
-
+      const { invoiceId, income } = await recordDetectedPayment(
+        userId, Number(data.amount), detectionId, data.brand_name ?? 'Payment auto-detected via Smart Inbox',
+      );
+      if (invoiceId) updates.linked_invoice_id = invoiceId;
       if (income) updates.linked_income_id = income.id;
 
     } else if (detectedType === 'tds_deduction' && data.amount) {
@@ -265,5 +242,6 @@ export function startAllJobs() {
   startAdvanceTaxReminderJob();
   startInvoiceOverdueJob();
   startGmailScanJob();
-  console.log('[JOBS] Advance tax, invoice overdue, and Gmail scan jobs started');
+  startInvoiceJobs();
+  console.log('[JOBS] Advance tax, invoice overdue, payment reminder, recurring invoice and Gmail scan jobs started');
 }

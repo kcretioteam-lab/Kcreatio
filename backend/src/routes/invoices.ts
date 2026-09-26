@@ -3,22 +3,47 @@ import { z } from 'zod';
 import rateLimit from 'express-rate-limit';
 import { supabase } from '../lib/supabase.js';
 import { authenticate, AuthRequest } from '../middleware/auth.js';
+import { partialWithoutDefaults } from '../lib/zodUtils.js';
 import { validateBody } from '../middleware/validateBody.js';
 import { getFrontendUrl } from '../lib/env.js';
+import { markPaid, MarkPaidSchema } from '../services/paymentService.js';
+import { logInvoiceEvent } from '../services/auditLog.js';
+import { nextRecurringDate } from '../lib/dates.js';
 import {
-  calculateGst,
+  calculateInvoiceTotals,
+  nextInvoiceNumber,
   getFinancialYear,
   getFYCode,
-  VALID_GST_RATES,
   CREATOR_GST_CONFIG,
+  InvoiceLine,
 } from '../services/invoiceService.js';
+import { GST_RATES, DEFAULT_GST_RATE, checkGstin, GSTIN_MESSAGES, supplierStateCode, FOREIGN_STATE_CODE } from '../lib/gst.js';
 import { generateInvoicePdf } from '../services/pdfService.js';
 import { generateInvoicePdfWithPuppeteer, warmBrowser } from '../services/puppeteerPdfService.js';
 import { PLAN_LIMITS, Plan } from '../config/plans.js';
 
 const router = Router();
 
-const GSTIN_REGEX = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
+const gstinField = z.string().trim().toUpperCase().superRefine((v, ctx) => {
+  const problem = checkGstin(v);
+  if (problem) ctx.addIssue({ code: 'custom', message: `Brand ${GSTIN_MESSAGES[problem]}` });
+});
+const gstRateField = z.number().refine(r => (GST_RATES as readonly number[]).includes(r), {
+  message: `GST rate must be one of ${GST_RATES.join(', ')}%`,
+});
+const LineItemSchema = z.object({
+  description: z.string().trim().min(1, 'Describe each service line').max(500),
+  sacCode: z.string().max(10).nullish(),
+  amount: z.number().positive('Each line needs an amount above ₹0').max(9999999),
+  gstRate: gstRateField,
+});
+
+const SUPPLIER_STATE_MISSING = {
+  error: 'SUPPLIER_STATE_MISSING',
+  message: 'Add your GSTIN in Settings → Tax Profile (or your state, if you aren’t GST-registered) so we can charge the right GST.',
+  field: 'supplierState',
+  statusCode: 422,
+};
 const DATA_URL_REGEX = /^data:image\/(png|jpeg|gif|webp|svg\+xml);base64,[A-Za-z0-9+/]+=*$/;
 
 function isValidImageField(val: string | undefined | null): boolean {
@@ -60,16 +85,18 @@ router.get('/confirm-payment/:token', async (req: ExpressRequest, res: Response)
     return;
   }
 
+  // The brand's word only flags the invoice. The creator records the payment (with the TDS
+  // actually deducted) so income and TDS are logged correctly.
   await supabase.from('invoices').update({
-    status: 'paid',
     payment_confirm_token: null,
     payment_confirmed_by_brand: true,
   }).eq('id', inv.id);
+  await logInvoiceEvent(null, inv.user_id, inv, 'brand_confirmed');
 
   const user = await getUser(inv.user_id);
   if (user) {
     const { sendPaymentConfirmedEmail } = await import('../services/emailService.js');
-    const amount = `₹${(inv.total_amount / 100).toLocaleString('en-IN')}`;
+    const amount = `₹${Number(inv.total_amount).toLocaleString('en-IN')}`;
     await sendPaymentConfirmedEmail(user.email, {
       recipientName: user.name,
       invoiceNumber: inv.invoice_number,
@@ -79,7 +106,7 @@ router.get('/confirm-payment/:token', async (req: ExpressRequest, res: Response)
     }).catch(() => null);
   }
 
-  res.status(200).send(`<!DOCTYPE html><html><body style="font-family:sans-serif;max-width:480px;margin:80px auto;text-align:center;background:#07080F;color:#F0F1F8;padding:32px;"><div style="font-size:48px;margin-bottom:16px;">✓</div><h2 style="color:#22c55e;margin-bottom:8px;">Payment Confirmed</h2><p style="color:#94a3b8;">Invoice ${inv.invoice_number} payment confirmed. The creator has been notified.</p><p style="margin-top:32px;font-size:12px;color:#64748b;">Powered by Kcretio</p></body></html>`);
+  res.status(200).send(`<!DOCTYPE html><html><body style="font-family:sans-serif;max-width:480px;margin:80px auto;text-align:center;background:#07080F;color:#F0F1F8;padding:32px;"><div style="font-size:48px;margin-bottom:16px;">✓</div><h2 style="color:#22c55e;margin-bottom:8px;">Thanks for confirming</h2><p style="color:#94a3b8;">We've told the creator that invoice ${inv.invoice_number} has been paid.</p><p style="margin-top:32px;font-size:12px;color:#64748b;">Powered by Kcretio</p></body></html>`);
 });
 
 // All routes below require authentication
@@ -87,13 +114,15 @@ router.use(authenticate);
 
 const CreateInvoiceSchema = z.object({
   brandName: z.string().min(1).max(200).trim(),
-  brandGstin: z.string().regex(GSTIN_REGEX, 'Invalid GSTIN format').nullish().or(z.literal('')),
+  brandGstin: gstinField.nullish().or(z.literal('')),
   brandAddress: z.string().min(1).max(500).trim(),
   brandStateCode: z.string().length(2),
   brandPan: z.string().regex(/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/).nullish().or(z.literal('')),
   serviceDescription: z.string().min(5).max(500).trim().default(CREATOR_GST_CONFIG.serviceDescription),
-  baseAmount: z.number().positive().max(9999999),
-  gstRate: z.union([z.literal(0), z.literal(5), z.literal(12), z.literal(18), z.literal(28)]).default(18),
+  // Either lineItems (preferred — amounts before discount) or a single baseAmount (after discount).
+  lineItems: z.array(LineItemSchema).min(1).max(30).nullish(),
+  baseAmount: z.number().positive('Enter an amount above ₹0').max(9999999).optional(),
+  gstRate: gstRateField.default(DEFAULT_GST_RATE),
   invoiceDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).default(() => new Date().toISOString().split('T')[0]),
   dueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullish(),
   dealId: z.string().uuid().nullish(),
@@ -118,7 +147,7 @@ const CreateInvoiceSchema = z.object({
   includeTerms: z.boolean().default(false),
   termsText: z.string().max(5000).nullish(),
   // Signatory
-  includeSignatory: z.boolean().default(false),
+  includeSignatory: z.boolean().default(true),
   signatoryName: z.string().max(200).nullish(),
   signatoryImageUrl: z.string().nullish().refine(isValidImageField, { message: 'signatoryImageUrl must be a base64 data URL or Supabase storage URL' }),
   sellerBusinessName: z.string().max(200).nullish(),
@@ -130,7 +159,20 @@ const CreateInvoiceSchema = z.object({
   upiScannerUrl: z.string().nullish().refine(isValidImageField, { message: 'upiScannerUrl must be a base64 data URL or Supabase storage URL' }),
   // Accent color override
   invoiceAccentColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).nullish().nullable(),
+  // Export of services to a foreign client, zero-rated under the creator's LUT
+  isExport: z.boolean().default(false),
+  exportCurrency: z.string().length(3).toUpperCase().nullish(),
+  // Payment reminders to the brand and recurring invoices
+  remindersEnabled: z.boolean().default(false),
+  recurring: z.enum(['monthly', 'quarterly']).nullish(),
 });
+
+const LUT_MISSING = {
+  error: 'LUT_REQUIRED',
+  message: 'Add your LUT reference in Settings → Tax Profile to invoice foreign clients without IGST.',
+  field: 'isExport',
+  statusCode: 422,
+};
 
 // GET /invoices/warm — pre-warms Puppeteer browser (called on page load from frontend)
 router.get('/warm', async (_req: AuthRequest, res: Response): Promise<void> => {
@@ -190,7 +232,7 @@ router.get('/', async (req: AuthRequest, res: Response): Promise<void> => {
     .order('created_at', { ascending: false })
     .range(offset, offset + lim - 1);
 
-  if (status && ['draft', 'sent', 'paid', 'overdue'].includes(status)) query = query.eq('status', status);
+  if (status && ['draft', 'sent', 'partially_paid', 'paid', 'overdue', 'cancelled'].includes(status)) query = query.eq('status', status);
   if (fy) query = query.eq('financial_year', fy);
   if (search && search.trim()) {
     // Strip characters that would break PostgREST's or() filter syntax
@@ -251,7 +293,7 @@ router.post('/', validateBody(CreateInvoiceSchema), async (req: AuthRequest, res
   // }
 
   // GSTIN state code cross-validation: first 2 digits must match brand's state code
-  if (body.brandGstin && body.brandStateCode && body.brandGstin.slice(0, 2) !== body.brandStateCode) {
+  if (!body.isExport && body.brandGstin && body.brandStateCode && body.brandGstin.slice(0, 2) !== body.brandStateCode) {
     res.status(422).json({
       error: 'VALIDATION_ERROR',
       message: `Brand GSTIN state code (${body.brandGstin.slice(0, 2)}) does not match the selected brand state (${body.brandStateCode})`,
@@ -261,7 +303,20 @@ router.post('/', validateBody(CreateInvoiceSchema), async (req: AuthRequest, res
     return;
   }
 
-  const gst = calculateGst(body.baseAmount, body.gstRate, user.state_code || '', body.brandStateCode);
+  const supplierState = supplierStateCode(user);
+  if (!supplierState) { res.status(422).json(SUPPLIER_STATE_MISSING); return; }
+  if (!body.lineItems?.length && !body.baseAmount) {
+    res.status(422).json({ error: 'VALIDATION_ERROR', message: 'Enter an amount above ₹0', field: 'baseAmount', statusCode: 422 });
+    return;
+  }
+  const lines: InvoiceLine[] = body.lineItems?.length
+    ? body.lineItems
+    : [{ description: body.serviceDescription, sacCode: body.sacCode, amount: body.baseAmount, gstRate: body.gstRate }];
+  // Old clients send baseAmount after discount; line items are always before discount.
+  const discount = body.lineItems?.length ? { value: body.discountValue, type: body.discountType } : {};
+  if (body.isExport && !user.lut_number) { res.status(422).json(LUT_MISSING); return; }
+  const gst = calculateInvoiceTotals(lines, discount, supplierState,
+    body.isExport ? FOREIGN_STATE_CODE : body.placeOfSupply || body.brandStateCode, { exportUnderLut: body.isExport });
 
   const fy = getFinancialYear(new Date(body.invoiceDate));
   const fyCode = getFYCode(fy);
@@ -275,6 +330,12 @@ router.post('/', validateBody(CreateInvoiceSchema), async (req: AuthRequest, res
     return d.toISOString().split('T')[0];
   })();
 
+  // Only link deals that belong to this user
+  if (body.dealId) {
+    const { data: deal } = await supabase.from('deals').select('id').eq('id', body.dealId).eq('user_id', req.userId!).maybeSingle();
+    if (!deal) body.dealId = null;
+  }
+
   const insertInvoice = () => supabase
     .from('invoices')
     .insert({
@@ -286,7 +347,8 @@ router.post('/', validateBody(CreateInvoiceSchema), async (req: AuthRequest, res
       brand_state_code: body.brandStateCode,
       brand_pan: body.brandPan || null,
       hsn_code: CREATOR_GST_CONFIG.hsnCode,
-      service_description: body.serviceDescription,
+      service_description: body.lineItems?.length ? body.lineItems[0].description : body.serviceDescription,
+      line_items: gst.lines,
       base_amount: gst.baseAmount,
       gst_rate: gst.gstRate,
       gst_amount: gst.gstAmount,
@@ -332,6 +394,12 @@ router.post('/', validateBody(CreateInvoiceSchema), async (req: AuthRequest, res
       include_upi: body.includeUpi || false,
       upi_scanner_url: body.upiScannerUrl || null,
       invoice_accent_color: body.invoiceAccentColor || null,
+      is_export: Boolean(body.isExport),
+      export_currency: body.isExport ? body.exportCurrency || 'USD' : null,
+      lut_number: body.isExport ? user.lut_number : null,
+      reminders_enabled: Boolean(body.remindersEnabled),
+      recurring: body.recurring || null,
+      next_recurring_on: body.recurring ? nextRecurringDate(body.invoiceDate, body.recurring) : null,
     })
     .select()
     .single();
@@ -347,6 +415,13 @@ router.post('/', validateBody(CreateInvoiceSchema), async (req: AuthRequest, res
     res.status(500).json({ error: 'INTERNAL_ERROR', message: error?.message || 'Failed to create invoice' });
     return;
   }
+
+  if (body.dealId) {
+    await supabase.from('deals').update({ status: 'invoiced', updated_at: new Date().toISOString() })
+      .eq('id', body.dealId).eq('user_id', req.userId!).in('status', ['inquiry', 'negotiating', 'active', 'delivered']);
+  }
+
+  await logInvoiceEvent(req, req.userId!, invoice, 'created', { total_amount: invoice.total_amount, deal_id: invoice.deal_id });
 
   res.status(201).json({
     ...invoice,
@@ -402,7 +477,7 @@ router.get('/:id/pdf', pdfRateLimit, async (req: AuthRequest, res: Response): Pr
           name: user.business_name || user.name,
           gstin: user.gstin,
           address: user.business_address,
-          stateCode: user.state_code,
+          stateCode: supplierStateCode(user) ?? undefined,
         },
         buyer: {
           name: invoice.brand_name,
@@ -451,7 +526,7 @@ router.get('/:id/export', async (req: AuthRequest, res: Response): Promise<void>
 });
 
 // PUT /invoices/:id
-router.put('/:id', validateBody(CreateInvoiceSchema.partial()), async (req: AuthRequest, res: Response): Promise<void> => {
+router.put('/:id', validateBody(partialWithoutDefaults(CreateInvoiceSchema)), async (req: AuthRequest, res: Response): Promise<void> => {
   const { data: existing } = await supabase
     .from('invoices')
     .select('id, status')
@@ -500,26 +575,55 @@ router.put('/:id', validateBody(CreateInvoiceSchema.partial()), async (req: Auth
     includeSignatory: 'include_signatory', signatoryName: 'signatory_name',
     signatoryImageUrl: 'signatory_image_url', sellerBusinessName: 'seller_business_name',
     invoiceAccentColor: 'invoice_accent_color',
+    exportCurrency: 'export_currency', remindersEnabled: 'reminders_enabled', recurring: 'recurring',
   };
   for (const [camel, snake] of Object.entries(fieldMap)) {
     if (body[camel] !== undefined) updates[snake] = body[camel];
   }
 
   // Amounts are always recomputed server-side — never trust client totals
-  if (body.baseAmount !== undefined || body.gstRate !== undefined || body.brandStateCode !== undefined) {
+  if (body.recurring !== undefined) updates.next_recurring_on = body.recurring ? nextRecurringDate(body.invoiceDate || new Date().toISOString().slice(0, 10), body.recurring) : null;
+  const touchesTotals = ['lineItems', 'baseAmount', 'gstRate', 'brandStateCode', 'placeOfSupply', 'discountValue', 'discountType', 'isExport']
+    .some(k => body[k] !== undefined);
+  if (touchesTotals) {
     const { data: current } = await supabase
       .from('invoices')
-      .select('base_amount, gst_rate, brand_state_code')
+      .select('base_amount, gst_rate, brand_state_code, place_of_supply, line_items, discount_value, discount_type, service_description, sac_code, is_export')
       .eq('id', req.params.id)
       .eq('user_id', req.userId!)
       .maybeSingle();
     const user = await getUser(req.userId!);
-    const gst = calculateGst(
-      body.baseAmount ?? Number(current?.base_amount),
-      body.gstRate ?? Number(current?.gst_rate),
-      user?.state_code || '',
-      body.brandStateCode ?? current?.brand_state_code,
-    );
+    const supplierState = user && supplierStateCode(user);
+    if (!supplierState) { res.status(422).json(SUPPLIER_STATE_MISSING); return; }
+    const isExport = body.isExport ?? Boolean(current?.is_export);
+    if (isExport && !user?.lut_number) { res.status(422).json(LUT_MISSING); return; }
+    updates.is_export = isExport;
+    updates.lut_number = isExport ? user?.lut_number : null;
+    const pos = isExport ? FOREIGN_STATE_CODE : body.placeOfSupply || body.brandStateCode || current?.place_of_supply || current?.brand_state_code;
+
+    const storedLines: InvoiceLine[] | null = Array.isArray(current?.line_items)
+      ? current.line_items.map((l: InvoiceLine) => ({ description: l.description, sacCode: l.sacCode, amount: Number(l.amount), gstRate: Number(l.gstRate) }))
+      : null;
+    const lines: InvoiceLine[] | null = body.lineItems?.length ? body.lineItems : storedLines;
+    const gst = lines
+      ? calculateInvoiceTotals(
+          lines,
+          { value: body.discountValue !== undefined ? body.discountValue : current?.discount_value, type: body.discountType ?? current?.discount_type },
+          supplierState,
+          pos,
+          { exportUnderLut: isExport },
+        )
+      : calculateInvoiceTotals(
+          [{ description: body.serviceDescription ?? current?.service_description, amount: body.baseAmount ?? Number(current?.base_amount), gstRate: body.gstRate ?? Number(current?.gst_rate) }],
+          {},
+          supplierState,
+          pos,
+          { exportUnderLut: isExport },
+        );
+    if (lines) {
+      updates.line_items = gst.lines;
+      updates.service_description = lines[0].description;
+    }
     Object.assign(updates, {
       base_amount: gst.baseAmount, gst_rate: gst.gstRate, gst_amount: gst.gstAmount,
       total_amount: gst.totalAmount, supply_type: gst.supplyType,
@@ -536,7 +640,8 @@ router.put('/:id', validateBody(CreateInvoiceSchema.partial()), async (req: Auth
     .select()
     .single();
 
-  if (error) { res.status(500).json({ error: 'INTERNAL_ERROR', message: error.message }); return; }
+  if (error) { res.status(500).json({ error: 'INTERNAL_ERROR', message: 'Couldn’t save the invoice. Please try again.' }); return; }
+  await logInvoiceEvent(req, req.userId!, data, 'updated', { fields: Object.keys(updates).filter(k => k !== 'updated_at') });
   res.json(data);
 });
 
@@ -544,7 +649,7 @@ router.put('/:id', validateBody(CreateInvoiceSchema.partial()), async (req: Auth
 router.delete('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
   const { data: existing } = await supabase
     .from('invoices')
-    .select('id, status')
+    .select('id, status, invoice_number, total_amount')
     .eq('id', req.params.id)
     .eq('user_id', req.userId!)
     .maybeSingle();
@@ -561,28 +666,17 @@ router.delete('/:id', async (req: AuthRequest, res: Response): Promise<void> => 
     .eq('id', req.params.id)
     .eq('user_id', req.userId!);
 
-  if (error) { res.status(500).json({ error: 'INTERNAL_ERROR', message: error.message }); return; }
+  if (error) { res.status(500).json({ error: 'INTERNAL_ERROR', message: 'Couldn’t delete the invoice. Please try again.' }); return; }
+  await logInvoiceEvent(req, req.userId!, existing, 'deleted', { total_amount: existing.total_amount });
   res.status(204).send();
 });
 
 // Next sequence = highest existing number in this prefix/FY + 1 (not a count — deleted drafts leave gaps)
-async function nextInvoiceNumber(userId: string, prefix: string, fyCode: string): Promise<string> {
-  const { data } = await supabase
-    .from('invoices')
-    .select('invoice_number')
-    .eq('user_id', userId)
-    .like('invoice_number', `${prefix}/${fyCode}/%`);
-  const maxSeq = (data || []).reduce((max, row) => {
-    const n = parseInt(String(row.invoice_number).split('/').pop() || '0', 10);
-    return Number.isFinite(n) && n > max ? n : max;
-  }, 0);
-  return `${prefix}/${fyCode}/${String(maxSeq + 1).padStart(4, '0')}`;
-}
 
 async function getUser(userId: string) {
   const { data } = await supabase
     .from('users')
-    .select('id, name, email, business_name, gstin, pan, business_address, state_code, invoice_prefix, phone, show_phone_on_invoice, invoice_phone, invoice_email, gmail_access_token, gmail_refresh_token, gmail_connected_email')
+    .select('id, name, email, business_name, gstin, pan, business_address, state_code, invoice_prefix, lut_number, phone, show_phone_on_invoice, invoice_phone, invoice_email, gmail_access_token, gmail_refresh_token, gmail_connected_email')
     .eq('id', userId)
     .maybeSingle();
   return data;
@@ -610,7 +704,7 @@ router.post('/:id/send', async (req: AuthRequest, res: Response): Promise<void> 
   const { sendInvoiceEmail } = await import('../services/emailService.js');
   const { sendViaGmail } = await import('../services/gmailService.js');
 
-  const amount = `₹${(inv.total_amount / 100).toLocaleString('en-IN')}`;
+  const amount = `₹${Number(inv.total_amount).toLocaleString('en-IN')}`;
   const subject = `GST Invoice ${inv.invoice_number} from ${user.name}`;
 
   const html = `
@@ -647,24 +741,21 @@ router.post('/:id/send', async (req: AuthRequest, res: Response): Promise<void> 
       await supabase.from('invoices').update({ status: 'sent', sent_at: new Date().toISOString() }).eq('id', inv.id);
     }
 
+    await logInvoiceEvent(req, req.userId!, inv, 'sent', { to: inv.brand_email });
     res.json({ success: true, sentTo: inv.brand_email });
   } catch (err: any) {
     res.status(500).json({ error: 'EMAIL_FAILED', message: 'Failed to send email. Check your email configuration.', statusCode: 500 });
   }
 });
 
-// PATCH /invoices/:id/mark-paid — creator marks an invoice as paid
-router.patch('/:id/mark-paid', async (req: AuthRequest, res: Response): Promise<void> => {
-  const { data, error } = await supabase
-    .from('invoices')
-    .update({ status: 'paid', updated_at: new Date().toISOString() })
-    .eq('id', req.params.id)
-    .eq('user_id', req.userId!)
-    .neq('status', 'paid')
-    .select('id, status')
-    .maybeSingle();
-  if (error) { res.status(500).json({ error: 'INTERNAL_ERROR', message: error.message }); return; }
-  if (!data) { res.status(404).json({ error: 'NOT_FOUND', message: 'Invoice not found or already paid' }); return; }
+// POST /invoices/:id/mark-paid — records the payment: status, income (taxable value) and TDS, atomically
+router.post('/:id/mark-paid', validateBody(MarkPaidSchema), async (req: AuthRequest, res: Response): Promise<void> => {
+  const result = await markPaid('invoice', req.userId!, String(req.params.id), req.body);
+  if (!result.ok) { res.status(result.status).json({ error: result.error, message: result.message }); return; }
+  const { data } = await supabase.from('invoices').select('*').eq('id', String(req.params.id)).eq('user_id', req.userId!).single();
+  await logInvoiceEvent(req, req.userId!, data || { id: String(req.params.id) }, data?.status === 'paid' ? 'paid' : 'part_paid', {
+    payment_date: req.body.paymentDate, amount_received: req.body.amountReceived, tds: req.body.tdsDeducted,
+  });
   res.json(data);
 });
 

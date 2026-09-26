@@ -1,5 +1,6 @@
 import { useEffect, lazy, Suspense, useState, createContext, useContext } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useSearchParams } from 'react-router-dom';
+import { nextPathFrom } from './utils/redirect.js';
 import { AuthProvider, useAuth } from './hooks/useAuth.jsx';
 import { UsageProvider } from './hooks/useUsage.jsx';
 import { ToastProvider } from './hooks/useToast.jsx';
@@ -11,8 +12,6 @@ import ErrorBoundary from './components/ui/ErrorBoundary.jsx';
 
 // Eager: auth-critical
 import LandingPage from './pages/LandingPage.jsx';
-import LandingPageV2 from './pages/LandingPageV2.jsx';
-import LandingV3 from './pages/landing-v3/LandingV3.jsx';
 import AuthPage from './pages/AuthPage.jsx';
 import ForgotPasswordPage from './pages/ForgotPasswordPage.jsx';
 import ResetPasswordPage from './pages/ResetPasswordPage.jsx';
@@ -41,15 +40,19 @@ function AppInitializer() { return null; }
 // Auth-enforced route guard: redirects unauthenticated users to /login
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth();
+  const location = useLocation();
   if (loading) return <SkeletonPage />;
-  if (!user) return <Navigate to="/login" replace />;
+  // Remember where the user was going so login can send them back there
+  if (!user) return <Navigate to="/login" replace state={{ from: location }} />;
   return children;
 }
 
 function PublicOnlyRoute({ children }) {
   const { user, loading } = useAuth();
+  const location = useLocation();
+  const [searchParams] = useSearchParams();
   if (loading) return <SkeletonPage />;
-  if (user) return <Navigate to="/dashboard" replace />;
+  if (user) return <Navigate to={nextPathFrom(location, searchParams)} replace />;
   return children;
 }
 
@@ -94,8 +97,6 @@ export default function App() {
               <Routes>
                 {/* Public routes */}
                 <Route path="/" element={<LandingPage />} />
-                <Route path="/v2" element={<LandingPageV2 />} />
-                <Route path="/v3" element={<LandingV3 />} />
                 {/* key forces a fresh AuthPage instance on /login <-> /register navigation —
                     otherwise React Router keeps the same component mounted (same type, same
                     spot in the tree) and only updates the defaultMode prop, which AuthPage

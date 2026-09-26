@@ -40,8 +40,11 @@ function numToWordsBelowThousand(n) {
 }
 
 export function amountInWords(amount) {
-  const n = Math.round(amount);
-  if (n === 0) return 'INR Zero Only';
+  const totalPaise = Math.round((Number(amount) || 0) * 100);
+  const n = Math.floor(totalPaise / 100);
+  const paise = totalPaise % 100;
+  const paiseWords = paise ? ` and ${numToWordsBelowThousand(paise)} Paise` : '';
+  if (n === 0) return paise ? `INR ${numToWordsBelowThousand(paise)} Paise Only` : 'INR Zero Only';
   const crore = Math.floor(n / 10000000);
   const lakh = Math.floor((n % 10000000) / 100000);
   const thousand = Math.floor((n % 100000) / 1000);
@@ -51,6 +54,6 @@ export function amountInWords(amount) {
   if (lakh) words += numToWordsBelowThousand(lakh) + ' Lakh ';
   if (thousand) words += numToWordsBelowThousand(thousand) + ' Thousand ';
   if (remainder) words += numToWordsBelowThousand(remainder);
-  return 'INR ' + words.trim() + ' Only';
+  return 'INR ' + words.trim() + paiseWords + ' Only';
 }
 

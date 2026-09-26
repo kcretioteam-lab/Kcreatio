@@ -2,6 +2,9 @@ services:
   - type: web
     name: kcretio-backend
     runtime: node
+    # Most users are in India — singapore is much closer than oregon (changing region needs a new service).
+    # On the free plan the service sleeps when idle; use a paid plan (plan: starter) for always-on,
+    # or set BACKEND_URL for the keep-warm GitHub workflow.
     region: oregon
     rootDir: backend
     buildCommand: apt-get install -y chromium-browser --no-install-recommends 2>/dev/null || true && npm ci --omit=dev && npm run build
@@ -26,6 +29,8 @@ services:
         sync: false
       - key: JWT_REFRESH_SECRET
         sync: false
+      - key: TOTP_ENCRYPTION_KEY
+        generateValue: true
       - key: SUPABASE_URL
         sync: false
       - key: SUPABASE_SERVICE_ROLE_KEY

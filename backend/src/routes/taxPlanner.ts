@@ -4,181 +4,155 @@ import { supabase } from '../lib/supabase.js';
 import { authenticate, checkPlan, AuthRequest } from '../middleware/auth.js';
 import { validateBody } from '../middleware/validateBody.js';
 import { getFinancialYear } from '../services/invoiceService.js';
+import { computeTax, estimateDeferralInterest, quickTaxEstimate, firstYearDepreciation, INSTALMENT_SCHEDULE, Regime, Presumptive } from '../services/taxEngine.js';
 
 const router = Router();
 
-// PUBLIC — no auth required (used by landing page TDS calculator)
+// PUBLIC — no auth required (used by landing page tax calculator)
 router.get('/quick-estimate', (req, res): void => {
   const monthlyIncome = parseFloat(req.query.monthly_income as string) || 0;
   const brandCount = parseInt(req.query.brand_count as string, 10) || 1;
-  const annual = monthlyIncome * 12;
-  // No standard deduction — it applies to salary income only; creator income is professional/business income
-  const taxableIncome = Math.max(0, annual);
-
-  // New regime slabs FY 2025-26 (matches NEW_REGIME_SLABS in this file)
-  const slabs: [number, number, number][] = [
-    [0, 400000, 0], [400000, 800000, 0.05], [800000, 1200000, 0.10],
-    [1200000, 1600000, 0.15], [1600000, 2000000, 0.20],
-    [2000000, 2400000, 0.25], [2400000, Infinity, 0.30],
-  ];
-  let preCessTax = 0;
-  for (const [min, max, rate] of slabs) {
-    if (taxableIncome <= min) break;
-    preCessTax += (Math.min(taxableIncome, max === Infinity ? taxableIncome : max) - min) * rate;
-  }
-  // Section 87A rebate: taxable income ≤ ₹12L → rebate up to ₹60,000 (most creators pay ₹0 tax)
-  if (taxableIncome <= 1200000) preCessTax = Math.max(0, preCessTax - 60000);
-  const incomeTax = Math.round(preCessTax * 1.04); // 4% cess
-
-  const estimatedTds = Math.round(annual * 0.10);
-  const advanceTaxOwed = Math.max(0, incomeTax - estimatedTds);
-  const itrRefund = Math.max(0, estimatedTds - incomeTax);
-  const q2Due = Math.round(advanceTaxOwed * 0.45); // 45% cumulative by Sep 15
-
-  const lateCount = Math.round(brandCount * 0.4);
-  const form16aRisk = brandCount < 3
-    ? `${Math.round(brandCount * 40)}% chance of delay`
-    : `~${lateCount} of ${brandCount} brand${lateCount !== 1 ? 's' : ''} likely late`;
-
-  res.json({ annual, estimatedTds, incomeTax, advanceTaxOwed, itrRefund, q2Due, form16aRisk });
+  res.json(quickTaxEstimate(monthlyIncome, brandCount));
 });
 
 router.use(authenticate);
 
-// Tax slabs FY 2025-26 (New Regime)
-const NEW_REGIME_SLABS = [
-  { min: 0,       max: 400000,  rate: 0 },
-  { min: 400000,  max: 800000,  rate: 0.05 },
-  { min: 800000,  max: 1200000, rate: 0.10 },
-  { min: 1200000, max: 1600000, rate: 0.15 },
-  { min: 1600000, max: 2000000, rate: 0.20 },
-  { min: 2000000, max: 2400000, rate: 0.25 },
-  { min: 2400000, max: Infinity, rate: 0.30 },
-];
-
-const OLD_REGIME_SLABS = [
-  { min: 0,       max: 250000,  rate: 0 },
-  { min: 250000,  max: 500000,  rate: 0.05 },
-  { min: 500000,  max: 1000000, rate: 0.20 },
-  { min: 1000000, max: Infinity, rate: 0.30 },
-];
-
-const INSTALMENT_SCHEDULE = [
-  { quarter: 'Q1', dueDate: 'Jun 15', dueMonth: 5, dueDay: 15, cumPct: 0.15 },
-  { quarter: 'Q2', dueDate: 'Sep 15', dueMonth: 8, dueDay: 15, cumPct: 0.45 },
-  { quarter: 'Q3', dueDate: 'Dec 15', dueMonth: 11, dueDay: 15, cumPct: 0.75 },
-  { quarter: 'Q4', dueDate: 'Mar 15', dueMonth: 2,  dueDay: 15, cumPct: 1.00 },
-];
-
-function calcTax(annualIncomePaise: number, regime: string): number {
-  const slabs = regime === 'old' ? OLD_REGIME_SLABS : NEW_REGIME_SLABS;
-  // No standard deduction — it applies to salary income only; creator income is professional/business income
-  const taxableIncomePaise = Math.max(0, annualIncomePaise);
-  let taxPaise = 0;
-  for (const slab of slabs) {
-    if (taxableIncomePaise <= slab.min * 100) break;
-    const inSlab = Math.min(taxableIncomePaise, slab.max === Infinity ? Infinity : slab.max * 100) - slab.min * 100;
-    taxPaise += Math.round(inSlab * slab.rate);
-  }
-  // Section 87A rebate — new regime: taxable ≤ ₹12L, up to ₹60,000; old regime: taxable ≤ ₹5L, up to ₹12,500
-  const rebateLimitPaise = regime === 'old' ? 500000 * 100 : 1200000 * 100;
-  const maxRebatePaise = regime === 'old' ? 12500 * 100 : 60000 * 100;
-  if (taxableIncomePaise <= rebateLimitPaise) taxPaise = Math.max(0, taxPaise - maxRebatePaise);
-  const cessPaise = Math.round(taxPaise * 0.04);
-  return taxPaise + cessPaise;
-}
-
-// GET /tax/estimate
+// GET /tax/estimate — projects this tax year's income and runs it through the tax engine.
 router.get('/estimate', checkPlan('pro'), async (req: AuthRequest, res: Response): Promise<void> => {
-  const { fy, regime = 'new', annualEstimate } = req.query as Record<string, string>;
-  const currentFY = fy || getFinancialYear(new Date());
+  const { fy, regime: regimeParam, annualEstimate } = req.query as Record<string, string>;
+  const currentFY = /^\d{4}-\d{2}$/.test(fy || '') ? fy : getFinancialYear(new Date());
+  const fyStartYear = parseInt(currentFY.split('-')[0], 10);
 
-  // Get YTD income from logged records
-  const { data: incomeData } = await supabase
-    .from('income')
-    .select('amount')
-    .eq('user_id', req.userId!)
-    .eq('financial_year', currentFY);
+  const [{ data: profile }, { data: incomeData }, { data: expenseData }, { data: tdsData }, { data: paidData }] = await Promise.all([
+    supabase.from('users').select('tax_regime, presumptive').eq('id', req.userId!).maybeSingle(),
+    supabase.from('income').select('amount').eq('user_id', req.userId!).eq('financial_year', currentFY),
+    supabase.from('expenses').select('amount, is_capital_asset, asset_class, expense_date').eq('user_id', req.userId!).eq('financial_year', currentFY),
+    supabase.from('tds_records').select('tds_amount').eq('user_id', req.userId!).eq('financial_year', currentFY),
+    supabase.from('tax_payments').select('quarter, amount_paid').eq('user_id', req.userId!).eq('financial_year', currentFY).eq('type', 'advance_tax'),
+  ]);
 
-  const ytdIncome = (incomeData || []).reduce((s, r) => s + Number(r.amount), 0);
+  const sum = (rows: Record<string, unknown>[] | null, key: string) =>
+    (rows || []).reduce((s, r) => s + Number(r[key] || 0), 0);
+  const ytdIncome = sum(incomeData, 'amount');
+  // Capital assets (cameras, laptops) are depreciated, not expensed in full
+  const revenueExpenses = (expenseData || []).filter(e => !e.is_capital_asset);
+  const assets = (expenseData || []).filter(e => e.is_capital_asset);
+  const ytdExpenses = sum(revenueExpenses, 'amount');
+  const depreciation = firstYearDepreciation(
+    assets.map(a => ({ amount: Number(a.amount), assetClass: a.asset_class, purchaseDate: a.expense_date })), fyStartYear);
+  const totalTDS = sum(tdsData, 'tds_amount');
 
-  // Annualize: project full year from YTD
+  // Annualise from year-to-date, unless the user typed their own estimate.
   const now = new Date();
-  const fyStart = new Date(currentFY.startsWith('20') ? parseInt(currentFY.split('-')[0]) : 2024, 3, 1);
-  const fyEnd = new Date(parseInt(currentFY.split('-')[0]) + 1, 2, 31);
+  const fyStart = new Date(fyStartYear, 3, 1);
+  const fyEnd = new Date(fyStartYear + 1, 2, 31);
   const totalDays = (fyEnd.getTime() - fyStart.getTime()) / 86400000;
-  const elapsed = Math.max(1, (now.getTime() - fyStart.getTime()) / 86400000);
-  const projectedAnnual = annualEstimate ? parseFloat(annualEstimate) : Math.round(ytdIncome * (totalDays / elapsed));
+  const elapsed = Math.min(totalDays, Math.max(1, (now.getTime() - fyStart.getTime()) / 86400000));
+  const factor = totalDays / elapsed;
+  const manual = parseFloat(annualEstimate);
+  const projectedAnnual = Number.isFinite(manual) && manual >= 0 ? manual : Math.round(ytdIncome * factor);
+  const projectedExpenses = Number.isFinite(manual) ? 0 : Math.round(ytdExpenses * factor) + depreciation;
 
-  // Get TDS deducted this FY
-  const { data: tdsData } = await supabase
-    .from('tds_records')
-    .select('tds_amount')
-    .eq('user_id', req.userId!)
-    .eq('financial_year', currentFY);
+  const regime: Regime = regimeParam === 'old' || regimeParam === 'new'
+    ? regimeParam : (profile?.tax_regime === 'old' ? 'old' : 'new');
+  const presumptive: Presumptive = profile?.presumptive === '44ADA' || profile?.presumptive === '44AD'
+    ? profile.presumptive : 'none';
 
-  const totalTDS = (tdsData || []).reduce((s, r) => s + Number(r.tds_amount), 0);
+  const result = computeTax({
+    grossReceipts: projectedAnnual,
+    expenses: projectedExpenses,
+    regime,
+    presumptive,
+    tdsPaid: totalTDS,
+  });
 
-  const annualIncomePaise = Math.round(projectedAnnual * 100);
-  const totalTaxPaise = calcTax(annualIncomePaise, regime);
-  const tdsPaise = Math.round(totalTDS * 100);
-  const netAdvanceTaxPaise = Math.max(0, totalTaxPaise - tdsPaise);
-
-  const cumInstalments = INSTALMENT_SCHEDULE.map(inst => ({
-    ...inst,
-    cumAmountPaise: Math.round(netAdvanceTaxPaise * inst.cumPct),
-  }));
-
-  const instalments = cumInstalments.map((inst, i) => ({
-    quarter: inst.quarter,
-    dueDate: inst.dueDate,
-    dueMonth: inst.dueMonth,
-    dueDay: inst.dueDay,
-    amountDue: (inst.cumAmountPaise - (i > 0 ? cumInstalments[i-1].cumAmountPaise : 0)) / 100,
-  }));
+  // Cumulative advance tax paid by each instalment's due date, for the deferral-interest estimate.
+  const paidByQuarter = new Map<string, number>();
+  for (const p of paidData || []) paidByQuarter.set(p.quarter, (paidByQuarter.get(p.quarter) || 0) + Number(p.amount_paid || 0));
+  let running = 0;
+  const paidCumulative = INSTALMENT_SCHEDULE.map(i => (running += paidByQuarter.get(i.quarter) || 0));
+  const interest = estimateDeferralInterest(result.instalments, paidCumulative, now, fyStartYear);
 
   res.json({
     financialYear: currentFY,
-    regime,
     ytdIncome,
+    ytdExpenses,
     projectedAnnual,
-    totalTax: totalTaxPaise / 100,
+    projectedExpenses,
+    depreciation,
     tdsDeducted: totalTDS,
-    netAdvanceTax: netAdvanceTaxPaise / 100,
-    instalments,
+    ...result,
+    advanceTaxPaid: running,
+    balanceDue: Math.max(0, result.netPayable - running),
+    // kept for older clients
+    totalTax: result.totalTax,
+    netAdvanceTax: result.netPayable,
+    instalments: result.instalments.map((inst, i) => ({ ...inst, paid: paidByQuarter.get(inst.quarter) || 0, ...interest[i] })),
+    interestTotal: interest.reduce((s, q) => s + q.interest, 0),
   });
 });
 
-// GET /tax/deadlines
+// GET /tax/deadlines — the next few filing and payment dates that apply to this creator
 router.get('/deadlines', async (req: AuthRequest, res: Response): Promise<void> => {
   const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const currentFY = getFinancialYear(now);
-  const fyStartYear = parseInt(currentFY.split('-')[0]);
+  const fyStartYear = parseInt(currentFY.split('-')[0], 10);
 
-  const deadlines = [
-    { name: 'Q1 Advance Tax', quarter: 'Q1', date: new Date(fyStartYear, 5, 15), fy: currentFY },
-    { name: 'Q2 Advance Tax', quarter: 'Q2', date: new Date(fyStartYear, 8, 15), fy: currentFY },
-    { name: 'Q3 Advance Tax', quarter: 'Q3', date: new Date(fyStartYear, 11, 15), fy: currentFY },
-    { name: 'Q4 Advance Tax', quarter: 'Q4', date: new Date(fyStartYear + 1, 2, 15), fy: currentFY },
-    { name: 'GSTR-3B Filing', quarter: null, date: new Date(now.getFullYear(), now.getMonth() + 1, 20), fy: currentFY },
-  ]
-    .filter(d => d.date >= now)
+  const [{ data: profile }, { data: incomeRows }] = await Promise.all([
+    supabase.from('users').select('gst_registered, presumptive').eq('id', req.userId!).maybeSingle(),
+    supabase.from('income').select('amount').eq('user_id', req.userId!).eq('financial_year', currentFY),
+  ]);
+  const gstRegistered = profile?.gst_registered !== false;
+  const presumptive = profile?.presumptive === '44ADA' || profile?.presumptive === '44AD';
+
+  type D = { name: string; quarter: string | null; date: Date; kind: 'advance_tax' | 'gst' | 'itr'; detail?: string };
+  const list: D[] = presumptive
+    ? [{ name: 'Advance tax (presumptive, full amount)', quarter: 'Q4', date: new Date(fyStartYear + 1, 2, 15), kind: 'advance_tax' }]
+    : [
+        { name: 'Q1 Advance Tax', quarter: 'Q1', date: new Date(fyStartYear, 5, 15), kind: 'advance_tax' },
+        { name: 'Q2 Advance Tax', quarter: 'Q2', date: new Date(fyStartYear, 8, 15), kind: 'advance_tax' },
+        { name: 'Q3 Advance Tax', quarter: 'Q3', date: new Date(fyStartYear, 11, 15), kind: 'advance_tax' },
+        { name: 'Q4 Advance Tax', quarter: 'Q4', date: new Date(fyStartYear + 1, 2, 15), kind: 'advance_tax' },
+      ];
+
+  if (gstRegistered) {
+    // Monthly filers: GSTR-1 (sales) by the 11th, GSTR-3B (summary + payment) by the 20th of the next month
+    for (const offset of [0, 1]) {
+      const m = now.getMonth() + offset;
+      const period = new Date(now.getFullYear(), m - 1, 1).toLocaleString('en-IN', { month: 'long' });
+      list.push({ name: `GSTR-1 for ${period}`, quarter: null, date: new Date(now.getFullYear(), m, 11), kind: 'gst' });
+      list.push({ name: `GSTR-3B for ${period}`, quarter: null, date: new Date(now.getFullYear(), m, 20), kind: 'gst' });
+    }
+  }
+
+  // Income-tax return for the tax year that just ended: 31 July (31 October if audited)
+  const itrYear = now.getMonth() >= 7 ? now.getFullYear() + 1 : now.getFullYear();
+  list.push({ name: `ITR for tax year ${itrYear - 1}-${String(itrYear).slice(-2)}`, quarter: null, date: new Date(itrYear, 6, 31), kind: 'itr', detail: '31 October if your accounts are audited' });
+
+  const deadlines = list
+    .filter(d => d.date >= today)
     .sort((a, b) => a.date.getTime() - b.date.getTime())
-    .slice(0, 4)
+    .slice(0, 6)
     .map(d => {
-      const daysUntil = Math.ceil((d.date.getTime() - now.getTime()) / 86400000);
+      const daysUntil = Math.round((d.date.getTime() - today.getTime()) / 86400000);
       return {
-        name: d.name,
-        quarter: d.quarter,
-        dueDate: d.date.toISOString().split('T')[0],
+        name: d.name, quarter: d.quarter, kind: d.kind, detail: d.detail ?? null,
+        dueDate: `${d.date.getFullYear()}-${String(d.date.getMonth() + 1).padStart(2, '0')}-${String(d.date.getDate()).padStart(2, '0')}`,
         daysUntil,
         urgency: daysUntil <= 7 ? 'danger' : daysUntil <= 14 ? 'warning' : 'ok',
       };
     });
 
+  // Creators must register for GST once turnover crosses ₹20 lakh — warn from ₹18 lakh
+  const fyIncome = (incomeRows || []).reduce((s, r) => s + Number(r.amount), 0);
+  const gstThreshold = !gstRegistered && fyIncome >= 1800000
+    ? { income: fyIncome, limit: 2000000, crossed: fyIncome >= 2000000 }
+    : null;
+
   const plan = req.userPlan || 'basic';
   const limitedDeadlines = plan === 'basic' ? deadlines.slice(0, 2) : deadlines;
-  res.json({ deadlines: limitedDeadlines, limited: plan === 'basic' });
+  res.json({ deadlines: limitedDeadlines, limited: plan === 'basic', gstThreshold });
 });
 
 // POST /tax/payments

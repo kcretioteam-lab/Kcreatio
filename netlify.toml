@@ -6,7 +6,48 @@
 [build.environment]
   NODE_VERSION = "22"
 
+# Redirect rules are matched top to bottom — keep the SPA fallback last.
+
+# The old /v2 preview of the landing page now lives at /
+[[redirects]]
+  from   = "/v2"
+  to     = "/"
+  status = 301
+  force  = true
+
+[[redirects]]
+  from   = "/v2/*"
+  to     = "/"
+  status = 301
+  force  = true
+
+# The API is served by the backend (VITE_API_URL), never by this site. Without this rule the
+# SPA fallback answered /api/* with index.html and a 200, which hid broken API calls.
+[[redirects]]
+  from   = "/api/*"
+  to     = "/404.html"
+  status = 404
+  force  = true
+
 [[redirects]]
   from   = "/*"
   to     = "/index.html"
   status = 200
+
+# Security headers for every page. HSTS is already added by Netlify on HTTPS.
+# connect-src must list the backend host — update it if the API moves (e.g. to api.kcretio.in).
+[[headers]]
+  for = "/*"
+  [headers.values]
+    Content-Security-Policy = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://*.supabase.co https://lh3.googleusercontent.com; font-src 'self' data:; connect-src 'self' https://*.onrender.com https://api.kcretio.in https://*.supabase.co; frame-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self' https://accounts.google.com; frame-ancestors 'none'; upgrade-insecure-requests"
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "camera=(), microphone=(), geolocation=(), payment=(), usb=(), interest-cohort=()"
+    Cross-Origin-Opener-Policy = "same-origin-allow-popups"
+
+# Hashed build assets never change — cache them for a year
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
