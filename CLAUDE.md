@@ -52,6 +52,7 @@ cd backend && node -r dotenv/config dist/server.js   # http://localhost:4000
 - 018: barter/foreign income/export invoices, invoice_payments + record_invoice_payment(), credit_notes, reminders, recurring
 - 017: users.totp_* (2FA), user_sessions, invoice_audit_log
 - 016: mark_invoice_paid / mark_deal_paid functions, Tax Profile fields (tax_regime, presumptive, gst_registered, LUT), invoices.line_items
+- 019: invoices.client_request_id — retried invoice saves return the existing invoice (no duplicates)
 
 ## GST compliance (Rule 46 CGST Rules 2017)
 - CGST+SGST for intrastate (same state supplier+brand), IGST for interstate

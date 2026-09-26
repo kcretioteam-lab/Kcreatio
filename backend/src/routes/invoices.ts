@@ -113,6 +113,7 @@ router.get('/confirm-payment/:token', async (req: ExpressRequest, res: Response)
 router.use(authenticate);
 
 const CreateInvoiceSchema = z.object({
+  clientRequestId: z.string().uuid().optional(),   // same id on a retry → the existing invoice is returned
   brandName: z.string().min(1).max(200).trim(),
   brandGstin: gstinField.nullish().or(z.literal('')),
   brandAddress: z.string().min(1).max(500).trim(),
@@ -247,8 +248,27 @@ router.get('/', async (req: AuthRequest, res: Response): Promise<void> => {
 });
 
 // POST /invoices
+// Set to false if migration 019 hasn't been run, so saving still works without retry protection
+let clientRequestIdColumn = true;
+const missingClientRequestIdColumn = (err: { code?: string; message?: string } | null) =>
+  Boolean(err && (err.code === 'PGRST204' || err.code === '42703') && err.message?.includes('client_request_id'));
+
+async function findByClientRequestId(userId: string, clientRequestId: string) {
+  if (!clientRequestIdColumn) return null;
+  const { data, error } = await supabase.from('invoices').select('*')
+    .eq('user_id', userId).eq('client_request_id', clientRequestId).maybeSingle();
+  if (missingClientRequestIdColumn(error)) clientRequestIdColumn = false;
+  return error ? null : data;
+}
+
 router.post('/', validateBody(CreateInvoiceSchema), async (req: AuthRequest, res: Response): Promise<void> => {
   const body = req.body;
+
+  // A retry of a save that already went through (only the response was lost) — return that invoice
+  if (body.clientRequestId) {
+    const existing = await findByClientRequestId(req.userId!, body.clientRequestId);
+    if (existing) { res.status(200).json(existing); return; }
+  }
 
   // ── Plan enforcement (runs before DB calls) ───────────────────────────────
   const plan = (req.userPlan || 'basic') as Plan;
@@ -400,11 +420,21 @@ router.post('/', validateBody(CreateInvoiceSchema), async (req: AuthRequest, res
       reminders_enabled: Boolean(body.remindersEnabled),
       recurring: body.recurring || null,
       next_recurring_on: body.recurring ? nextRecurringDate(body.invoiceDate, body.recurring) : null,
+      ...(body.clientRequestId && clientRequestIdColumn ? { client_request_id: body.clientRequestId } : {}),
     })
     .select()
     .single();
 
   let { data: invoice, error } = await insertInvoice();
+  if (missingClientRequestIdColumn(error)) {
+    clientRequestIdColumn = false;
+    ({ data: invoice, error } = await insertInvoice());
+  }
+  // The same request raced in twice — return the copy that won
+  if (error?.code === '23505' && error.message?.includes('client_request_id')) {
+    const existing = await findByClientRequestId(req.userId!, body.clientRequestId);
+    if (existing) { res.status(200).json(existing); return; }
+  }
   // Unique (user_id, invoice_number) clash — e.g. two tabs saving at once — take the next number and retry
   for (let attempt = 0; attempt < 3 && error?.code === '23505'; attempt++) {
     invoiceNumber = await nextInvoiceNumber(req.userId!, prefix, fyCode);

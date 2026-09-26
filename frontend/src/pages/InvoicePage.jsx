@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { format, addDays } from 'date-fns';
-import { Plus, FileText, Check, AlertCircle, Eye, Download, X, HelpCircle, ChevronUp, ChevronDown, ChevronsUpDown, Lock, Save, Mail, Trash2, Sun, Moon } from 'lucide-react';
+import { Plus, FileText, Check, AlertCircle, Eye, Download, X, HelpCircle, ChevronUp, ChevronDown, ChevronsUpDown, Lock, Save, Mail, Trash2, Sun, Moon, WifiOff, RefreshCw, FileDown } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth.jsx';
 import { useToast } from '../hooks/useToast.jsx';
 import UsageBar from '../components/ui/UsageBar.jsx';
@@ -265,7 +265,7 @@ function AutosaveIndicator({ lastSaved }) {
   }, [lastSaved]);
   if (!label) return null;
   return (
-    <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)', display: 'flex', alignItems: 'center', gap: 4 }}>
+    <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)', display: 'flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' }}>
       <Save size={11} aria-hidden="true" />
       {label}
     </span>
@@ -742,6 +742,13 @@ ${inv.include_terms && inv.terms_text ? `
 </body></html>`;
 }
 
+// True when the request never got a usable answer: offline, connection refused, timed out, or the
+// host is up but the app isn't (Render returns 502/503/504 while the service starts)
+function isServerUnreachable(err) {
+  if (err?.code === 'ERR_CANCELED') return false;
+  return !err?.response || [502, 503, 504].includes(err.response.status);
+}
+
 // Save a PDF blob. On phones, open the native share sheet (Save to Files / WhatsApp / Drive);
 // fall back to a normal download if sharing isn't supported or is refused.
 async function savePdfBlob(blob, filename) {
@@ -761,13 +768,22 @@ async function savePdfBlob(blob, filename) {
   setTimeout(() => URL.revokeObjectURL(url), 60000);
 }
 
-function downloadInvoicePDF(inv, user, template, plan) {
+// Stamps a built invoice as a draft: no "TAX INVOICE" heading and a large DRAFT mark on every page,
+// so a preview made while the server is unreachable can't be passed off as the GST tax invoice.
+function markAsDraft(html) {
+  const stamp = '<div style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-30deg);font:800 120px/1 sans-serif;letter-spacing:8px;color:rgba(220,38,38,0.14);pointer-events:none;z-index:9999">DRAFT</div>'
+    + '<div style="position:fixed;top:0;left:0;right:0;padding:4px;text-align:center;font:600 10px sans-serif;color:#b91c1c;background:#fee2e2">DRAFT — not a tax invoice. The final invoice and its number are issued once it is saved.</div>';
+  return html.replaceAll('TAX INVOICE', 'DRAFT — NOT A TAX INVOICE').replace('</body>', `${stamp}</body>`);
+}
+
+function downloadInvoicePDF(inv, user, template, plan, { draft = false } = {}) {
   const t = template || TEMPLATES[0];
   const effectiveT = { ...t, accentColor: inv.invoiceAccentColor || t.accentColor };
   let html;
   if (effectiveT.layout === 'corporate') html = buildCorporateHTML(inv, user, effectiveT, plan);
   else if (effectiveT.layout === 'minimal') html = buildMinimalHTML(inv, user, effectiveT, plan);
   else html = buildClassicHTML(inv, user, effectiveT, plan);
+  if (draft) html = markAsDraft(html);
 
   // Use Blob URL — avoids popup blocker issues with document.write
   const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
@@ -1038,6 +1054,11 @@ export default function InvoicePage({ initialView }) {
   const sigCanvasRef = useRef(null);
   const typePreviewRef = useRef(null);
   const [lastDraftSaved, setLastDraftSaved] = useState(null);
+  // 'save' | 'download' while a save is waiting for the server to be reachable again. The invoice is
+  // never saved only in this browser (its number must come from the server); the draft stays here.
+  const [pendingSave, setPendingSave] = useState(null);
+  // Sent with each new invoice so a retry of a save that did reach the server can't create a duplicate
+  const saveRequestIdRef = useRef(crypto.randomUUID());
   const { theme, toggleTheme } = useTheme();
   const [showBrandPicker, setShowBrandPicker] = useState(false);
   const [sigTab, setSigTab] = useState('draw');
@@ -1077,6 +1098,19 @@ export default function InvoicePage({ initialView }) {
     }, 600);
     return () => clearTimeout(autosaveTimer.current);
   }, [form, view]);
+
+  // Retry a save that failed because the server was unreachable: as soon as the browser is back online,
+  // and every 30s (on Render the backend may be waking up while the device itself is online).
+  // A ref keeps the listener pointed at the latest form and handlers.
+  const retryRef = useRef(null);
+  retryRef.current = () => retryPendingSave({ silent: true });
+  useEffect(() => {
+    if (!pendingSave || view === 'list') return;
+    const retry = () => retryRef.current?.();
+    const id = setInterval(retry, 30000);
+    window.addEventListener('online', retry);
+    return () => { clearInterval(id); window.removeEventListener('online', retry); };
+  }, [pendingSave, view]);
 
   // Update typed-signature canvas preview whenever text or font changes
   useEffect(() => {
@@ -1293,15 +1327,10 @@ export default function InvoicePage({ initialView }) {
   const showErr = (f) => touched[f] && formErrors[f];
 
   // ── Core save logic ────────────────────────────────────────────────────────
-  async function doSave() {
-    const allTouched = Object.keys(EMPTY_FORM).reduce((a,k) => ({...a,[k]:true}), {});
-    setTouched(allTouched);
-    if (!complete) { toast.error('Please fill all required fields'); return null; }
-    setSubmitting(true);
-
+  function buildPayload() {
     const c = calcGST(form, user);
     const invNum = nextNumber;
-    const payload = {
+    return {
       invoice_number: invNum, brand_name: form.brandName.trim(),
       brand_gstin: form.brandGstin.trim()||null, brand_address: form.brandAddress.trim(),
       brand_state_code: form.brandStateCode, brand_pan: form.brandPan.trim()||null,
@@ -1333,13 +1362,24 @@ export default function InvoicePage({ initialView }) {
       signatory_image_url: form.signatoryImageUrl||null,
       seller_business_name: user?.business_name||user?.name||null,
     };
+  }
+
+  // opts.mode: 'save' | 'download' (what to resume after a retry); opts.silent: background retry —
+  // no full-screen loader and no toasts unless something actually changes
+  async function doSave(opts = {}) {
+    if (!opts.silent) setTouched(Object.keys(EMPTY_FORM).reduce((a,k) => ({...a,[k]:true}), {}));
+    if (!complete) { if (!opts.silent) toast.error('Please fill all required fields'); return null; }
+    setSubmitting(true);
+
+    const payload = buildPayload();
+    const reqConfig = { silent: Boolean(opts.silent) };
 
     // Upload images before saving if they're still base64 data URLs
     if (payload.signatory_image_url?.startsWith('data:')) {
       try {
         const parts = payload.signatory_image_url.split(',');
         const mimeType = parts[0].split(';')[0].split(':')[1];
-        const { data: upData } = await api.post('/upload/signature', { imageBase64: parts[1], mimeType });
+        const { data: upData } = await api.post('/upload/signature', { imageBase64: parts[1], mimeType }, reqConfig);
         payload.signatory_image_url = upData.url;
       } catch { /* keep data url if upload fails */ }
     }
@@ -1347,7 +1387,7 @@ export default function InvoicePage({ initialView }) {
       try {
         const parts = payload.upi_scanner_url.split(',');
         const mimeType = parts[0].split(';')[0].split(':')[1];
-        const { data: upData } = await api.post('/upload/scanner', { imageBase64: parts[1], mimeType });
+        const { data: upData } = await api.post('/upload/scanner', { imageBase64: parts[1], mimeType }, reqConfig);
         payload.upi_scanner_url = upData.url;
       } catch { /* keep data url if upload fails */ }
     }
@@ -1356,6 +1396,7 @@ export default function InvoicePage({ initialView }) {
     try {
       const isRemoteEdit = Boolean(editingId);
       const body = {
+        clientRequestId: isRemoteEdit ? undefined : saveRequestIdRef.current,
         brandName: payload.brand_name, brandGstin: payload.brand_gstin,
         brandAddress: payload.brand_address, brandStateCode: payload.brand_state_code,
         brandPan: payload.brand_pan,
@@ -1395,37 +1436,46 @@ export default function InvoicePage({ initialView }) {
         sellerBusinessName: payload.seller_business_name,
       };
       const res = isRemoteEdit
-        ? await api.put(`/invoices/${editingId}`, body)
-        : await api.post('/invoices', body);
+        ? await api.put(`/invoices/${editingId}`, body, reqConfig)
+        : await api.post('/invoices', body, reqConfig);
       saved = { ...payload, ...res.data, id: res.data.id };
     } catch (err) {
-      // Never save only to this browser — an invoice number must come from the server.
-      toast.error(getErrorMessage(err, 'Couldn’t save the invoice — check your connection and try again.'));
       setSubmitting(false);
+      // Never save only to this browser — an invoice number must come from the server. Keep the
+      // draft here and retry when the server is back (see the pendingSave effect).
+      if (isServerUnreachable(err)) {
+        if (!opts.silent) toast.warning('Can’t reach the server. Your draft is saved on this device — the invoice will be saved as soon as the connection is back.');
+        setPendingSave(opts.mode || 'save');
+        return null;
+      }
+      setPendingSave(null);
+      toast.error(getErrorMessage(err, 'Couldn’t save the invoice — please try again.'));
       return null;
     }
     setSubmitting(false);
+    setPendingSave(null);
+    saveRequestIdRef.current = crypto.randomUUID();
     refreshUsage();
     return saved;
   }
 
-  async function handleSave(e) {
+  async function handleSave(e, opts = {}) {
     e?.preventDefault();
-    const inv = await doSave();
+    const inv = await doSave({ ...opts, mode: 'save' });
     if (!inv) return;
     try { localStorage.removeItem(draftKey()); } catch {}
     setLastDraftSaved(null);
-    toast.success(editingId ? 'Invoice updated' : 'Invoice saved');
+    toast.success(opts.silent ? `Connection is back — invoice ${inv.invoice_number || ''} saved` : editingId ? 'Invoice updated' : 'Invoice saved');
     resetAndGoList();
   }
 
-  async function handleSaveAndDownload(e) {
+  async function handleSaveAndDownload(e, opts = {}) {
     e?.preventDefault();
-    const inv = await doSave();
+    const inv = await doSave({ ...opts, mode: 'download' });
     if (!inv) return;
     try { localStorage.removeItem(draftKey()); } catch {}
     setLastDraftSaved(null);
-    toast.success('Invoice saved — downloading PDF…');
+    toast.success(opts.silent ? `Connection is back — invoice ${inv.invoice_number || ''} saved, downloading PDF…` : 'Invoice saved — downloading PDF…');
     resetAndGoList();
     setTimeout(async () => {
       pdfAbortRef.current?.abort();
@@ -1444,6 +1494,16 @@ export default function InvoicePage({ initialView }) {
     }, 300);
   }
 
+  function retryPendingSave(opts = {}) {
+    if (!pendingSave || submitting) return;
+    (pendingSave === 'download' ? handleSaveAndDownload : handleSave)(null, opts);
+  }
+
+  // Offline preview for the brand: built in the browser, stamped DRAFT, no invoice number
+  function handleDownloadDraft() {
+    downloadInvoicePDF({ ...buildPayload(), invoice_number: 'DRAFT' }, user, effectiveTemplate, user?.plan, { draft: true });
+  }
+
   function handleDiscardDraft() {
     if (!window.confirm('Discard this draft? Everything you entered will be lost.')) return;
     clearTimeout(autosaveTimer.current);
@@ -1454,6 +1514,7 @@ export default function InvoicePage({ initialView }) {
   }
 
   function resetAndGoList() {
+    setPendingSave(null);
     setForm({ ...EMPTY_FORM });
     setTouched({});
     setEditingId(null);
@@ -2110,10 +2171,25 @@ export default function InvoicePage({ initialView }) {
           padding: isMobile ? 'var(--space-2) var(--space-3)' : 'var(--space-1) var(--space-5)',
           flexShrink: 0,
         }}>
+          {pendingSave && (
+            <div role="status" style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 'var(--space-2)', maxWidth: 1200, margin: '0 auto var(--space-2)', padding: 'var(--space-2) var(--space-3)', background: 'var(--warning-dim)', border: '1px solid var(--warning)', borderRadius: 'var(--radius-md)', fontSize: 'var(--text-xs)', color: 'var(--text-primary)' }}>
+              <WifiOff size={14} aria-hidden="true" style={{ color: 'var(--warning-text)', flexShrink: 0 }} />
+              <span style={{ flex: '1 1 240px' }}>
+                Can’t reach the server. Your draft is saved on this device, and the invoice will be saved{pendingSave === 'download' ? ' and downloaded' : ''} automatically when the connection is back.
+              </span>
+              <button type="button" className="inv-btn inv-btn--secondary" onClick={() => retryPendingSave()} disabled={submitting}>
+                <RefreshCw size={14} aria-hidden="true" /> {submitting ? 'Trying…' : 'Retry now'}
+              </button>
+              <button type="button" className="inv-btn inv-btn--secondary" onClick={handleDownloadDraft} title="A preview stamped DRAFT, with no invoice number — not a tax invoice">
+                <FileDown size={14} aria-hidden="true" /> Download draft PDF
+              </button>
+            </div>
+          )}
           {/* Single compact row: status (compliance, hint, autosave) left · actions right */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', maxWidth: 1200, margin: '0 auto', width: '100%', flexWrap: isMobile ? 'wrap' : 'nowrap' }}>
+          {/* Wraps instead of overlapping: when status + buttons don't fit, the buttons move to a second line */}
+          <div style={{ display: 'flex', alignItems: 'center', columnGap: 'var(--space-3)', rowGap: 'var(--space-2)', maxWidth: 1200, margin: '0 auto', width: '100%', flexWrap: 'wrap' }}>
           {!isMobile && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', flex: '1 1 auto', minWidth: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', flex: '1 1 auto' }}>
               <CompliancePanel form={form} user={user} />
               {!complete && Object.keys(touched).length > 0 ? (
                 <span title="Fill all required (*) fields to enable invoice creation" style={{ fontSize: 'var(--text-xs)', color: 'var(--warning-text)', display: 'flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
@@ -2123,7 +2199,7 @@ export default function InvoicePage({ initialView }) {
               ) : lastDraftSaved && <AutosaveIndicator lastSaved={lastDraftSaved} />}
             </div>
           )}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', flex: isMobile ? '1 1 100%' : '0 0 auto', flexWrap: isMobile ? 'wrap' : 'nowrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', flex: isMobile ? '1 1 100%' : '0 0 auto', marginLeft: 'auto', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
             {/* Leave editor — draft is autosaved, so Close is safe; Discard is the explicit destructive path */}
             {!editingId && lastDraftSaved && (
               <button type="button" className="inv-btn inv-btn--danger" onClick={handleDiscardDraft} title="Delete this draft and go back to the invoice list">
@@ -2133,7 +2209,7 @@ export default function InvoicePage({ initialView }) {
             <button
               type="button"
               className="inv-btn inv-btn--secondary"
-              onClick={() => navigate('/invoices')}
+              onClick={() => { setPendingSave(null); navigate('/invoices'); }}
               title={editingId ? 'Close without saving changes' : 'Close — your draft is saved and will be restored next time'}
             >
               <X size={14} aria-hidden="true" /> Close

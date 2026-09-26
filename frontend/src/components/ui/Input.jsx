@@ -117,7 +117,10 @@ export default function Input({
         style={{
           padding: 'var(--space-2) var(--space-3)',
           background: 'var(--surface-2)',
-          border: `1px solid ${shownError ? 'var(--danger)' : 'var(--border)'}`,
+          // Longhands, not `border`: the focus/blur handlers below set borderColor directly
+          borderWidth: 1,
+          borderStyle: 'solid',
+          borderColor: shownError ? 'var(--danger)' : 'var(--border)',
           borderRadius: 'var(--radius-md)',
           color: 'var(--text-primary)',
           fontSize: 'var(--text-base)',

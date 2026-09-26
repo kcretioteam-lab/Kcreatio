@@ -2,7 +2,7 @@ import { NavLink } from 'react-router-dom';
 import {
   LayoutDashboard, FileText, IndianRupee, Calculator,
   Briefcase, TrendingUp, Receipt, Settings,
-  ChevronLeft, ChevronRight, MessageCircle,
+  PanelLeftClose, PanelLeftOpen, MessageCircle,
 } from 'lucide-react';
 
 // WhatsApp support number in international format without '+', e.g. 91XXXXXXXXXX
@@ -53,7 +53,9 @@ export default function Sidebar({ collapsed, onToggle }) {
     <aside
       style={{
         width: w, minWidth: w, maxWidth: w,
-        height: '100dvh', position: 'sticky', top: 0,
+        // Fill the AppShell card, not the window: the card is inset by padding, so 100dvh pushed the
+        // collapse toggle below the visible edge
+        height: '100%', alignSelf: 'stretch',
         background: 'var(--surface)',
         borderRight: '1px solid var(--border)',
         display: 'flex', flexDirection: 'column',
@@ -76,7 +78,7 @@ export default function Sidebar({ collapsed, onToggle }) {
       </div>
 
       {/* Nav — no section labels, just a subtle separator */}
-      <nav aria-label="Main navigation" style={{ flex: 1, padding: 'var(--space-3) var(--space-2)', overflow: 'auto', display: 'flex', flexDirection: 'column', gap: 1 }}>
+      <nav aria-label="Main navigation" style={{ flex: 1, minHeight: 0, padding: 'var(--space-3) var(--space-2)', overflow: 'auto', display: 'flex', flexDirection: 'column', gap: 1 }}>
         <ul style={{ display: 'flex', flexDirection: 'column', gap: 1, listStyle: 'none' }}>
           {NAV_ITEMS.map(({ to, icon: Icon, label }) => (
             <li key={to}>
@@ -151,24 +153,29 @@ export default function Sidebar({ collapsed, onToggle }) {
         </div>
       )}
 
-      {/* Collapse toggle */}
-      <div style={{ borderTop: '1px solid var(--border)', padding: 'var(--space-2)' }}>
+      {/* Collapse toggle — also Ctrl+B / Cmd+B (AppShell) */}
+      <div style={{ borderTop: '1px solid var(--border)', padding: 'var(--space-2)', flexShrink: 0 }}>
         <button
+          type="button"
           onClick={onToggle}
           aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          aria-expanded={!collapsed}
+          title={collapsed ? 'Expand sidebar (Ctrl+B)' : 'Collapse sidebar for more space (Ctrl+B)'}
           style={{
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            padding: 'var(--space-2)', borderRadius: 'var(--radius-md)',
+            display: 'flex', alignItems: 'center', justifyContent: collapsed ? 'center' : 'flex-start',
+            gap: 'var(--space-3)',
+            padding: 'var(--space-2) var(--space-3)', borderRadius: 'var(--radius-md)',
             color: 'var(--text-muted)', background: 'transparent', border: 'none',
-            cursor: 'pointer', width: '100%',
+            cursor: 'pointer', width: '100%', fontSize: 'var(--text-sm)', fontFamily: 'inherit',
+            whiteSpace: 'nowrap',
             transition: 'background var(--duration-fast)',
           }}
           onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-2)'}
           onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
         >
           {collapsed
-            ? <ChevronRight size={14} aria-hidden="true" />
-            : <ChevronLeft size={14} aria-hidden="true" />
+            ? <PanelLeftOpen size={16} aria-hidden="true" style={{ flexShrink: 0 }} />
+            : <><PanelLeftClose size={16} aria-hidden="true" style={{ flexShrink: 0 }} /><span>Collapse</span></>
           }
         </button>
       </div>
