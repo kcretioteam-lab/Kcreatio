@@ -7,7 +7,7 @@ export const PLAN_HIERARCHY = { basic: 0, starter: 1, trial: 2, pro: 2, business
 
 // null = unlimited
 export const PLAN_LIMITS = {
-  // Invoices are unlimited on Basic — Basic PDFs carry the Kcretio watermark instead (was: invoices_monthly: 5)
+  // Invoices are unlimited on Basic — Basic PDFs carry the Kcreatio watermark instead (was: invoices_monthly: 5)
   basic:    { invoices_monthly: null, tds_entries: 10,   bank_accounts: 1, upi_ids: 1, tc_profiles: 1, templates: ['classic', 'modern', 'compact'] },
   trial:    { invoices_monthly: null, tds_entries: null, bank_accounts: 5, upi_ids: 5, tc_profiles: 5, templates: null },
   starter:  { invoices_monthly: null, tds_entries: null, bank_accounts: 5, upi_ids: 5, tc_profiles: 5, templates: null },

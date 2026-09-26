@@ -75,8 +75,8 @@ api.interceptors.response.use(
 // 5xx and network errors are not, so those get a friendly fallback instead.
 export function getErrorMessage(err, fallback = 'Something went wrong. Please try again.') {
   if (!err?.response) {
-    if (err?.code === 'ECONNABORTED') return 'Kcretio is taking too long to respond. Please try again in a moment.';
-    return 'Can’t reach Kcretio — check your internet connection and try again.';
+    if (err?.code === 'ECONNABORTED') return 'Kcreatio is taking too long to respond. Please try again in a moment.';
+    return 'Can’t reach Kcreatio — check your internet connection and try again.';
   }
   const { status, data } = err.response;
   if (status >= 500) return fallback;

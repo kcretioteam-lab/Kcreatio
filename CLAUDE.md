@@ -1,4 +1,4 @@
-# Kcretio — Claude Context
+# Kcreatio — Claude Context
 
 ## What this is
 Financial OS for Indian content creators: GST invoicing, TDS tracking, advance tax planning, brand deal CRM.
@@ -21,7 +21,8 @@ cd backend && node -r dotenv/config dist/server.js   # http://localhost:4000
 - Frontend: `src/pages/` + `src/components/layout/` + `src/hooks/` + `src/utils/`
 - Backend: `src/routes/` + `src/services/` + `src/middleware/`
 - DB: Supabase PostgreSQL — run migrations in `backend/migrations/` in order (001→011, see SETUP.md)
-- Product name is **Kcretio** everywhere (never "Kcreatio")
+- Product name is **Kcreatio**, matching the domain https://kcreatio.com (API: `api.kcreatio.com`, email: `@kcreatio.com`). The old spelling "Kcretio" is retired
+- Internal identifiers that deliberately keep `kcretio` (renaming breaks things): `kcretio-totp:` salt in `totp.ts` (decrypts stored 2FA secrets), localStorage keys `kcretio:cache:` / `kcretio:invoice_draft`, Render service `kcretio-backend`, host `kcretio.netlify.app`, dev login `admin@kcretio.in`
 - Storage: Supabase bucket `invoice-signatures` for avatars, signatures, UPI QR images
 
 ## Critical rules

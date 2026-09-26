@@ -1,4 +1,4 @@
-# Site Structure — kcretio.com
+# Site Structure — kcreatio.com
 
 ```
 /                                   Home (prerendered)
@@ -33,7 +33,7 @@
 ├── /compare
 │   ├── /zoho-invoice-alternative
 │   ├── /refrens-alternative
-│   └── /spreadsheet-vs-kcretio
+│   └── /spreadsheet-vs-kcreatio
 ├── /about                          Founders, entity, CA reviewer
 ├── /authors/<slug>
 ├── /editorial-policy
@@ -70,6 +70,6 @@ Disallow: /login
 Disallow: /register
 Allow: /
 
-Sitemap: https://kcretio.com/sitemap-index.xml
+Sitemap: https://kcreatio.com/sitemap-index.xml
 ```
 Match the Disallow lines to the real route paths in `frontend/src/App.jsx` before shipping.

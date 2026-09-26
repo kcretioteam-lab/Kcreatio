@@ -1,4 +1,4 @@
-# Kcretio
+# Kcreatio
 
 > **"Generate GST-compliant invoices for brand deals in 30 seconds. Never miss a TDS deduction or advance tax deadline again."**
 
@@ -8,7 +8,7 @@ The financial operating system for Indian content creators.
 
 ## What This Is
 
-Kcretio replaces the CA-visit-once-a-year panic cycle and the spreadsheet chaos with one product that handles:
+Kcreatio replaces the CA-visit-once-a-year panic cycle and the spreadsheet chaos with one product that handles:
 
 - **GST Invoice Generation** — Rule 46-compliant invoices with auto-calculated CGST/SGST/IGST, correct SAC code (998399), and multiple template layouts
 - **TDS Tracking** — Log every deduction from every brand, track Form 16A status, reconcile at year-end
@@ -73,7 +73,7 @@ Indian creators earning ₹5L–₹50L/year face legally mandated business-grade
 
 | Plan | Price | Included |
 |------|-------|----------|
-| Basic | Free | Unlimited invoices (PDFs carry a Kcretio watermark), TDS tracker (10 entries), March advance tax reminder |
+| Basic | Free | Unlimited invoices (PDFs carry a Kcreatio watermark), TDS tracker (10 entries), March advance tax reminder |
 | Starter | ₹299/month | Watermark-free invoices, all templates, unlimited TDS, **Gmail Smart Inbox** (auto-detect payments/deals/TDS), manual email paste, invoice auto-overdue, deal stale alerts, smart invoice pre-fill from deal, full quarterly advance tax reminders |
 | Pro | ₹599/month | Everything in Starter + advance tax calculator, P&L dashboard, CA export, **auto-apply mode** (high-confidence detections apply without review), YouTube AdSense sync, WhatsApp notifications |
 <!-- Business plan paused for launch:
@@ -106,7 +106,7 @@ Indian creators earning ₹5L–₹50L/year face legally mandated business-grade
 1. **SEO content** (near-zero CAC) — "GST for YouTubers India", "TDS on brand deals", "advance tax for creators" — zero competition, high intent
 2. **CA Partner Program** — CAs refer creator clients, earn 20% recurring commission
 3. **Creator ambassador program** — 10 creators (50K–200K followers) get free lifetime Pro for honest feedback + organic mention
-4. **Invoice watermark viral loop** — Basic invoices are unlimited but carry a faint Kcretio logo + "Kcretio.in" footer, so every free invoice sent to a brand markets the product
+4. **Invoice watermark viral loop** — Basic invoices are unlimited but carry a faint Kcreatio logo + "kcreatio.com" footer, so every free invoice sent to a brand markets the product
 5. **The March Effect** — India's financial year ends March 31. Every creator panics January–March. Peak acquisition season. Plan major feature launches and marketing spend for February–March.
 
 ---
@@ -168,7 +168,7 @@ Connect Gmail once. App scans every 6 hours for payment confirmations, brand dea
 - **Invoice Compliance Panel** — sticky footer on the invoice form with live Rule 46 CGST compliance badges ("RULE 46 4/7" counters) and a blocking error list. Prevents non-compliant invoice saves.
 - **Net-in-Hand Breakdown** — below the Tax Calculation section on invoice form: shows exact amount brand pays, TDS deducted (10%), and net creator receives, with a Form 16A reminder.
 - **ITR Claimable Banner** — green callout at the top of the TDS page showing total TDS deducted for the FY and a reminder to collect Form 16A from all brands before filing.
-- **PDF watermark** — Basic plan PDFs carry a faint diagonal Kcretio logo and a "Kcretio.in — upgrade for watermark-free invoices" footer (Puppeteer server-side, same watermark in the client-side fallback). Starter and above get clean PDFs.
+- **PDF watermark** — Basic plan PDFs carry a faint diagonal Kcreatio logo and a "kcreatio.com — upgrade for watermark-free invoices" footer (Puppeteer server-side, same watermark in the client-side fallback). Starter and above get clean PDFs.
 
 **Pending (requires Supabase credentials):**
 - Run DB migrations 001–015 (see `SETUP.md`)

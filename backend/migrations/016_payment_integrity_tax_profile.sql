@@ -1,4 +1,4 @@
--- Kcretio — Migration 016
+-- Kcreatio — Migration 016
 -- 1. Payment integrity: marking an invoice/deal paid happens in one transaction,
 --    logs income on the taxable value (excl. GST), logs the TDS actually deducted,
 --    and can't be repeated.

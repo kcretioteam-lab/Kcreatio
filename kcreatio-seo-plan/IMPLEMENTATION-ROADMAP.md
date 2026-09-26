@@ -7,8 +7,8 @@ Each item lists how to know it failed, so you can check without re-running an au
 
 | # | Task | Where | Depends on | Failure check |
 |---|---|---|---|---|
-| 1 | Launch kcretio.com, 301 netlify.app → kcretio.com | Netlify DNS | — | `curl -I netlify.app` not 301 |
-| 2 | Build-time prerender/SSG for marketing routes | `frontend/` Vite config | — | `curl -s kcretio.com/ \| grep "<h1"` empty |
+| 1 | Launch kcreatio.com, 301 netlify.app → kcreatio.com | Netlify DNS | — | `curl -I netlify.app` not 301 |
+| 2 | Build-time prerender/SSG for marketing routes | `frontend/` Vite config | — | `curl -s kcreatio.com/ \| grep "<h1"` empty |
 | 3 | Per-route head tags (title, description, canonical, OG, robots) | shared `<Seo>` component | 2 | Duplicate titles in the Search Console page report |
 | 4 | robots.txt + sitemap generation | `frontend/public/`, build script | 2 | `/robots.txt` content-type not text/plain |
 | 5 | Real 404 status + app routes noindex | `netlify.toml`, `NotFoundPage.jsx` | 2 | Unknown URL returns 200 |
@@ -55,4 +55,4 @@ Each item lists how to know it failed, so you can check without re-running an au
 ## Next commands
 - `/claude-seo:seo-cluster "gst for content creators"` to finalise the cluster topics per pillar.
 - `/claude-seo:seo-content-brief <topic>` for each piece.
-- `/claude-seo:seo-drift baseline https://kcretio.com` once live.
+- `/claude-seo:seo-drift baseline https://kcreatio.com` once live.
