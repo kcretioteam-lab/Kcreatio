@@ -92,4 +92,36 @@ router.post('/scanner', authenticate, validateBody(UploadSignatureSchema), async
   res.json({ url: urlData.publicUrl, path: fileName });
 });
 
+// ── Documents (Form 16A, expense receipts) ────────────────────────────────────
+// Stored by path only. Never exposed as public URLs — the app asks for a short-lived signed link.
+const DocumentSchema = z.object({
+  kind: z.enum(['form16a', 'receipt']),
+  fileBase64: z.string().min(10),
+  mimeType: z.enum(['application/pdf', 'image/png', 'image/jpeg', 'image/webp']),
+});
+const MAX_DOC_BYTES = 4 * 1024 * 1024;
+const EXT: Record<string, string> = { 'application/pdf': 'pdf', 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp' };
+
+router.post('/document', authenticate, validateBody(DocumentSchema), async (req: AuthRequest, res: Response): Promise<void> => {
+  const { kind, fileBase64, mimeType } = req.body;
+  const buffer = Buffer.from(fileBase64.replace(/^data:[^;]+;base64,/, ''), 'base64');
+  if (buffer.length > MAX_DOC_BYTES) {
+    res.status(422).json({ error: 'VALIDATION_ERROR', message: 'File must be under 4 MB', statusCode: 422 });
+    return;
+  }
+  const path = `${req.userId!}/docs/${kind}_${Date.now()}.${EXT[mimeType]}`;
+  const { error } = await supabase.storage.from('invoice-signatures').upload(path, buffer, { contentType: mimeType, upsert: false });
+  if (error) { res.status(500).json({ error: 'UPLOAD_FAILED', message: 'Couldn’t upload the file. Please try again.' }); return; }
+  res.json({ path });
+});
+
+router.get('/document-url', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
+  const path = String(req.query.path || '');
+  // Users can only open their own files
+  if (!path.startsWith(`${req.userId!}/docs/`) || path.includes('..')) { res.status(404).json({ error: 'NOT_FOUND', message: 'File not found' }); return; }
+  const { data, error } = await supabase.storage.from('invoice-signatures').createSignedUrl(path, 300);
+  if (error || !data) { res.status(404).json({ error: 'NOT_FOUND', message: 'File not found' }); return; }
+  res.json({ url: data.signedUrl });
+});
+
 export default router;

@@ -20,13 +20,15 @@ const ERRORS: Record<string, { status: number; message: string }> = {
   NOT_FOUND: { status: 404, message: 'Not found' },
   ALREADY_PAID: { status: 409, message: 'This is already marked as paid' },
   TDS_TOO_HIGH: { status: 422, message: 'TDS can’t be more than the taxable value' },
+  OVERPAID: { status: 422, message: 'That’s more than is still owed on this invoice' },
 };
 
-// Marks an invoice or deal paid in one DB transaction (see migration 016):
-// status → paid, one income row on the taxable value, one TDS row if any was deducted.
+// Records a payment against an invoice (full or part — migration 018) or marks a deal paid,
+// in one DB transaction: income on the taxable value (pro-rated for part payments), TDS if deducted,
+// and status → paid once the invoice is fully settled.
 export async function markPaid(kind: 'invoice' | 'deal', userId: string, id: string, body: MarkPaidBody): Promise<Result> {
   const date = new Date(body.paymentDate + 'T00:00:00');
-  const { data, error } = await supabase.rpc(kind === 'invoice' ? 'mark_invoice_paid' : 'mark_deal_paid', {
+  const { data, error } = await supabase.rpc(kind === 'invoice' ? 'record_invoice_payment' : 'mark_deal_paid', {
     p_user_id: userId,
     [kind === 'invoice' ? 'p_invoice_id' : 'p_deal_id']: id,
     p_payment_date: body.paymentDate,
@@ -60,7 +62,7 @@ export async function recordDetectedPayment(
   let invoice: { id: string; total_amount: number; base_amount: number } | undefined;
   if (preferredInvoiceId) {
     const { data } = await supabase.from('invoices').select('id, total_amount, base_amount')
-      .eq('id', preferredInvoiceId).eq('user_id', userId).in('status', ['draft', 'sent', 'overdue']).maybeSingle();
+      .eq('id', preferredInvoiceId).eq('user_id', userId).in('status', ['draft', 'sent', 'overdue', 'partially_paid']).maybeSingle();
     invoice = data ?? undefined;
   } else {
     const { data } = await supabase.from('invoices').select('id, total_amount, base_amount')

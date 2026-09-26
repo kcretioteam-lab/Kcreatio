@@ -17,6 +17,8 @@ import { useUsage } from '../hooks/useUsage.jsx';
 import { CURRENT_FY, PREVIOUS_FY as PREV_FY, getFinancialYear } from '../utils/financialYear.js';
 import { taxYearLabel, tdsSectionLabel } from '../utils/taxLabels.js';
 import { readCache, writeCache } from '../utils/listCache.js';
+import { uploadDocument, openDocument } from '../utils/documents.js';
+import InfoTip from '../components/ui/InfoTip.jsx';
 
 const FORM_16A_VARIANT = {
   received: 'success',
@@ -85,6 +87,24 @@ export default function TDSPage() {
       refreshUsage();
     } catch (err) { toast.error(getErrorMessage(err, 'Failed to add record')); }
     finally { setSaving(false); }
+  }
+
+  async function uploadForm16A(record, file) {
+    if (!file) return;
+    try {
+      const path = await uploadDocument(file, 'form16a');
+      await api.put(`/tds/${record.id}`, { form16aPath: path });
+      toast.success(`Form 16A saved for ${record.brand_name}`);
+      loadData();
+    } catch (err) { toast.error(err?.response ? getErrorMessage(err, 'Upload failed') : err.message); }
+  }
+
+  async function setInAis(record, value) {
+    try {
+      await api.put(`/tds/${record.id}`, { inAis: value });
+      setRecords(prev => prev.map(r => r.id === record.id ? { ...r, in_ais: value } : r));
+      loadData();
+    } catch (err) { toast.error(getErrorMessage(err, 'Couldn’t update')); }
   }
 
   async function updateStatus(id, status) {
@@ -177,11 +197,27 @@ export default function TDSPage() {
         </div>
       )}
 
+      {/* Before filing: every deduction should appear in Form 26AS / AIS */}
+      {!loading && summary?.ais && records.length > 0 && (
+        <div style={{ background: 'var(--surface)', border: `1px solid ${summary.ais.missing > 0 ? 'var(--danger)' : 'var(--border)'}`, borderRadius: 'var(--radius-lg)', padding: 'var(--space-4) var(--space-5)', marginBottom: 'var(--space-5)', display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+          <div style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: 'var(--text-sm)' }}>Before you file: match against Form 26AS / AIS <InfoTip term="ais" /></div>
+          <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)', margin: 0 }}>
+            Download your Annual Information Statement from the income-tax portal (Services → AIS) and tick each entry below that appears there.
+            TDS that isn’t in AIS can’t be claimed until the brand files its TDS return — chase them early.
+          </p>
+          <div style={{ display: 'flex', gap: 'var(--space-4)', flexWrap: 'wrap', fontSize: 'var(--text-sm)' }}>
+            <span style={{ color: 'var(--text-body)' }}>Not checked yet: <strong>{summary.ais.unchecked}</strong></span>
+            <span style={{ color: summary.ais.missing ? 'var(--danger-text)' : 'var(--text-body)' }}>Missing from AIS: <strong>{summary.ais.missing}</strong>{summary.ais.missing ? ` (${formatINR(summary.ais.missingAmount)})` : ''}</span>
+            {summary.byQuarter && <span style={{ color: 'var(--text-muted)' }}>By quarter: {summary.byQuarter.map(q => `${q.quarter} ${formatINR(q.amount)}`).join(' · ')}</span>}
+          </div>
+        </div>
+      )}
+
       {/* Table */}
       {loading ? (
         <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', overflow: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <tbody>{[1,2,3,4].map(i => <SkeletonTableRow key={i} cols={9} />)}</tbody>
+            <tbody>{[1,2,3,4].map(i => <SkeletonTableRow key={i} cols={10} />)}</tbody>
           </table>
         </div>
       ) : records.length === 0 ? (
@@ -241,7 +277,7 @@ export default function TDSPage() {
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ borderBottom: '1px solid var(--border)' }}>
-                {['Brand', 'TAN', 'Invoice Amt', 'TDS Rate', 'TDS Amt', 'Received', 'Date', 'Form 16A', 'Action'].map(h => (
+                {['Brand', 'TAN', 'Taxable', 'Rate', 'TDS', 'Received', 'Date', 'Qtr', 'Form 16A', 'In AIS?'].map(h => (
                   <th key={h} style={{ padding: 'var(--space-3) var(--space-4)', textAlign: 'left', fontSize: 'var(--text-xs)', fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{h}</th>
                 ))}
               </tr>
@@ -258,19 +294,33 @@ export default function TDSPage() {
                   <td style={{ padding: 'var(--space-3) var(--space-4)', fontSize: 'var(--text-sm)', color: 'var(--text-muted)' }}>{r.tds_rate}%</td>
                   <td style={{ padding: 'var(--space-3) var(--space-4)', fontSize: 'var(--text-sm)', fontVariantNumeric: 'tabular-nums', fontWeight: 700, color: 'var(--warning-text)' }}>{formatINR(r.tds_amount)}</td>
                   <td style={{ padding: 'var(--space-3) var(--space-4)', fontSize: 'var(--text-sm)', fontVariantNumeric: 'tabular-nums', color: 'var(--success-text)' }}>{formatINR(r.received_amount)}</td>
-                  <td style={{ padding: 'var(--space-3) var(--space-4)', fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>{format(new Date(r.payment_date), 'd MMM yyyy')}</td>
+                  <td style={{ padding: 'var(--space-3) var(--space-4)', fontSize: 'var(--text-xs)', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{format(new Date(r.payment_date), 'd MMM yyyy')}</td>
+                  <td style={{ padding: 'var(--space-3) var(--space-4)', fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>{r.quarter || '—'}</td>
                   <td style={{ padding: 'var(--space-3) var(--space-4)' }}>
-                    <Badge variant={FORM_16A_VARIANT[r.form_16a_status] || 'muted'}>{FORM_16A_LABEL[r.form_16a_status]}</Badge>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-start' }}>
+                      <Badge variant={FORM_16A_VARIANT[r.form_16a_status] || 'muted'}>{FORM_16A_LABEL[r.form_16a_status]}</Badge>
+                      <div style={{ display: 'flex', gap: 'var(--space-2)', whiteSpace: 'nowrap' }}>
+                        {r.form_16a_url ? (
+                          <button onClick={() => openDocument(r.form_16a_url).catch(() => toast.error('Couldn’t open the file'))} style={{ fontSize: 'var(--text-xs)', color: 'var(--accent)', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline', padding: 0 }}>View</button>
+                        ) : (
+                          <label style={{ fontSize: 'var(--text-xs)', color: 'var(--accent)', cursor: 'pointer', textDecoration: 'underline' }}>
+                            Upload
+                            <input type="file" accept="application/pdf,image/png,image/jpeg,image/webp" onChange={e => uploadForm16A(r, e.target.files?.[0])} style={{ display: 'none' }} />
+                          </label>
+                        )}
+                        {r.form_16a_status === 'awaiting' && (
+                          <button onClick={() => updateStatus(r.id, 'requested')} style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline', padding: 0 }}>Mark requested</button>
+                        )}
+                      </div>
+                    </div>
                   </td>
                   <td style={{ padding: 'var(--space-3) var(--space-4)' }}>
-                    {r.form_16a_status !== 'received' && (
-                      <button
-                        onClick={() => updateStatus(r.id, r.form_16a_status === 'awaiting' ? 'requested' : 'received')}
-                        style={{ fontSize: 'var(--text-xs)', color: 'var(--accent)', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}
-                      >
-                        {r.form_16a_status === 'awaiting' ? 'Mark Requested' : 'Mark Received'}
-                      </button>
-                    )}
+                    <select aria-label={`Is ${r.brand_name}'s TDS in AIS?`} value={r.in_ais == null ? '' : String(r.in_ais)} onChange={e => setInAis(r, e.target.value === '' ? null : e.target.value === 'true')}
+                      style={{ padding: '2px 6px', background: 'var(--surface-2)', border: `1px solid ${r.in_ais === false ? 'var(--danger)' : 'var(--border)'}`, borderRadius: 'var(--radius-sm)', color: 'var(--text-primary)', fontFamily: 'inherit', fontSize: 'var(--text-xs)' }}>
+                      <option value="">Not checked</option>
+                      <option value="true">✓ Yes</option>
+                      <option value="false">✗ Missing</option>
+                    </select>
                   </td>
                 </tr>
               ))}

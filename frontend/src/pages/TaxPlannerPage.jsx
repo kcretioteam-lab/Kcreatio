@@ -12,6 +12,7 @@ import Modal from '../components/ui/Modal.jsx';
 import Input from '../components/ui/Input.jsx';
 import { TrendingUp, PartyPopper } from 'lucide-react';
 import PlanGate from '../components/ui/PlanGate.jsx';
+import InfoTip from '../components/ui/InfoTip.jsx';
 
 function getQuarterDueDate(quarter, fy) {
   const startYear = parseInt(fy.split('-')[0]);
@@ -108,7 +109,7 @@ export default function TaxPlannerPage() {
       <PlanGate feature="advance_tax_calculator">
       {/* Annual income estimate */}
       <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: 'var(--space-5)', marginBottom: 'var(--space-5)' }}>
-        <div style={{ fontSize: 'var(--text-xs)', fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 'var(--space-3)' }}>Annual Income Estimate</div>
+        <div style={{ fontSize: 'var(--text-xs)', fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 'var(--space-3)' }}>Annual Income Estimate <InfoTip term="advanceTax" /></div>
         {estimate && (
           <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-body)', marginBottom: 'var(--space-3)' }}>
             Based on {formatINR(estimate.ytdIncome)} logged this year, projecting {formatINR(estimate.projectedAnnual)} annual income.
@@ -166,7 +167,7 @@ export default function TaxPlannerPage() {
 
       {taxData?.presumptive && taxData.presumptive !== 'none' && (
         <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-body)', marginBottom: 'var(--space-3)' }}>
-          You use presumptive taxation, so all advance tax is due in one instalment by 15 March.
+          You use presumptive taxation, so all advance tax is due in one instalment by 15 March. <InfoTip term="presumptive" />
         </p>
       )}
 

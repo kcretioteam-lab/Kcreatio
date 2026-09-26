@@ -10,10 +10,11 @@ import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { useTheme } from '../App.jsx';
 import api, { getErrorMessage } from '../utils/api.js';
 import { formatINR, formatINRDecimal, amountInWords } from '../utils/formatINR.js';
-import { STATE_CODES, INDIAN_STATES, GST_RATES, gstinError, supplierStateCode, stateLabel } from '../utils/gst.js';
+import { STATE_CODES, INDIAN_STATES, GST_RATES, gstinError, supplierStateCode, stateLabel, FOREIGN_STATE_CODE } from '../utils/gst.js';
 import { tdsSectionLabel } from '../utils/taxLabels.js';
 import { CURRENT_FY } from '../utils/financialYear.js';
 import MarkPaidDialog from '../components/features/payment/MarkPaidDialog.jsx';
+import CreditNoteDialog from '../components/features/invoice/CreditNoteDialog.jsx';
 import Input from '../components/ui/Input.jsx';
 import Badge from '../components/ui/Badge.jsx';
 import Modal from '../components/ui/Modal.jsx';
@@ -28,17 +29,17 @@ const STATE_MAP = STATE_CODES;
 // equals place of supply. Mirrors calculateInvoiceTotals in backend/src/services/invoiceService.ts.
 function calcGSTMulti(form, supplierState) {
   const lines = form.serviceLines || [{ amount: form.baseAmount, gstRate: form.gstRate }];
-  const pos = form.placeOfSupply || form.brandStateCode;
-  const isIntra = Boolean(supplierState && pos && supplierState === pos);
+  const pos = form.isExport ? FOREIGN_STATE_CODE : form.placeOfSupply || form.brandStateCode;
+  const isIntra = Boolean(!form.isExport && supplierState && pos && supplierState === pos);
 
   let subtotalPaise = 0;
   let totalGstPaise = 0;
   const lineCalcs = lines.map(line => {
     const basePaise = Math.round((parseFloat(line.amount) || 0) * 100);
-    const rate = parseInt(line.gstRate || form.gstRate || 18) / 100;
+    const rate = form.isExport ? 0 : parseInt(line.gstRate || form.gstRate || 18) / 100;
     const gstPaise = Math.round(basePaise * rate);
     subtotalPaise += basePaise;
-    return { base: basePaise / 100, gstRate: parseInt(line.gstRate || form.gstRate || 18), gstAmount: gstPaise / 100 };
+    return { base: basePaise / 100, gstRate: form.isExport ? 0 : parseInt(line.gstRate || form.gstRate || 18), gstAmount: gstPaise / 100 };
   });
 
   // Apply discount to subtotal before GST
@@ -72,7 +73,7 @@ function calcGSTMulti(form, supplierState) {
     total: (totalBasePaise + totalGstPaise) / 100,
     subtotal: subtotalPaise / 100,
     discountAmount: discountPaise / 100,
-    supplyType: isIntra ? 'intrastate' : 'interstate',
+    supplyType: form.isExport ? 'export' : isIntra ? 'intrastate' : 'interstate',
     cgst: isIntra ? cgstPaise / 100 : 0,
     sgst: isIntra ? (totalGstPaise - cgstPaise) / 100 : 0,
     igst: !isIntra ? totalGstPaise / 100 : 0,
@@ -82,6 +83,7 @@ function calcGSTMulti(form, supplierState) {
 
 // Keep old single-line calc for backward compat
 function gstRows(calc) {
+  if (calc.supplyType === 'export') return [['IGST', 'Nil — export under LUT']];
   const byRate = {};
   for (const l of calc.lines || []) {
     byRate[l.gstRate] = (byRate[l.gstRate] || 0) + Math.round(l.gstAmount * 100);
@@ -184,6 +186,8 @@ const EMPTY_FORM = {
   invoiceDate: format(new Date(), 'yyyy-MM-dd'),
   dueDate: format(addDays(new Date(), 30), 'yyyy-MM-dd'),
   placeOfSupply: '', reverseCharge: 'No', notes: '',
+  // Export to a foreign client (zero-rated under LUT), reminders to the brand, recurring
+  isExport: false, exportCurrency: 'USD', remindersEnabled: false, recurring: '',
   paymentTerms: 'Net 30', templateId: 'classic',
   purchaseOrderNumber: '',
   discountValue: '', discountType: 'flat',
@@ -209,8 +213,9 @@ function getErrors(form, user) {
   if (user && !supplierStateCode(user))                    e.supplierState = 'Add your GSTIN (or state) in Settings → Tax Profile';
   if (!form.brandName.trim())                              e.brandName = 'Brand name is required';
   if (!form.brandAddress.trim())                           e.brandAddress = 'Brand address is mandatory on GST invoice';
-  if (!form.brandStateCode)                                e.brandStateCode = 'Brand state is required';
-  if (!form.placeOfSupply)                                 e.placeOfSupply = 'Place of supply is mandatory per GST law (Rule 46)';
+  if (!form.isExport && !form.brandStateCode)             e.brandStateCode = 'Brand state is required';
+  if (!form.isExport && !form.placeOfSupply)              e.placeOfSupply = 'Place of supply is mandatory per GST law (Rule 46)';
+  if (form.isExport && user && !user.lut_number)          e.isExport = 'Add your LUT reference in Settings → Tax Profile first';
   if (form.brandGstin && gstinError(form.brandGstin))    e.brandGstin = gstinError(form.brandGstin);
   if (form.brandGstin && !gstinError(form.brandGstin) && form.brandStateCode && form.brandGstin.slice(0, 2) !== form.brandStateCode) {
     e.brandGstin = `GSTIN state code (${form.brandGstin.slice(0, 2)}) does not match selected brand state (${form.brandStateCode})`;
@@ -1236,6 +1241,13 @@ export default function InvoicePage({ initialView }) {
       signatoryName: inv.signatory_name||'',
       signatoryImageUrl: inv.signatory_image_url||null,
       invoiceAccentColor: inv.invoice_accent_color||'',
+      isExport: Boolean(inv.is_export), exportCurrency: inv.export_currency || 'USD',
+      remindersEnabled: Boolean(inv.reminders_enabled), recurring: inv.recurring || '',
+      dealId: inv.deal_id || null,
+      // Keep every line of multi-line invoices when editing
+      ...(Array.isArray(inv.line_items) && inv.line_items.length ? {
+        serviceLines: inv.line_items.map(l => ({ description: l.description, sacCode: l.sacCode || '998399', amount: String(l.amount), gstRate: String(l.gstRate) })),
+      } : {}),
     });
     api.get(`/invoices/${editId}`)
       .then(res => { setForm(buildForm(res.data)); setNextNumber(res.data.invoice_number || ''); })
@@ -1351,6 +1363,10 @@ export default function InvoicePage({ initialView }) {
           gstRate: parseInt(l.gstRate || form.gstRate || 18, 10),
         })),
         dealId: form.dealId || undefined,
+        isExport: form.isExport,
+        exportCurrency: form.isExport ? form.exportCurrency : undefined,
+        remindersEnabled: form.remindersEnabled,
+        recurring: form.recurring || null,
         gstRate: payload.gst_rate, invoiceDate: payload.invoice_date, dueDate: payload.due_date,
         notes: payload.notes, sacCode: payload.sac_code, placeOfSupply: payload.place_of_supply,
         reverseCharge: payload.reverse_charge, templateId: payload.template_id,
@@ -1476,10 +1492,21 @@ export default function InvoicePage({ initialView }) {
     setPayingInvoice(inv);
   }
 
+  const [creditInvoice, setCreditInvoice] = useState(null);
+  async function handleCreditNoteDone(note) {
+    setCreditInvoice(null);
+    toast.success(`Credit note ${note.credit_note_number} created`);
+    loadInvoices();
+    try {
+      const res = await api.get(`/credit-notes/${note.id}/pdf`, { responseType: 'blob', timeout: 90000 });
+      await savePdfBlob(new Blob([res.data], { type: res.headers?.['content-type'] || 'application/pdf' }), `${note.credit_note_number.replace(/\//g, '-')}.pdf`);
+    } catch { /* the credit note exists; the PDF can be downloaded later */ }
+  }
+
   async function recordInvoicePayment(body) {
     await api.post(`/invoices/${payingInvoice.id}/mark-paid`, body);
     const fy = CURRENT_FY;
-    toast.success(`${payingInvoice.invoice_number} marked paid · income${body.tdsDeducted > 0 ? ' and TDS' : ''} logged for ${fy}`);
+    toast.success(`${payingInvoice.invoice_number}: payment recorded · income${body.tdsDeducted > 0 ? ' and TDS' : ''} logged for ${fy}`);
     setPayingInvoice(null);
     loadInvoices();
   }
@@ -1704,6 +1731,34 @@ export default function InvoicePage({ initialView }) {
               <SField id="reverseCharge" label="Reverse Charge" value={form.reverseCharge} onChange={e => update('reverseCharge', e.target.value)} tooltip="Reverse charge means the recipient (brand) pays GST instead of supplier. Very rare for creator invoices — select 'No' unless specifically instructed by your CA.">
                 <option value="No">No — Normal (creator charges GST)</option>
                 <option value="Yes">Yes — Reverse charge applicable</option>
+              </SField>
+              <label style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'flex-start', fontSize: 'var(--text-sm)', color: 'var(--text-primary)', cursor: 'pointer', marginTop: 'var(--space-3)' }}>
+                <input type="checkbox" checked={form.isExport} onChange={e => { const on = e.target.checked; setForm(p => ({ ...p, isExport: on, ...(on ? { brandStateCode: FOREIGN_STATE_CODE, placeOfSupply: FOREIGN_STATE_CODE } : { brandStateCode: '', placeOfSupply: '' }) })); }} style={{ marginTop: 3 }} />
+                <span>Foreign client (export of services)
+                  <span style={{ display: 'block', fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>
+                    {user?.lut_number ? `No IGST charged — issued under your LUT ${user.lut_number}.` : 'Needs an LUT reference in Settings → Tax Profile.'}
+                  </span>
+                </span>
+              </label>
+              {form.isExport && (
+                <SField id="exportCurrency" label="Billing currency" value={form.exportCurrency} onChange={e => update('exportCurrency', e.target.value)}>
+                  {['USD', 'EUR', 'GBP', 'AED', 'SGD', 'AUD', 'CAD'].map(c => <option key={c} value={c}>{c}</option>)}
+                </SField>
+              )}
+              {formErrors.isExport && <p role="alert" style={{ color: 'var(--danger-text)', fontSize: 'var(--text-xs)', margin: 'var(--space-1) 0 0' }}>{formErrors.isExport}</p>}
+            </Sect>
+
+            <Sect title="After sending">
+              <label style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'flex-start', fontSize: 'var(--text-sm)', color: 'var(--text-primary)', cursor: 'pointer' }}>
+                <input type="checkbox" checked={form.remindersEnabled} onChange={e => update('remindersEnabled', e.target.checked)} style={{ marginTop: 3 }} />
+                <span>Email the brand a polite reminder if it’s unpaid after the due date
+                  <span style={{ display: 'block', fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>Up to 3 reminders, a week apart. Needs the brand’s email.</span>
+                </span>
+              </label>
+              <SField id="recurring" label="Repeat this invoice" value={form.recurring} onChange={e => update('recurring', e.target.value)} tooltip="For retainers: Kcretio drafts the next invoice on the same date and emails you to review and send it.">
+                <option value="">Don’t repeat</option>
+                <option value="monthly">Every month</option>
+                <option value="quarterly">Every quarter</option>
               </SField>
             </Sect>
 
@@ -2389,6 +2444,7 @@ export default function InvoicePage({ initialView }) {
           <option value="all">All statuses</option>
           <option value="draft">Draft</option>
           <option value="sent">Sent</option>
+          <option value="partially_paid">Part paid</option>
           <option value="paid">Paid</option>
           <option value="overdue">Overdue</option>
         </select>
@@ -2399,14 +2455,21 @@ export default function InvoicePage({ initialView }) {
         onClose={() => setPayingInvoice(null)}
         title={payingInvoice ? `Mark ${payingInvoice.invoice_number} as paid` : ''}
         brandName={payingInvoice?.brand_name}
-        taxableValue={Number(payingInvoice?.base_amount || 0)}
-        total={Number(payingInvoice?.total_amount || 0)}
+        // For a part-paid invoice, suggest the balance (pro-rated taxable value)
+        taxableValue={(() => {
+          const total = Number(payingInvoice?.total_amount || 0);
+          const left = Math.max(0, total - Number(payingInvoice?.amount_received || 0));
+          return total > 0 ? Math.round(Number(payingInvoice?.base_amount || 0) * (left / total) * 100) / 100 : 0;
+        })()}
+        total={Math.max(0, Number(payingInvoice?.total_amount || 0) - Number(payingInvoice?.amount_received || 0))}
         onSubmit={recordInvoicePayment}
       />
 
+      <CreditNoteDialog invoice={creditInvoice} onClose={() => setCreditInvoice(null)} onDone={handleCreditNoteDone} />
+
       <InvoiceList
         invoices={invoices} loading={listLoading}
-        onDownload={handleDownloadFromList} onExportJson={handleExportJson} onDelete={handleDelete} onMarkPaid={handleMarkPaid} onRefresh={loadInvoices}
+        onDownload={handleDownloadFromList} onExportJson={handleExportJson} onDelete={handleDelete} onMarkPaid={handleMarkPaid} onCreditNote={setCreditInvoice} onRefresh={loadInvoices}
         sortCol={sortCol} sortDir={sortDir}
         isFiltered={!!debouncedSearch || filterStatus !== 'all'}
         onSort={(col) => {
@@ -2630,7 +2693,7 @@ function ClassicPreview({ form, calc, invoiceNumber, user, template }) {
         {form.placeOfSupply && (
           <div style={{ marginBottom: 14, padding: '5px 8px', background: '#f5f5f5', borderRadius: 5, fontSize: 10, color: '#555' }}>
             <strong>Place of Supply:</strong> {STATE_MAP[form.placeOfSupply] || form.placeOfSupply} ({form.placeOfSupply}) &nbsp;·&nbsp;
-            <strong>Type:</strong> {calc.supplyType === 'intrastate' ? 'Intrastate' : 'Interstate'}
+            <strong>Type:</strong> {calc.supplyType === 'intrastate' ? 'Intrastate' : calc.supplyType === 'export' ? 'Export (LUT, no IGST)' : 'Interstate'}
           </div>
         )}
 

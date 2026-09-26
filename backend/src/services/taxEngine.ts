@@ -146,3 +146,19 @@ export function quickTaxEstimate(monthlyIncome: number, brandCount = 1) {
     : `~${lateCount} of ${brandCount} brand${lateCount !== 1 ? 's' : ''} likely late`;
   return { annual, estimatedTds, incomeTax: r.totalTax, advanceTaxOwed: r.netPayable, itrRefund: r.refund, q2Due, form16aRisk };
 }
+
+// First-year depreciation on assets bought this tax year (written-down-value rates).
+// Half the rate applies when the asset is used for less than 180 days in the year
+// (bought after about 2 October). Later years' depreciation isn't tracked yet. PENDING CA SIGN-OFF.
+export const DEPRECIATION_RATES: Record<string, number> = {
+  computer: 0.40, camera_equipment: 0.15, furniture: 0.10, vehicle: 0.15, other: 0.15,
+};
+
+export function firstYearDepreciation(assets: { amount: number; assetClass?: string | null; purchaseDate: string }[], fyStartYear: number): number {
+  const fyEnd = Date.UTC(fyStartYear + 1, 2, 31);
+  return Math.round(assets.reduce((sum, a) => {
+    const rate = DEPRECIATION_RATES[a.assetClass || 'other'] ?? DEPRECIATION_RATES.other;
+    const daysUsed = Math.floor((fyEnd - Date.parse(a.purchaseDate + 'T00:00:00Z')) / 86400000) + 1;
+    return sum + a.amount * rate * (daysUsed < 180 ? 0.5 : 1);
+  }, 0));
+}

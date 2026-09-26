@@ -2,8 +2,14 @@ import { NavLink } from 'react-router-dom';
 import {
   LayoutDashboard, FileText, IndianRupee, Calculator,
   Briefcase, TrendingUp, Receipt, Settings,
-  ChevronLeft, ChevronRight,
+  ChevronLeft, ChevronRight, MessageCircle,
 } from 'lucide-react';
+
+// WhatsApp support number in international format without '+', e.g. 919876543210
+const SUPPORT_WHATSAPP = import.meta.env.VITE_SUPPORT_WHATSAPP;
+const SUPPORT_HREF = SUPPORT_WHATSAPP
+  ? `https://wa.me/${SUPPORT_WHATSAPP}?text=${encodeURIComponent('Hi Kcretio team, I need help with ')}`
+  : 'mailto:support@kcretio.in';
 import { useAuth } from '../../hooks/useAuth.jsx';
 import LogoMark from '../ui/LogoMark.jsx';
 
@@ -117,6 +123,15 @@ export default function Sidebar({ collapsed, onToggle }) {
               <Settings size={16} aria-hidden="true" style={{ flexShrink: 0 }} />
               {!collapsed && <span>Settings</span>}
             </NavLink>
+          </li>
+          <li>
+            <a href={SUPPORT_HREF} target="_blank" rel="noopener noreferrer" title={collapsed ? 'Help' : undefined}
+              style={navStyle({ isActive: false, collapsed })}
+              onMouseEnter={e => { e.currentTarget.style.background = 'var(--surface-2)'; }}
+              onMouseLeave={e => { e.currentTarget.style.background = ''; }}>
+              <MessageCircle size={16} aria-hidden="true" style={{ flexShrink: 0 }} />
+              {!collapsed && <span>{SUPPORT_WHATSAPP ? 'Help on WhatsApp' : 'Help'}</span>}
+            </a>
           </li>
         </ul>
       </nav>

@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase.js';
 import { sendAdvanceTaxReminder } from '../services/emailService.js';
 import { scanInbox } from '../services/gmailService.js';
 import { hasFeature } from '../config/plans.js';
+import { startInvoiceJobs } from './invoiceJobs.js';
 import { recordDetectedPayment } from '../services/paymentService.js';
 import { getFinancialYear } from '../services/invoiceService.js';
 
@@ -82,7 +83,7 @@ export function startInvoiceOverdueJob() {
       const { error } = await supabase
         .from('invoices')
         .update({ status: 'overdue' })
-        .eq('status', 'sent')
+        .in('status', ['sent', 'partially_paid'])
         .lt('due_date', today)
         .not('due_date', 'is', null);
 
@@ -241,5 +242,6 @@ export function startAllJobs() {
   startAdvanceTaxReminderJob();
   startInvoiceOverdueJob();
   startGmailScanJob();
-  console.log('[JOBS] Advance tax, invoice overdue, and Gmail scan jobs started');
+  startInvoiceJobs();
+  console.log('[JOBS] Advance tax, invoice overdue, payment reminder, recurring invoice and Gmail scan jobs started');
 }

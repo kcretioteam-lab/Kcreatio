@@ -175,3 +175,26 @@ export async function sendNewDeviceEmail(to: string, name: string, opts: { devic
     </div>`;
   await send(to, 'New sign-in to your Kcretio account', html);
 }
+
+export async function sendPaymentReminderEmail(to: string, opts: { brandName: string; creatorName: string; invoiceNumber: string; amountDue: string; dueDate: string; daysOverdue: number; replyTo?: string }) {
+  const html = `
+    <div style="font-family:Inter,Arial,sans-serif;max-width:520px;margin:0 auto;padding:32px;background:#ffffff;color:#1a1a1a;border:1px solid #e5e7eb;border-radius:12px;">
+      <h2 style="font-size:18px;font-weight:600;margin:0 0 12px;">Payment reminder: invoice ${opts.invoiceNumber}</h2>
+      <p style="margin:0 0 12px;">Hello ${opts.brandName} team,</p>
+      <p style="margin:0 0 12px;">This is a friendly reminder that invoice <strong>${opts.invoiceNumber}</strong> from <strong>${opts.creatorName}</strong> for <strong>${opts.amountDue}</strong> was due on ${opts.dueDate}${opts.daysOverdue > 0 ? ` (${opts.daysOverdue} day${opts.daysOverdue === 1 ? '' : 's'} ago)` : ''}.</p>
+      <p style="margin:0 0 12px;">If you've already paid, thank you — please ignore this email. When paying, please share the TDS deducted and the Form 16A so it can be claimed.</p>
+      <p style="margin:0;color:#6b7280;font-size:12px;">Sent on behalf of ${opts.creatorName} by Kcretio${opts.replyTo ? ` · reply to ${opts.replyTo}` : ''}.</p>
+    </div>`;
+  await send(to, `Reminder: invoice ${opts.invoiceNumber} from ${opts.creatorName}`, html);
+}
+
+export async function sendRecurringDraftEmail(to: string, name: string, invoiceNumber: string, brandName: string, invoiceId: string) {
+  const html = `
+    <div style="font-family:Inter,sans-serif;max-width:480px;margin:0 auto;padding:32px;background:#07080F;color:#F0F1F8;border-radius:12px;">
+      <div style="font-size:22px;font-weight:700;margin-bottom:8px;color:#E8921A;">Kcretio</div>
+      <h2 style="font-size:18px;font-weight:600;margin:0 0 8px;">Your recurring invoice is ready</h2>
+      <p style="color:#94a3b8;margin:0 0 24px;">Hi ${name}, we've drafted ${invoiceNumber} for ${brandName}. Check it and send it when you're ready.</p>
+      <a href="${getFrontendUrl()}/invoices/${invoiceId}/edit" style="display:inline-block;background:#E8921A;color:#fff;font-weight:700;padding:14px 32px;border-radius:8px;text-decoration:none;">Review draft</a>
+    </div>`;
+  await send(to, `Recurring invoice ${invoiceNumber} is ready to send`, html);
+}

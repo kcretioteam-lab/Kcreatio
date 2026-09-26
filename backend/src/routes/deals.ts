@@ -2,6 +2,7 @@ import { Router, Response } from 'express';
 import { z } from 'zod';
 import { supabase } from '../lib/supabase.js';
 import { authenticate, AuthRequest } from '../middleware/auth.js';
+import { partialWithoutDefaults } from '../lib/zodUtils.js';
 import { validateBody } from '../middleware/validateBody.js';
 import { markPaid, MarkPaidSchema } from '../services/paymentService.js';
 import { logInvoiceEvent } from '../services/auditLog.js';
@@ -13,6 +14,9 @@ const DealSchema = z.object({
   brandName: z.string().min(1).max(200).trim(),
   brandContactEmail: z.string().email().optional().or(z.literal('')),
   dealValue: z.number().positive().max(9999999),
+  // Barter: paid in products instead of cash. marketValue = what those products sell for.
+  dealType: z.enum(['cash', 'barter']).default('cash'),
+  marketValue: z.number().positive().max(9999999).optional(),
   status: z.enum(['inquiry', 'negotiating', 'active', 'delivered', 'invoiced', 'paid', 'rejected']).default('inquiry'),
   niche: z.string().max(100).optional(),
   deliverables: z.string().max(1000).optional(),
@@ -21,7 +25,7 @@ const DealSchema = z.object({
   notes: z.string().max(1000).optional(),
 });
 
-const UpdateDealSchema = DealSchema.partial();
+const UpdateDealSchema = partialWithoutDefaults(DealSchema);
 
 // GET /deals
 router.get('/', async (req: AuthRequest, res: Response): Promise<void> => {
@@ -72,6 +76,8 @@ router.post('/', validateBody(DealSchema), async (req: AuthRequest, res: Respons
       brand_name: body.brandName,
       brand_contact_email: body.brandContactEmail || null,
       deal_value: body.dealValue,
+      deal_type: body.dealType,
+      market_value: body.dealType === 'barter' ? body.marketValue ?? body.dealValue : null,
       status: body.status,
       niche: body.niche || null,
       deliverables: body.deliverables || null,
@@ -97,6 +103,8 @@ router.put('/:id', validateBody(UpdateDealSchema), async (req: AuthRequest, res:
   if (body.brandName !== undefined) updates.brand_name = body.brandName;
   if (body.brandContactEmail !== undefined) updates.brand_contact_email = body.brandContactEmail || null;
   if (body.dealValue !== undefined) updates.deal_value = body.dealValue;
+  if (body.dealType !== undefined) updates.deal_type = body.dealType;
+  if (body.marketValue !== undefined) updates.market_value = body.marketValue;
   if (body.status === 'paid') {
     res.status(422).json({ error: 'USE_MARK_PAID', message: 'Use “Mark paid” so the income and TDS are recorded.' });
     return;
@@ -139,7 +147,7 @@ router.post('/:id/mark-paid', validateBody(MarkPaidSchema), async (req: AuthRequ
     .select('id')
     .eq('deal_id', deal.id)
     .eq('user_id', req.userId!)
-    .in('status', ['draft', 'sent', 'overdue'])
+    .in('status', ['draft', 'sent', 'overdue', 'partially_paid'])
     .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle();

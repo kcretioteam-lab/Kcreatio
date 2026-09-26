@@ -12,7 +12,7 @@ export const STATE_CODES: Record<string, string> = {
   '28': 'Andhra Pradesh (old)', '29': 'Karnataka', '30': 'Goa',
   '31': 'Lakshadweep', '32': 'Kerala', '33': 'Tamil Nadu', '34': 'Puducherry',
   '35': 'Andaman & Nicobar Islands', '36': 'Telangana', '37': 'Andhra Pradesh', '38': 'Ladakh',
-  '97': 'Other Territory',
+  '96': 'Foreign country', '97': 'Other Territory',
 };
 
 // GST rates after the September 2025 rationalisation. 12% and 28% were removed;
@@ -20,6 +20,7 @@ export const STATE_CODES: Record<string, string> = {
 export const GST_RATES = [0, 5, 18, 40] as const;
 export const LEGACY_GST_RATES = [12, 28] as const;
 export const DEFAULT_GST_RATE = 18;
+export const FOREIGN_STATE_CODE = '96'; // place of supply for exports in GST returns
 
 export const GSTIN_REGEX = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
 export const PAN_REGEX = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;

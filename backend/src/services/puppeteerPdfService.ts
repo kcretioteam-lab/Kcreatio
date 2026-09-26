@@ -87,6 +87,9 @@ export interface InvoiceForPdf {
   seller_business_name?: string | null;
   template_id?: string | null;
   invoice_accent_color?: string | null;
+  is_export?: boolean | null;
+  export_currency?: string | null;
+  lut_number?: string | null;
 }
 
 export interface UserForPdf {
@@ -212,7 +215,8 @@ function buildInvoiceHtml(inv: InvoiceForPdf, user: UserForPdf, plan?: string): 
       ${inv.brand_state_code ? `<div class="party-detail">State: ${esc(STATE_MAP[inv.brand_state_code] || '')} | Code: ${esc(inv.brand_state_code)}</div>` : ''}
     </div>
   </div>
-  ${placeOfSupply ? `<div class="pos"><strong>Place of Supply:</strong> ${esc(STATE_MAP[placeOfSupply] || placeOfSupply)} (${esc(placeOfSupply)}) &nbsp;·&nbsp; <strong>Supply Type:</strong> ${inv.supply_type === 'intrastate' ? 'Intrastate (CGST + SGST)' : 'Interstate (IGST)'}</div>` : ''}
+  ${placeOfSupply ? `<div class="pos"><strong>Place of Supply:</strong> ${esc(STATE_MAP[placeOfSupply] || placeOfSupply)} (${esc(placeOfSupply)}) &nbsp;·&nbsp; <strong>Supply Type:</strong> ${inv.supply_type === 'intrastate' ? 'Intrastate (CGST + SGST)' : inv.supply_type === 'export' ? 'Export of services' : 'Interstate (IGST)'}</div>` : ''}
+  ${inv.is_export ? `<div class="pos"><strong>Supply meant for export under LUT without payment of IGST</strong>${inv.lut_number ? ` &nbsp;·&nbsp; LUT No. ${esc(inv.lut_number)}` : ''}${inv.export_currency ? ` &nbsp;·&nbsp; Billing currency: ${esc(inv.export_currency)}` : ''}</div>` : ''}
   <table>
     <thead><tr>
       <th>Description of Services</th><th>SAC/HSN</th><th>GST Rate</th><th class="r">Taxable Value</th>
@@ -229,7 +233,7 @@ function buildInvoiceHtml(inv: InvoiceForPdf, user: UserForPdf, plan?: string): 
   <div class="totals">
     ${discountAmount > 0 ? `<div class="trow"><span>Subtotal</span><span>${inr(subtotal)}</span></div><div class="trow" style="color:#c0392b"><span>Less: Discount${inv.discount_type==='percent'?` (${inv.discount_value}%)`:''}</span><span>−${inr(discountAmount)}</span></div>` : ''}
     <div class="trow"><span>Taxable Value</span><span>${inr(inv.base_amount)}</span></div>
-    ${gstByRate.map(g => inv.supply_type === 'intrastate' ? `
+    ${inv.supply_type === 'export' ? '<div class="trow"><span>IGST</span><span>Nil (export under LUT)</span></div>' : gstByRate.map(g => inv.supply_type === 'intrastate' ? `
     <div class="trow"><span>Add: CGST @ ${g.rate / 2}%${gstByRate.length > 1 ? ` on ${inr(g.taxable)}` : ''}</span><span>${inr(g.gst / 2)}</span></div>
     <div class="trow"><span>Add: SGST @ ${g.rate / 2}%${gstByRate.length > 1 ? ` on ${inr(g.taxable)}` : ''}</span><span>${inr(g.gst / 2)}</span></div>
     ` : `<div class="trow"><span>Add: IGST @ ${g.rate}%${gstByRate.length > 1 ? ` on ${inr(g.taxable)}` : ''}</span><span>${inr(g.gst)}</span></div>`).join('')}
