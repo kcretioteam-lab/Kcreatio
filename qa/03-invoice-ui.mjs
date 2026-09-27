@@ -178,6 +178,29 @@ try {
     return { notes: `UI save → 201 ${j.invoice_number}; DB total ₹1,77,000, template ${row.template_id}, ${row.line_items?.length} lines, CGST ${row.cgst_amount} / SGST ${row.sgst_amount}`, evidence: { sh } };
   });
 
+  await check('INV-12', async () => {
+    const p = await watchedPage(ctx);
+    await openNew(p);
+    const field = sac(p);
+    await field.click(); await p.keyboard.press('Control+A');
+    await field.pressSequentially('99ab!83991234', { delay: 5 });
+    const typed = await field.inputValue();
+    await field.click(); await p.keyboard.press('Control+A'); await p.keyboard.press('Backspace');
+    await field.blur();
+    await p.waitForTimeout(300);
+    const cleared = await field.inputValue();
+    const body = await p.locator('body').innerText();
+    const states = await p.locator('#brandState option').evaluateAll(os => os.map(o => o.value).filter(Boolean));
+    const sh = await shot(p, 'inv12-sac');
+    await p.close();
+    eq(typed, '998399', 'letters/symbols stripped and capped at 6 digits');
+    eq(cleared, '', 'cleared field shows empty (no phantom default)');
+    expect(/SAC code is required/.test(body), 'no visible message for an empty SAC');
+    const sorted = [...states].sort();
+    expect(states.join() === sorted.join(), `state list not in code order: ${states.slice(0, 5)} … ${states.slice(-5)}`);
+    return { notes: `SAC input "99ab!83991234" → "${typed}"; clearing shows "" + "SAC code is required"; state picker in code order (${states[0]} … ${states.at(-1)})`, evidence: { sh } };
+  });
+
   await check('SEC-01', async () => {
     const p2 = await watchedPage(ctx);
     await p2.goto(APP + '/invoices', { waitUntil: 'networkidle' });

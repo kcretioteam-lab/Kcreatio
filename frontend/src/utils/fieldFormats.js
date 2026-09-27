@@ -19,6 +19,7 @@ export function limitText(v, max) {
 export const textLimitMessage = (max) => `Up to ${max} characters, and no word longer than ${MAX_WORD} characters`;
 
 export const TAN_REGEX = /^[A-Z]{4}[0-9]{5}[A-Z]$/;
+export const SAC_REGEX = /^99\d{4}$/;
 export const IFSC_REGEX = /^[A-Z]{4}0[A-Z0-9]{6}$/;
 export const MOBILE_REGEX = /^(?:\+?91|0)?[6-9]\d{9}$/;
 export const UPI_REGEX = /^[a-zA-Z0-9._-]{2,256}@[a-zA-Z][a-zA-Z0-9]{1,63}$/;
@@ -65,6 +66,12 @@ export const FORMATS = {
       const digits = v.replace(/\D/g, '').length;
       return digits >= 8 && digits <= 15 ? null : 'Enter a valid phone number (8–15 digits)';
     },
+  },
+  // SAC (services accounting code): 6 digits, all services codes are in chapter 99 — e.g. 998399
+  sac: {
+    inputMode: 'numeric',
+    clean: (v) => v.replace(/\D/g, '').slice(0, 6),
+    validate: (v) => (SAC_REGEX.test(v) ? null : 'SAC is 6 digits starting with 99, like 998399'),
   },
   account: {
     inputMode: 'numeric',

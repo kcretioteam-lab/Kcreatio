@@ -143,6 +143,8 @@ Priority: **P1** = money/tax correctness, security, or data loss; **P2** = core 
 | SEC-08 | P1 | Invoice email HTML | User-controlled fields are HTML-escaped in outbound email (code review) |
 | ACC-DEL | P1 | Delete account | All rows and uploaded files removed |
 | UI-SWEEP-desktop / -mobile | P2 | All 9 app pages at 1440 px and 390 px | No console/page errors, failed calls or horizontal overflow |
+| UI-SWEEP-basic-desktop / -mobile | P1 | Same sweep while the account is still on Basic | No calls to Pro/Starter-only endpoints (no 403s), no error toasts behind plan gates |
+| INB-ACCEPT-TDS | P1 | Accept the Form-16A-mentioning TDS email from INB-01 | TDS row ₹10,000 on ₹1,00,000 linked to the detection |
 
 ### 2.9 Cross-cutting UI checks (applied to every page visited)
 

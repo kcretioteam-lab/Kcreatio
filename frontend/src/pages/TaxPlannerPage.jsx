@@ -13,6 +13,8 @@ import Input from '../components/ui/Input.jsx';
 import { LIMITS, sanitizeNumber } from '../utils/limits.js';
 import { TrendingUp, PartyPopper } from 'lucide-react';
 import PlanGate from '../components/ui/PlanGate.jsx';
+import { useAuth } from '../hooks/useAuth.jsx';
+import { canAccess } from '../utils/planConfig.js';
 import InfoTip from '../components/ui/InfoTip.jsx';
 
 function getQuarterDueDate(quarter, fy) {
@@ -36,6 +38,8 @@ const EMPTY_ESTIMATE = computeTax({ grossReceipts: 0 });
 export default function TaxPlannerPage() {
   const toast = useToast();
   const isMobile = useIsMobile();
+  const { user } = useAuth();
+  const hasCalculator = canAccess('advance_tax_calculator', user?.plan);
   const [regime, setRegime] = useState('new');
   const [estimate, setEstimate] = useState(null);
   const [paidPayments, setPaidPayments] = useState([]);
@@ -44,9 +48,9 @@ export default function TaxPlannerPage() {
   const [payingQ, setPayingQ] = useState(null);
   const [payForm, setPayForm] = useState({ amountPaid: '', paidDate: '', challanNumber: '' });
   const [saving, setSaving] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(hasCalculator);   // Basic sees the PlanGate — nothing to load
 
-  useEffect(() => { loadData(); }, [regime, manualEstimate]);
+  useEffect(() => { if (hasCalculator) loadData(); }, [regime, manualEstimate, hasCalculator]);
 
   async function loadData() {
     setLoading(true);

@@ -6,6 +6,7 @@ import { authenticate, AuthRequest } from '../middleware/auth.js';
 import { partialWithoutDefaults } from '../lib/zodUtils.js';
 import { validateBody } from '../middleware/validateBody.js';
 import { getFrontendUrl } from '../lib/env.js';
+import { escapeHtml } from '../lib/html.js';
 import { markPaid, MarkPaidSchema } from '../services/paymentService.js';
 import { logInvoiceEvent } from '../services/auditLog.js';
 import { nextRecurringDate } from '../lib/dates.js';
@@ -490,7 +491,8 @@ router.get('/:id/pdf', pdfRateLimit, async (req: AuthRequest, res: Response): Pr
   if (!user) { res.status(404).json({ error: 'NOT_FOUND', message: 'User not found' }); return; }
 
   try {
-    const cacheKey = `${invoice.id}:${invoice.updated_at || invoice.created_at}`;
+    // Plan is part of the key so an upgrade (or downgrade) never serves the other plan's cached copy
+    const cacheKey = `${invoice.id}:${invoice.updated_at || invoice.created_at}:${req.userPlan || 'basic'}`;
     const pdfBuffer = await generateInvoicePdfWithPuppeteer(invoice, user, cacheKey, req.userPlan);
 
     res.setHeader('Content-Type', 'application/pdf');
@@ -516,6 +518,9 @@ router.get('/:id/pdf', pdfRateLimit, async (req: AuthRequest, res: Response): Pr
           stateCode: invoice.brand_state_code,
         },
         serviceDescription: invoice.service_description,
+        sacCode: invoice.sac_code,
+        reverseCharge: invoice.reverse_charge,
+        plan: req.userPlan,
         gst: {
           baseAmount: invoice.base_amount,
           gstRate: invoice.gst_rate,
@@ -739,10 +744,10 @@ router.post('/:id/send', async (req: AuthRequest, res: Response): Promise<void> 
 
   const html = `
     <div style="font-family:Inter,sans-serif;max-width:480px;margin:0 auto;padding:32px;background:#07080F;color:#F0F1F8;border-radius:12px;">
-      <div style="font-size:22px;font-weight:700;margin-bottom:8px;color:#E8921A;">${user.business_name || user.name}</div>
-      <h2 style="font-size:18px;font-weight:600;margin:0 0 8px;">GST Invoice ${inv.invoice_number}</h2>
-      <p style="color:#94a3b8;margin:0 0 8px;">Dear ${inv.brand_name},</p>
-      <p style="color:#94a3b8;margin:0 0 24px;">Please find the GST invoice for <strong style="color:#F0F1F8;">${amount}</strong> for services rendered. Kindly process payment at your earliest convenience.</p>
+      <div style="font-size:22px;font-weight:700;margin-bottom:8px;color:#E8921A;">${escapeHtml(user.business_name || user.name)}</div>
+      <h2 style="font-size:18px;font-weight:600;margin:0 0 8px;">GST Invoice ${escapeHtml(inv.invoice_number)}</h2>
+      <p style="color:#94a3b8;margin:0 0 8px;">Dear ${escapeHtml(inv.brand_name)},</p>
+      <p style="color:#94a3b8;margin:0 0 24px;">Please find the GST invoice for <strong style="color:#F0F1F8;">${escapeHtml(amount)}</strong> for services rendered. Kindly process payment at your earliest convenience.</p>
       <p style="color:#64748b;font-size:12px;margin:0;">This is a GST-compliant invoice generated via Kcreatio.</p>
     </div>`;
 

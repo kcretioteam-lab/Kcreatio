@@ -49,7 +49,7 @@ export function InlineTooltip({ text }) {
 //   max      — upper limit (default LIMITS.MONEY, ₹99,99,999)
 //   decimals — decimal places allowed (default 2; 0 for whole numbers)
 //   currency — prefix the limit message with ₹ (default true)
-// format="name" | "gstin" | "pan" | "tan" | "ifsc" | "mobile" | "phone" | "account" | "upi" | "email"
+// format="name" | "sac" | "gstin" | "pan" | "tan" | "ifsc" | "mobile" | "phone" | "account" | "upi" | "email"
 // (utils/fieldFormats.js) strips characters the field can't contain as you type, and
 // checks the finished value when the field loses focus.
 export default function Input({

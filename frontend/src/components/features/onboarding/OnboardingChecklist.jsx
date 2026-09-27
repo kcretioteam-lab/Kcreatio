@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { CheckCircle2, Circle, X } from 'lucide-react';
 import { useAuth } from '../../../hooks/useAuth.jsx';
 import api from '../../../utils/api.js';
+import { canAccess } from '../../../utils/planConfig.js';
 
 const STEPS = [
   { id: 'profile',  label: 'Set up your Tax Profile',    detail: 'Add GSTIN, PAN, business address',           href: '/settings' },
@@ -31,7 +32,7 @@ export default function OnboardingChecklist() {
     try {
       const [invoiceRes, incomeRes, dealRes, tdsRes, settingsRes] = await Promise.all([
         api.get('/invoices', { params: { limit: 1 } }),
-        api.get('/income', { params: { limit: 1 } }),
+        canAccess('income_dashboard', user?.plan) ? api.get('/income', { params: { limit: 1 } }) : Promise.resolve({ data: {} }),
         api.get('/deals', { params: { limit: 1 } }),
         api.get('/tds', { params: { limit: 1 } }),
         api.get('/invoice-settings').catch(() => ({ data: {} })),

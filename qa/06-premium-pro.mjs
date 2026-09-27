@@ -58,17 +58,36 @@ try {
 
   await check('PRM-02', async () => {
     const url = state.get().approveUrl;
-    const r = await client().get(url);
+    // Opening the link (what a mail scanner does) must not approve anything
+    const ctx = await b.newContext();
+    const page = await watchedPage(ctx);
+    await page.goto(url, { waitUntil: 'networkidle' });
+    const confirmText = await page.locator('body').innerText();
+    const { data: before } = await db().from('users').select('plan').eq('id', s.userId).single();
+    const confirmShot = await shot(page, 'prm02-confirm');
+    const [resp] = await Promise.all([
+      page.waitForResponse(r => r.request().method() === 'POST' && r.url().includes('/premium-requests/approve')),
+      page.getByRole('button', { name: /Approve 28 days of Pro/ }).click(),
+    ]);
+    await page.waitForLoadState('networkidle');
+    const doneText = await page.locator('body').innerText();
+    const doneShot = await shot(page, 'prm02-approved');
+    await ctx.close();
     const again = await client().get(url);
     const { data: u } = await db().from('users').select('plan, trial_ends_at').eq('id', s.userId).single();
     const { data: pr } = await db().from('premium_requests').select('status, approved_at').eq('id', state.get().premiumRequestId).single();
     const days = Math.round((new Date(u.trial_ends_at) - Date.now()) / 86400000);
-    eq(r.status, 200, 'approve'); expect(/Approved/.test(r.data), 'page text'); eq(u.plan, 'trial', 'plan');
-    expect(days === 28, `trial_ends_at in ${days} days`); eq(pr.status, 'approved', 'request status');
-    const stale = await c.get('/tax/estimate?annualEstimate=1500000');   // old access token still says basic
-    c = await login();                                                     // fresh login picks up the new plan
+    eq(before.plan, 'basic', 'plan after merely opening the link');
+    expect(/Approve premium access\?/.test(confirmText), 'confirm page text');
+    eq(resp.status(), 200, 'approve POST'); expect(/Approved ✓/.test(doneText), `result page: ${doneText.slice(0, 120)}`);
+    eq(u.plan, 'trial', 'plan'); expect(days === 28, `trial_ends_at in ${days} days`); eq(pr.status, 'approved', 'request status');
+    expect(/Already approved/.test(again.data), 're-open after approval');
+    // Same session, no re-login: /auth/me re-issues the cookies with the new plan
+    const me = await c.get('/auth/me');
     const fresh = await c.get('/tax/estimate?annualEstimate=1500000');
-    return { notes: `Approve link → 200 "Approved ✓"; users.plan=trial, trial_ends_at +${days}d; request approved; re-opening link → "${/Already approved/.test(again.data) ? 'Already approved ✓' : again.status}". Existing session keeps the old plan claim until token refresh (/tax/estimate ${stale.status}); after re-login → ${fresh.status}` };
+    eq(me.data.plan, 'trial', '/auth/me plan');
+    eq(fresh.status, 200, 'plan-gated call in the same session');
+    return { notes: `Opening the link shows a confirm page and changes nothing (plan still basic); clicking "Approve" → POST 200 "Approved ✓"; plan=trial, +${days}d; re-open → "Already approved ✓". Same session picks up Pro after /auth/me (re-issued cookies) — /tax/estimate ${fresh.status} without re-login`, evidence: { confirmShot, doneShot } };
   });
 
   // ── Pro: clean PDF ─────────────────────────────────────────────────────────
@@ -143,8 +162,8 @@ try {
     state.set({ detPayment: r.data.detection?.id });
     eq(r.status, 201, 'status');
     const ex = cl.extracted || {};
-    const ok = ['payment_received', 'tds_deduction'].includes(cl.type) && Number(ex.amount) === 45000;
-    return { status: ok ? (ex.tds_rate == 10 ? 'PASS' : 'FAIL') : 'FAIL', notes: `type=${cl.type} confidence=${cl.confidence} extracted=${JSON.stringify(ex)} reasons=${JSON.stringify(cl.reasons).slice(0, 200)}` };
+    eq(cl.type, 'payment_received', 'type'); eq(ex.amount, 45000, 'amount received'); eq(ex.tds_rate, 10, 'TDS rate'); eq(ex.tds_amount, 5000, 'TDS amount');
+    return { notes: `type=${cl.type} conf=${cl.confidence}; received ₹45,000, TDS 10% = ₹5,000; reasons: ${cl.reasons.join(' / ').slice(0, 200)}` };
   });
 
   await check('INB-01', async () => {
@@ -154,7 +173,8 @@ try {
     const { data: row } = await db().from('email_detections').select('status, confidence, email_received_at, extracted_data, detected_type').eq('id', r.data.detection.id).single();
     eq(row.status, 'pending_review', 'status');
     expect(row.email_received_at && row.extracted_data?.reasons?.length, 'timestamp/reasons missing');
-    return { status: cl.type === 'tds_deduction' ? 'PASS' : 'FAIL', notes: `TDS email → type=${cl.type} conf=${cl.confidence} extracted=${JSON.stringify(cl.extracted)}; DB row pending_review with timestamp + ${row.extracted_data.reasons.length} provenance reasons` };
+    eq(cl.type, 'tds_deduction', 'type'); eq(cl.extracted.tds_amount, 10000, 'TDS'); eq(cl.extracted.amount, 100000, 'taxable value'); eq(cl.extracted.tan, 'BLRM12345C', 'TAN');
+    return { notes: `TDS email → type=${cl.type} conf=${cl.confidence} extracted=${JSON.stringify(cl.extracted)}; DB row pending_review with timestamp + ${row.extracted_data.reasons.length} provenance reasons` };
   });
 
   await check('INB-03', async () => {
@@ -191,12 +211,13 @@ try {
     return { notes: `Bell badge ${n1} = ${pending1} pending; after rejecting one → ${n2} = ${pending2}. Smart Inbox cards visible: ${/Smart Inbox/i.test(body)}`, evidence: { sh1, sh2 } };
   });
 
-  await check('INB-ACCEPT', async () => {
+  await check('INB-ACCEPT-TDS', async () => {
     const r = await c.put(`/email-detections/${state.get().detTds}/accept`, {});
     const { data: det } = await db().from('email_detections').select('status, linked_tds_id').eq('id', state.get().detTds).single();
     const { data: tds } = det.linked_tds_id ? await db().from('tds_records').select('tds_amount, invoice_amount, brand_name').eq('id', det.linked_tds_id).single() : { data: null };
     eq(r.status, 200, 'accept');
-    return { status: tds && Number(tds.tds_amount) === 10000 ? 'PASS' : 'FAIL', notes: `Accept TDS detection → ${det.status}; linked TDS row ${JSON.stringify(tds)} (expected TDS ₹10,000 on ₹1,00,000)` };
+    expect(tds && Number(tds.tds_amount) === 10000 && Number(tds.invoice_amount) === 100000, `linked TDS row ${JSON.stringify(tds)}`);
+    return { notes: `Accept TDS detection → ${det.status}; linked TDS row ${JSON.stringify(tds)} (expected TDS ₹10,000 on ₹1,00,000)` };
   });
 
   // ── Tax planner UI ─────────────────────────────────────────────────────────

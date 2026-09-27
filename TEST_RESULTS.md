@@ -1,6 +1,63 @@
 # Kcreatio — E2E Test Results
 
-**Run date:** 26 Sep 2026 · **Branch:** `fix/domain-kcreatio-com` (`c691f70`) · **Plan:** [`TEST_PLAN.md`](./TEST_PLAN.md) · **Suite:** [`qa/`](./qa)
+**Plan:** [`TEST_PLAN.md`](./TEST_PLAN.md) · **Suite:** [`qa/`](./qa)
+
+## Fix round — 27 Sep 2026 (re-run after fixes)
+
+| | Count | Share |
+|---|---:|---:|
+| Test cases executed | **75** | 100% |
+| PASS | **74** | 98.7% |
+| FAIL | **1** | 1.3% |
+
+The only failure is **INV-10**. It needs a database change, not code: run `backend/migrations/019_invoice_client_request_id.sql` in the Supabase SQL Editor. The backend now warns about this at every startup:
+
+```
+[SCHEMA] invoices.client_request_id is missing — run 019_invoice_client_request_id.sql (retried invoice saves create duplicate invoices)
+```
+
+The re-run found one more bug, **BUG-13**, which is now fixed:
+
+- **What:** For Basic users, the dashboard, tax planner, income and expenses pages and the onboarding checklist called Pro/Starter-only endpoints.
+- **Impact:** The dashboard used `Promise.all`, so the 403 blanked everything on it: TDS summary, deadlines, recent invoices and deals. The other pages showed a "Failed to load" error toast behind the upgrade gate.
+- **Fix:** These pages now skip calls the plan can't use, and the dashboard loads each section independently.
+- **Verification:** the new UI-SWEEP-basic-desktop/-mobile cases.
+
+Backend unit tests: 78/78, including 16 new tests for the classifier, TDS figures and email escaping. Frontend: 37/37. No new lint errors in any touched file (compared against HEAD).
+
+### How each finding was fixed and verified
+
+| Finding | Fix | Verified by |
+|---|---|---|
+| BUG-01 PDF fallback crash | `pdfService.ts` registers pdfmake's font VFS and awaits the promise-based `getBuffer()`. The type file now matches pdfmake 0.3. The fallback adds the Basic watermark and the Rule 46 lines. A process-level `unhandledRejection` handler logs instead of exiting | INV-08-FALLBACK (backend started with a bogus `CHROME_PATH`: both PDFs 200, server up, Basic watermarked, Pro clean) |
+| BUG-02 Smart Inbox accept saved nothing | One shared `applyDetection()` (`services/detectionService.ts`) replaces the two copies. It drops the non-existent `extracted_data` column, uses the TDS the email states, logs unmatched payments at the taxable value plus a TDS row, and throws instead of marking a detection accepted without its record (API returns 422 and the detection stays pending) | INB-ACCEPT, INB-ACCEPT-TDS |
+| BUG-03 Non-idempotent saves | Startup schema check warns about missing migrations. **Still needs migration 019 run on the DB** | INV-10 (fails until migrated) |
+| BUG-04 Orphan TDS after deleting a paid deal | Deal delete removes the deal's own income and TDS rows (not ones tied to an invoice) | DEAL-07 |
+| BUG-05 Duplicate TDS | `POST /tds` returns 409 `DUPLICATE` for the same invoice or the same brand/amount/TDS/date. The TDS page asks before saving a second copy (`allowDuplicate`) | TDS-05 |
+| BUG-06 Payment wording missed | Classifier recognises NEFT/IMPS/RTGS/UTR and "processed / released / transferred ₹X" (not for SaaS receipts), and works out TDS from "after N% TDS" | INB-02 + unit tests |
+| BUG-07 Form 16A mention hid the TDS | Form 16A only wins when the email isn't reporting a deduction. TDS amount and taxable value are read by context. The review form gains a "TDS deducted" field | INB-01 + unit tests |
+| BUG-08 HTML injection in emails | `escapeHtml()` (`lib/html.ts`) applied to every dynamic value in every email template and the invoice-send email | SEC-08 (`emailService.test.ts`, which fails on the old code) |
+| BUG-09 SAC field | New `format="sac"` (digits only, 6, starts with 99). No phantom default, "SAC code is required" when empty, every line validated, previews show "—" | INV-12, INV-04 |
+| BUG-10 Missing Form 16A reminder | Added under the net-in-hand box | INV-06 |
+| BUG-11 Files left after account deletion | `removeUserFiles()` deletes `<userId>/…`, `<userId>/docs/…` and the avatar before the user row; the whole request fails (safe to retry) if storage can't be cleared | ACC-DEL |
+| BUG-12 Landing formatting / state order | `tabular-nums` and tokens on the calculator; states sorted by code | LND-05, INV-12 |
+| O-1 Dev bypass | Honoured only when `NODE_ENV === 'development'` | SEC-06 |
+| O-2 CORS 500 | Rejected origins get 403 and are no longer logged as unhandled errors | SEC-07 |
+| O-3 Approve via GET | GET shows a confirm page; the grant happens on POST from its button (routes mounted outside CORS: token-authorised, and the form posts with `Origin: null`). `API_URL` added to `render.yaml` | PRM-02 (opening the link changes nothing) |
+| O-4 Stale plan claim | `/auth/me` re-issues the session when the stored plan differs from the token | PRM-02 (same session gets Pro without re-login) |
+| O-5 PDF cache ignores plan | Plan is part of the cache key (invoice PDF and CA export) | code |
+| O-6 Reminder lookup | `tax_payments` lookup scoped to this FY and `advance_tax` | code |
+| O-7 Quick estimate | Input clamped to the widget's limits (₹10 Cr/month, 50 brands); "brands" plural fixed in both engine copies | LND-04 |
+| O-8 Stale-deal nudge | README corrected to describe the badge that exists (no scheduled nudge is built) | docs |
+| O-9 IGST before state chosen | Tax box says "Pick the brand's state — GST shown as IGST until then" | manual |
+| O-10 Chrome on Windows | `getChromePath()` finds Chrome/Edge under Program Files / LocalAppData | local runs used Puppeteer without `CHROME_PATH` |
+| O-11 Unsanitised storage | By design (escape on output); covered by BUG-08 | SEC-01 |
+
+---
+
+# Original run — 26 Sep 2026
+
+**Branch:** `fix/domain-kcreatio-com` (`c691f70`)
 
 ## 1. Executive summary
 
@@ -289,14 +346,14 @@ The README promises "…net creator receives, with a Form 16A reminder". The box
 ## 5. How to re-run
 
 ```bash
-# backend (Chrome path avoids BUG-01), writing stdout to a log the suite reads OTPs from
-cd backend && npm run build && CHROME_PATH="C:/Program Files/Google/Chrome/Application/chrome.exe" node -r dotenv/config dist/server.js > ../qa/out/backend.log 2>&1
+# backend, writing stdout to a log the suite reads OTPs and approve links from (Chrome is found automatically)
+cd backend && npm run build && node -r dotenv/config dist/server.js > ../qa/out/backend.log 2>&1
 # production build with same-origin API, served on :5174 (in Git Bash prefix MSYS_NO_PATHCONV=1)
 cd frontend && VITE_API_URL=/api/v1 npx vite build --outDir ../qa/.dist-prod && npx vite preview --outDir ../qa/.dist-prod --port 5174
-# suite
+# suite — pauses before 09-pdf-fallback so you can restart the backend with CHROME_PATH=C:/does-not-exist/chrome.exe
 cd qa && npm install && BACKEND_LOG=out/backend.log npm run e2e
 ```
 
 - Screenshots, PDFs and `results.json` land in `qa/out/`, which is git-ignored.
-- INV-08-FALLBACK, INV-10 and INV-12 were recorded from direct observation during the run (the crash, the missing column, the SAC input trace), not asserted by the scripts. SEC-08 is a code-review finding.
+- Every case is now asserted by the scripts (the original run recorded INV-08-FALLBACK, INV-10 and INV-12 by hand). SEC-08 is covered by `backend/src/services/__tests__/emailService.test.ts`.
 - The suite gives each API client its own `X-Forwarded-For` to stay under the 150-per-15-min rate limit. That only works because nothing sits in front of the local backend.

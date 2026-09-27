@@ -1,8 +1,11 @@
 import pdfMake from 'pdfmake/build/pdfmake.js';
+import vfsFonts from 'pdfmake/build/vfs_fonts.js';
 import { format } from 'date-fns';
 import { GstCalculation, CREATOR_GST_CONFIG } from './invoiceService.js';
+import { amountInWords } from './puppeteerPdfService.js';
 
-// Use built-in fonts in pdfmake (no external dependency)
+// Fallback renderer, used when Puppeteer can't start Chrome. Fonts come from pdfmake's bundled
+// virtual file system — without it every render fails with "Roboto-Medium.ttf not found".
 const FONTS = {
   Roboto: {
     normal: 'Roboto-Regular.ttf',
@@ -11,6 +14,8 @@ const FONTS = {
     bolditalics: 'Roboto-MediumItalic.ttf',
   },
 };
+pdfMake.addVirtualFileSystem(vfsFonts);
+pdfMake.setFonts(FONTS);
 
 interface InvoiceData {
   invoiceNumber: string;
@@ -29,8 +34,11 @@ interface InvoiceData {
     stateCode?: string;
   };
   serviceDescription: string;
+  sacCode?: string;
+  reverseCharge?: string;
   gst: Omit<GstCalculation, 'discountAmount' | 'lines'>;
   notes?: string;
+  plan?: string;
 }
 
 export function generateInvoicePdf(data: InvoiceData): Promise<Buffer> {
@@ -44,19 +52,19 @@ export function generateInvoicePdf(data: InvoiceData): Promise<Buffer> {
     ],
     [
       data.serviceDescription,
-      CREATOR_GST_CONFIG.hsnCode,
+      data.sacCode || CREATOR_GST_CONFIG.hsnCode,
       { text: `₹${gst.baseAmount.toLocaleString('en-IN')}`, alignment: 'right' },
     ],
   ];
 
   if (gst.supplyType === 'intrastate') {
     rows.push(
-      [{ text: `CGST @ ${gst.gstRate / 2}%`, colSpan: 2 }, '', { text: `₹${gst.cgstAmount!.toLocaleString('en-IN')}`, alignment: 'right' }],
-      [{ text: `SGST @ ${gst.gstRate / 2}%`, colSpan: 2 }, '', { text: `₹${gst.sgstAmount!.toLocaleString('en-IN')}`, alignment: 'right' }]
+      [{ text: `Add: CGST @ ${gst.gstRate / 2}%`, colSpan: 2 }, '', { text: `₹${gst.cgstAmount!.toLocaleString('en-IN')}`, alignment: 'right' }],
+      [{ text: `Add: SGST @ ${gst.gstRate / 2}%`, colSpan: 2 }, '', { text: `₹${gst.sgstAmount!.toLocaleString('en-IN')}`, alignment: 'right' }]
     );
   } else {
     rows.push(
-      [{ text: `IGST @ ${gst.gstRate}%`, colSpan: 2 }, '', { text: `₹${gst.igstAmount!.toLocaleString('en-IN')}`, alignment: 'right' }]
+      [{ text: `Add: IGST @ ${gst.gstRate}%`, colSpan: 2 }, '', { text: `₹${gst.igstAmount!.toLocaleString('en-IN')}`, alignment: 'right' }]
     );
   }
 
@@ -102,6 +110,7 @@ export function generateInvoicePdf(data: InvoiceData): Promise<Buffer> {
               { text: data.seller.name, bold: true, fontSize: 10 },
               data.seller.gstin ? { text: `GSTIN: ${data.seller.gstin}`, fontSize: 8, color: '#666', margin: [0, 2, 0, 0] } : '',
               data.seller.address ? { text: data.seller.address, fontSize: 8, color: '#666', margin: [0, 2, 0, 0] } : '',
+              data.seller.stateCode ? { text: `State Code: ${data.seller.stateCode}`, fontSize: 8, color: '#666', margin: [0, 2, 0, 0] } : '',
             ],
           },
           {
@@ -111,6 +120,7 @@ export function generateInvoicePdf(data: InvoiceData): Promise<Buffer> {
               { text: data.buyer.name, bold: true, fontSize: 10 },
               data.buyer.gstin ? { text: `GSTIN: ${data.buyer.gstin}`, fontSize: 8, color: '#666', margin: [0, 2, 0, 0] } : '',
               data.buyer.address ? { text: data.buyer.address, fontSize: 8, color: '#666', margin: [0, 2, 0, 0] } : '',
+              data.buyer.stateCode ? { text: `State Code: ${data.buyer.stateCode}`, fontSize: 8, color: '#666', margin: [0, 2, 0, 0] } : '',
             ],
           },
         ],
@@ -136,6 +146,10 @@ export function generateInvoicePdf(data: InvoiceData): Promise<Buffer> {
         marginBottom: 16,
       },
 
+      // Rule 46: amount in words and an explicit reverse-charge statement
+      { text: `Amount chargeable (in words): ${amountInWords(gst.totalAmount)}`, fontSize: 9, marginBottom: 4 },
+      { text: `Tax payable on reverse charge: ${data.reverseCharge === 'Yes' ? 'Yes' : 'No'}`, fontSize: 9, marginBottom: 8 },
+
       // Supply type note
       {
         text: `Supply type: ${gst.supplyType === 'intrastate' ? 'Intrastate (CGST + SGST)' : 'Interstate (IGST)'}`,
@@ -154,7 +168,7 @@ export function generateInvoicePdf(data: InvoiceData): Promise<Buffer> {
 
       // Footer
       {
-        text: 'Generated with Kcreatio',
+        text: 'Computer-generated invoice · Kcreatio · Subject to GST as applicable',
         fontSize: 7,
         color: '#CCC',
         alignment: 'center',
@@ -174,12 +188,16 @@ export function generateInvoicePdf(data: InvoiceData): Promise<Buffer> {
     pageMargins: [40, 40, 40, 40],
   };
 
-  return new Promise((resolve, reject) => {
-    try {
-      const pdf = pdfMake.createPdf(docDefinition);
-      pdf.getBuffer((buffer: Buffer) => resolve(buffer));
-    } catch (err) {
-      reject(err);
-    }
-  });
+  // Basic plan: same watermark as the Puppeteer renderer
+  if (data.plan === 'basic') {
+    docDefinition.watermark = { text: 'Kcreatio', color: '#718096', opacity: 0.07, bold: true, angle: -45 };
+    docDefinition.footer = { text: 'Made with ease on kcreatio.com', fontSize: 8, color: '#a0aec0', alignment: 'center', margin: [0, 10, 0, 0] };
+  }
+
+  // pdfmake 0.3 returns a promise here (it no longer takes a callback). Awaiting it keeps render
+  // errors inside the request — a rejected promise nobody awaited used to crash the whole process.
+  return (async () => {
+    const buffer = await pdfMake.createPdf(docDefinition).getBuffer();
+    return Buffer.from(buffer);
+  })();
 }

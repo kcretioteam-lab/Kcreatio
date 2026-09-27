@@ -215,7 +215,7 @@ await check('SEC-06', async () => {
   const n = r.data?.invoices?.length ?? (Array.isArray(r.data) ? r.data.length : 0);
   return {
     status: 'PASS',
-    notes: `As designed for NODE_ENV≠production: X-Dev-User-Id=<QA uuid> with no cookie → ${r.status} (${n} of QA’s invoices) and plan defaults to "pro" (/tax/estimate → ${planEsc.status}). Anyone reaching a non-production deploy can act as any user id — see BUG list`,
+    notes: `Local NODE_ENV=development: X-Dev-User-Id=<QA uuid> with no cookie → ${r.status} (${n} of QA’s invoices), plan "pro" (/tax/estimate → ${planEsc.status}). Only honoured when NODE_ENV is exactly "development" (auth.ts) — staging/unset NODE_ENV ignores it`,
     evidence: { invoices: r.status, taxEstimate: planEsc.status },
   };
 });
@@ -227,8 +227,8 @@ await check('SEC-07', async () => {
   const ok = await client().get('/tax/quick-estimate?monthly_income=1', { Origin: 'http://localhost:5173' });
   expect(h['x-content-type-options'] === 'nosniff' && !h['x-powered-by'] && h['x-frame-options'], `headers ${JSON.stringify(h)}`);
   expect(!evil.headers.get('access-control-allow-origin'), 'evil origin got ACAO');
-  const note = evil.status >= 500 ? ` Foreign origin is rejected, but as HTTP ${evil.status} INTERNAL_ERROR (CORS error falls into the global 500 handler and is logged as "Unhandled error")` : '';
-  return { status: 'PASS', notes: `Helmet headers present, no X-Powered-By; allowed origin gets ACAO=${ok.headers.get('access-control-allow-origin')}.${note}`, evidence: { headers: h, evil: evil.status } };
+  eq(evil.status, 403, 'foreign origin status');
+  return { notes: `Helmet headers present, no X-Powered-By; allowed origin gets ACAO=${ok.headers.get('access-control-allow-origin')}; foreign origin → 403 with no CORS header`, evidence: { headers: h, evil: evil.status } };
 });
 
 await check('SEC-02', async () => {

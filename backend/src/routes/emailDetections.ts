@@ -6,7 +6,7 @@ import { validateBody } from '../middleware/validateBody.js';
 import { classifyEmail } from '../services/emailClassifier.js';
 import { scanInbox } from '../services/gmailService.js';
 import { hasFeature } from '../config/plans.js';
-import { recordDetectedPayment } from '../services/paymentService.js';
+import { applyDetection, DetectionApplyError } from '../services/detectionService.js';
 
 const router = Router();
 
@@ -142,7 +142,8 @@ router.post('/scan-now', authenticate, async (req: AuthRequest, res: Response): 
       result.type !== 'deal_inquiry' &&
       hasFeature('gmail_auto_apply', (req as any).userPlan ?? 'basic')
     ) {
-      await applyDetection(inserted.id, req.userId!, result.type, result.extracted, supabase, 'auto_applied');
+      await applyDetection(inserted.id, req.userId!, result.type, result.extracted, 'auto_applied')
+        .catch(err => console.error('[SCAN_NOW] Auto-apply failed — left for review:', inserted.id, err));
     }
   }
 
@@ -204,6 +205,7 @@ const AcceptSchema = z.object({
   brand_name: z.string().max(200).optional(),
   amount: z.number().positive().max(9999999).optional(),
   tds_rate: z.number().min(0).max(100).optional(),
+  tds_amount: z.number().min(0).max(9999999).optional(),
   tan: z.string().max(20).optional(),
   description: z.string().max(500).optional(),
   invoice_id: z.string().uuid().optional(),   // user can pick which invoice to mark paid
@@ -233,16 +235,27 @@ router.put('/:id/accept', authenticate, validateBody(AcceptSchema ?? z.object({}
   const overrides = req.body ?? {};
   const merged = { ...detection.extracted_data, ...overrides };
 
-  const createdRecord = await applyDetection(
-    detection.id,
-    req.userId!,
-    detection.detected_type,
-    merged,
-    supabase,
-    'accepted',
-    overrides.invoice_id,
-    overrides.expense_category,
-  );
+  let createdRecord;
+  try {
+    createdRecord = await applyDetection(
+      detection.id,
+      req.userId!,
+      detection.detected_type,
+      merged,
+      'accepted',
+      overrides.invoice_id,
+      overrides.expense_category,
+    );
+  } catch (err) {
+    // Nothing was linked, so the detection stays pending and the user can fix the amounts and retry
+    if (err instanceof DetectionApplyError) {
+      res.status(422).json({ error: 'VALIDATION_ERROR', message: err.message, statusCode: 422 });
+      return;
+    }
+    console.error('[ACCEPT_DETECTION] Error:', err);
+    res.status(500).json({ error: 'INTERNAL_ERROR', message: 'Couldn’t save this — please try again', statusCode: 500 });
+    return;
+  }
 
   res.json({ detection: { ...detection, status: 'accepted' }, created_record: createdRecord });
 });
@@ -262,117 +275,5 @@ router.put('/:id/reject', authenticate, async (req: AuthRequest, res: Response):
   res.json({ ok: true });
 });
 
-// ── Apply detection logic ─────────────────────────────────────────────────────
-// Shared between scan-now (auto-apply) and PUT /:id/accept (user confirm)
-async function applyDetection(
-  detectionId: string,
-  userId: string,
-  detectedType: string,
-  data: Record<string, any>,
-  db: typeof supabase,
-  finalStatus: 'accepted' | 'auto_applied',
-  preferredInvoiceId?: string,
-  expenseCategory?: string,
-): Promise<Record<string, any> | null> {
-  const now = new Date().toISOString();
-  let createdRecord: Record<string, any> | null = null;
-  const updates: Record<string, any> = {
-    status: finalStatus,
-    reviewed_at: now,
-  };
-
-  try {
-    if (detectedType === 'payment_received') {
-      if (data.amount) {
-        const { invoiceId, income } = await recordDetectedPayment(
-          userId, Number(data.amount), detectionId,
-          data.description ?? data.brand_name ?? 'Payment detected via Smart Inbox', preferredInvoiceId,
-        );
-        if (invoiceId) updates.linked_invoice_id = invoiceId;
-        updates.linked_income_id = income?.id;
-        createdRecord = income;
-      }
-
-    } else if (detectedType === 'deal_confirmed' || detectedType === 'deal_inquiry') {
-      const { data: deal } = await db.from('deals').insert({
-        user_id: userId,
-        brand_name: data.brand_name ?? 'Unknown Brand',
-        brand_contact_email: data.contact_email ?? null,
-        deal_value: data.amount ?? 0,
-        status: 'inquiry',
-        notes: `Added from Smart Inbox (${detectedType === 'deal_confirmed' ? 'confirmed' : 'soft inquiry'})`,
-        extracted_data: { detection_id: detectionId },
-      }).select().single();
-
-      updates.linked_deal_id = deal?.id;
-      createdRecord = deal;
-
-    } else if (detectedType === 'tds_deduction') {
-      const tdsAmount = data.amount && data.tds_rate
-        ? data.amount * (data.tds_rate / 100)
-        : data.tds_amount ?? 0;
-
-      const today = new Date();
-      const fy = today.getMonth() >= 3
-        ? `${today.getFullYear()}-${String(today.getFullYear() + 1).slice(-2)}`
-        : `${today.getFullYear() - 1}-${String(today.getFullYear()).slice(-2)}`;
-
-      const { data: tds } = await db.from('tds_records').insert({
-        user_id: userId,
-        brand_name: data.brand_name ?? 'Unknown Brand',
-        brand_tan: data.tan ?? null,
-        invoice_amount: data.amount ?? 0,
-        tds_rate: data.tds_rate ?? 10,
-        tds_amount: tdsAmount,
-        received_amount: data.amount ? data.amount - tdsAmount : 0,
-        form_16a_status: 'awaiting',
-        financial_year: fy,
-        payment_date: new Date().toISOString().split('T')[0],
-        extracted_data: { detection_id: detectionId },
-      }).select().single();
-
-      updates.linked_tds_id = tds?.id;
-      createdRecord = tds;
-
-    } else if (detectedType === 'expense') {
-      const today = new Date();
-      const fy = today.getMonth() >= 3
-        ? `${today.getFullYear()}-${String(today.getFullYear() + 1).slice(-2)}`
-        : `${today.getFullYear() - 1}-${String(today.getFullYear()).slice(-2)}`;
-
-      const { data: expense } = await db.from('expenses').insert({
-        user_id: userId,
-        category: expenseCategory ?? 'subscription',
-        amount: data.amount ?? 0,
-        description: data.description ?? 'Detected via Smart Inbox',
-        expense_date: new Date().toISOString().split('T')[0],
-        financial_year: fy,
-        extracted_data: { detection_id: detectionId },
-      }).select().single();
-
-      createdRecord = expense;
-
-    } else if (detectedType === 'form_16a') {
-      // Update the most recent TDS record from this brand with form_16a_status = received
-      const brandName = data.brand_name;
-      if (brandName) {
-        await db.from('tds_records')
-          .update({ form_16a_status: 'received' })
-          .eq('user_id', userId)
-          .ilike('brand_name', `%${brandName}%`)
-          .in('form_16a_status', ['awaiting', 'requested']);
-      }
-      createdRecord = { updated: true, brand: brandName };
-    }
-
-    // Update detection status
-    await db.from('email_detections').update(updates).eq('id', detectionId);
-
-  } catch (err) {
-    console.error('[APPLY_DETECTION] Error:', err);
-  }
-
-  return createdRecord;
-}
 
 export default router;

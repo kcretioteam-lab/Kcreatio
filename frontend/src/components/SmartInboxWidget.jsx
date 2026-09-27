@@ -286,7 +286,8 @@ function EditAcceptModal({ detection, onConfirm, onClose }) {
   const [form, setForm] = useState({
     brand_name: detection.extracted_data?.brand_name ?? '',
     amount: detection.extracted_data?.amount ?? '',
-    tds_rate: detection.extracted_data?.tds_rate ?? 10,
+    tds_amount: detection.extracted_data?.tds_amount ?? '',
+    tds_rate: detection.extracted_data?.tds_rate ?? (detection.extracted_data?.tds_amount ? '' : 10),
     tan: detection.extracted_data?.tan ?? '',
     description: detection.extracted_data?.description ?? '',
     expense_category: 'subscription',
@@ -298,6 +299,7 @@ function EditAcceptModal({ detection, onConfirm, onClose }) {
     await onConfirm(detection.id, {
       brand_name: form.brand_name || undefined,
       amount: form.amount ? Number(form.amount) : undefined,
+      tds_amount: form.tds_amount ? Number(form.tds_amount) : undefined,
       tds_rate: form.tds_rate ? Number(form.tds_rate) : undefined,
       tan: form.tan || undefined,
       description: form.description || undefined,
@@ -327,10 +329,22 @@ function EditAcceptModal({ detection, onConfirm, onClose }) {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
           {['payment_received', 'tds_deduction', 'expense'].includes(detection.detected_type) && (
             <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)' }}>Amount (₹)</span>
+              <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)' }}>
+                {detection.detected_type === 'payment_received' ? 'Amount received (₹)' : detection.detected_type === 'tds_deduction' ? 'Taxable value, before TDS (₹)' : 'Amount (₹)'}
+              </span>
               <input
                 type="text" inputMode="decimal" value={form.amount}
                 onChange={e => { const v = sanitizeNumber(e.target.value); if (v !== null) setForm(f => ({ ...f, amount: v })); }}
+                style={{ padding: '8px 10px', background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', color: 'var(--text-primary)', fontSize: 'var(--text-sm)' }}
+              />
+            </label>
+          )}
+          {['payment_received', 'tds_deduction'].includes(detection.detected_type) && (
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)' }}>TDS deducted (₹)</span>
+              <input
+                type="text" inputMode="decimal" value={form.tds_amount} placeholder="0 if none"
+                onChange={e => { const v = sanitizeNumber(e.target.value, { max: LIMITS.MONEY }); if (v !== null) setForm(f => ({ ...f, tds_amount: v })); }}
                 style={{ padding: '8px 10px', background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', color: 'var(--text-primary)', fontSize: 'var(--text-sm)' }}
               />
             </label>
@@ -484,8 +498,8 @@ export default function SmartInboxWidget({ user, onManualPaste, onPendingCountCh
       setPendingCount(c => Math.max(0, c - 1));
       onPendingCountChange?.(Math.max(0, pendingCount - 1));
       toast('Logged successfully ✓', 'success');
-    } catch {
-      toast('Failed to accept — please try again', 'error');
+    } catch (err) {
+      toast(getErrorMessage(err, 'Failed to accept — please try again'), 'error');
     }
   }
 

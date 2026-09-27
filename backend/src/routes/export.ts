@@ -220,7 +220,7 @@ router.get('/annual', checkPlan('pro'), async (req: AuthRequest, res: Response):
   for (const inv of invoices) {
     if (!pdfEngineOk) { missing.push(inv.invoice_number); continue; }
     try {
-      const buffer = await generateInvoicePdfWithPuppeteer(inv, user, `${inv.id}:${inv.updated_at || inv.created_at}`, req.userPlan);
+      const buffer = await generateInvoicePdfWithPuppeteer(inv, user, `${inv.id}:${inv.updated_at || inv.created_at}:${req.userPlan || 'basic'}`, req.userPlan);
       invoicePdfs.push({ name: `invoices/${fileSafe(inv.invoice_number)}.pdf`, buffer });
     } catch (err) {
       console.warn('[export] invoice PDF failed:', err);

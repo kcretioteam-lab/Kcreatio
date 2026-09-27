@@ -14,14 +14,21 @@ await check('INB-ACCEPT', async () => {
     'Dear Creator, TDS of Rs. 10,000 has been deducted under Section 194J on your invoice of Rs. 1,00,000. TAN: BLRM12345C.');
   const p = await pasteAndAccept('Payment credited',
     'Rs. 45,000 has been credited to your account towards your campaign invoice after deducting TDS of Rs. 5,000.');
-  const { count: incomeRows } = await db().from('income').select('id', { count: 'exact', head: true }).eq('user_id', state.get().userId).eq('amount', 45000);
-  const ev = {
-    tds: { type: t.det.detected_type, http: t.accept.status, status: t.det.status, linked_tds_id: t.det.linked_tds_id, extracted: t.cl.extracted },
-    payment: { type: p.det.detected_type, http: p.accept.status, status: p.det.status, linked_income_id: p.det.linked_income_id, incomeRows },
-  };
   expect(t.det.linked_tds_id && p.det.linked_income_id,
-    `Detections marked "accepted" (HTTP ${t.accept.status}/${p.accept.status}) but no record created: linked_tds_id=${t.det.linked_tds_id}, linked_income_id=${p.det.linked_income_id}. ` +
-    'Inserts write an "extracted_data" column that tds_records/income/expenses do not have ("Could not find the \'extracted_data\' column of \'tds_records\'"); the error is ignored. ' +
-    `Even if it saved, the TDS email extracts amount=${t.cl.extracted.amount} (the TDS) and the accept path treats it as the invoice value → TDS ₹${t.cl.extracted.amount * (t.cl.extracted.tds_rate / 100)} instead of ₹10,000`);
-  return { notes: 'Linked records created', evidence: ev };
+    `Detections accepted (HTTP ${t.accept.status}/${p.accept.status}) without a linked record: linked_tds_id=${t.det.linked_tds_id}, linked_income_id=${p.det.linked_income_id} — ${JSON.stringify(t.accept.data)} ${JSON.stringify(p.accept.data)}`);
+
+  const { data: tds } = await db().from('tds_records').select('invoice_amount, tds_amount, received_amount, brand_tan').eq('id', t.det.linked_tds_id).single();
+  const { data: income } = await db().from('income').select('amount').eq('id', p.det.linked_income_id).single();
+  const { data: payTds } = await db().from('tds_records').select('invoice_amount, tds_amount, received_amount').eq('id', p.det.linked_tds_id).maybeSingle();
+  eq(tds.invoice_amount, 100000, 'TDS row taxable value'); eq(tds.tds_amount, 10000, 'TDS row TDS'); eq(tds.received_amount, 90000, 'TDS row received');
+  eq(income.amount, 50000, 'payment income = taxable value (received + TDS)');
+  expect(payTds && Number(payTds.tds_amount) === 5000, `payment TDS row ${JSON.stringify(payTds)}`);
+
+  // A detection whose record can't be saved stays pending instead of being marked accepted
+  const bad = await c.post('/email-detections/paste', { subject: 'TDS deducted', body: 'TDS has been deducted under section 194J.', from_email: 'x@brand.example' });
+  const badAccept = await c.put(`/email-detections/${bad.data.detection.id}/accept`, {});
+  const { data: badDet } = await db().from('email_detections').select('status').eq('id', bad.data.detection.id).single();
+  eq(badAccept.status, 422, 'accept with no amounts'); eq(badDet.status, 'pending_review', 'status after failed accept');
+
+  return { notes: `TDS email → TDS row ₹10,000 on ₹1,00,000 (received ₹90,000, TAN ${tds.brand_tan}); payment email → income ₹50,000 + TDS row ₹5,000; a detection with no amounts → 422 "${badAccept.data.message}" and stays pending` };
 });

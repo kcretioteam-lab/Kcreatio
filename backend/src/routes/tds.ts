@@ -22,6 +22,8 @@ const CreateTDSSchema = z.object({
   paymentDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   invoiceId: z.string().uuid().optional(),
   financialYear: z.string().optional(),
+  // Set after the user confirms that an entry matching an existing one is a separate deduction
+  allowDuplicate: z.boolean().optional(),
 });
 
 const UpdateTDSSchema = z.object({
@@ -122,6 +124,31 @@ router.post('/', validateBody(CreateTDSSchema), async (req: AuthRequest, res: Re
   const receivedAmount = body.amountReceived ?? Math.round((body.invoiceAmount - tdsAmount) * 100) / 100;
   const paymentDate = new Date(body.paymentDate + 'T00:00:00');
   const financialYear = body.financialYear || getFinancialYear(paymentDate);
+
+  // Duplicates double-count the TDS credit claimed at ITR. Same invoice already carrying TDS, or the
+  // same brand, taxable value, TDS and date → ask the user before saving a second copy.
+  if (!body.allowDuplicate) {
+    const sameInvoice = body.invoiceId
+      ? await supabase.from('tds_records').select('id').eq('user_id', req.userId!).eq('invoice_id', body.invoiceId).limit(1)
+      : { data: [] };
+    const sameEntry = await supabase.from('tds_records').select('id')
+      .eq('user_id', req.userId!)
+      .ilike('brand_name', body.brandName.replace(/[%_\\]/g, '\\$&'))
+      .eq('invoice_amount', body.invoiceAmount)
+      .eq('tds_amount', tdsAmount)
+      .eq('payment_date', body.paymentDate)
+      .limit(1);
+    if (sameInvoice.data?.length || sameEntry.data?.length) {
+      res.status(409).json({
+        error: 'DUPLICATE',
+        message: sameInvoice.data?.length
+          ? 'TDS is already recorded for this invoice.'
+          : `You already have a TDS entry from ${body.brandName} for this amount on this date.`,
+        statusCode: 409,
+      });
+      return;
+    }
+  }
 
   const { data, error } = await supabase
     .from('tds_records')

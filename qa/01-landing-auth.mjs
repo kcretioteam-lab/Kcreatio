@@ -38,12 +38,11 @@ await check('LND-04', async () => {
     expect(r.status === 200, `monthly_income=${v} → ${r.status}`);
   }
   const huge = out['1e12'];
-  const issues = [];
-  if (huge.annual > 999999999) issues.push(`no upper bound: 1e12/month accepted → annual ${huge.annual.toExponential(2)}`);
   const pl = await pub.get('/tax/quick-estimate?monthly_income=125000&brand_count=3');
-  if (/1 of 3 brand likely/.test(pl.data.form16aRisk)) issues.push(`copy: "${pl.data.form16aRisk}" (should be "brands")`);
-  if (issues.length) return { status: 'PASS', notes: `No 500s; garbage → zeros. Minor: ${issues.join('; ')}`, evidence: out };
-  return { notes: 'Garbage/negative/huge inputs handled without 5xx', evidence: out };
+  eq(out['abc'].annual, 0, 'garbage'); eq(out['-5000'].annual, 0, 'negative');
+  eq(huge.annual, 100000000 * 12, 'huge input clamped to ₹10 crore/month');
+  expect(/of 3 brands likely late/.test(pl.data.form16aRisk), `copy: "${pl.data.form16aRisk}"`);
+  return { notes: `Garbage/negative → 0; 1e12/month clamped to ₹10 Cr/month; "${pl.data.form16aRisk}"`, evidence: out };
 });
 
 // ── Landing UI ───────────────────────────────────────────────────────────────
@@ -67,15 +66,29 @@ try {
     for (let y = 0; y < 6000; y += 700) { await mp.mouse.wheel(0, 700); await mp.waitForTimeout(100); }
     const overflow = await mp.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
     const mob = await shot(mp, 'lnd05-mobile');
-    const errs = [...page.issues.pageErrors, ...page.issues.console, ...mp.issues.pageErrors, ...mp.issues.console];
+    // The logged-out session probe (GET /auth/me → 401) is expected; anything else is a real error
+    let expected401 = page.issues.failed.filter(f => f === '401 GET /api/v1/auth/me').length + mp.issues.failed.filter(f => f === '401 GET /api/v1/auth/me').length;
+    const errs = [...page.issues.pageErrors, ...page.issues.console, ...mp.issues.pageErrors, ...mp.issues.console]
+      .filter(e => !/status of 401/.test(e) || expected401-- <= 0);
     const rgb = theme.bg.match(/\d+/g).map(Number);
     const dark = rgb.slice(0, 3).reduce((a, c) => a + c, 0) < 150;
+    // Every ₹ figure in the calculator must use tabular numerals
+    await page.goto(APP + '/', { waitUntil: 'networkidle' });
+    await page.locator('#calc-monthly').scrollIntoViewIfNeeded();
+    await page.locator('#calc-monthly').fill('125000');
+    await page.getByRole('button', { name: /show me the numbers/i }).click();
+    await page.waitForTimeout(1200);
+    const nums = await page.locator('[aria-live="polite"]').first().evaluate(el => [...el.querySelectorAll('*')]
+      .filter(n => n.children.length === 0 && /₹\s?[\d,]+/.test(n.textContent) && n.textContent.trim().startsWith('₹'))
+      .map(n => ({ text: n.textContent.trim(), fvn: getComputedStyle(n).fontVariantNumeric })));
+    const notTabular = nums.filter(n => !n.fvn.includes('tabular-nums'));
     await ctx.close(); await m.close();
     expect(errs.length === 0, `console/page errors: ${errs.join(' | ')}`);
     expect(overflow <= 1, `mobile horizontal overflow ${overflow}px`);
     expect(/e8921a/i.test(theme.accent), `--accent is ${theme.accent}`);
     expect(dark, `body background ${theme.bg} is not dark`);
-    return { notes: `Dark bg ${theme.bg}, --accent ${theme.accent}, no console errors, mobile overflow ${overflow}px`, evidence: { desk, mob, theme } };
+    expect(nums.length >= 3 && !notTabular.length, `₹ figures without tabular-nums: ${JSON.stringify(notTabular)} (of ${nums.length})`);
+    return { notes: `Dark bg ${theme.bg}, --accent ${theme.accent}, no unexpected console errors, mobile overflow ${overflow}px, all ${nums.length} calculator ₹ figures tabular-nums`, evidence: { desk, mob, theme } };
   });
 
   await check('LND-01-UI', async () => {

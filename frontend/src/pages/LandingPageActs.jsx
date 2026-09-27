@@ -1069,8 +1069,8 @@ export function TaxRiskCalculator() {
             }}>
               {[
                 { label: 'Annual income', value: inrFmt(result.annual), color: 'var(--text-primary)', note: 'before any deductions' },
-                { label: 'TDS brands deduct', value: inrFmt(result.estimatedTds), color: '#e53e3e', note: '10% of fees (Sec 393, formerly 194J)' },
-                { label: 'You actually receive', value: inrFmt(result.annual - result.estimatedTds), color: '#48bb78', note: 'paid into your account' },
+                { label: 'TDS brands deduct', value: inrFmt(result.estimatedTds), color: 'var(--danger-text)', note: '10% of fees (Sec 393, formerly 194J)' },
+                { label: 'You actually receive', value: inrFmt(result.annual - result.estimatedTds), color: 'var(--success-text)', note: 'paid into your account' },
               ].map(({ label, value, color, note }) => (
                 <div key={label} style={{
                   background: 'var(--bg-card)',
@@ -1079,7 +1079,7 @@ export function TaxRiskCalculator() {
                   padding: 'var(--space-4)',
                 }}>
                   <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 6, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.06em' }}>{label}</div>
-                  <div style={{ fontSize: 22, fontWeight: 800, color, marginBottom: 4 }}>{value}</div>
+                  <div style={{ fontSize: 22, fontWeight: 800, color, marginBottom: 4, fontVariantNumeric: 'tabular-nums' }}>{value}</div>
                   <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{note}</div>
                 </div>
               ))}
@@ -1088,13 +1088,13 @@ export function TaxRiskCalculator() {
             {/* Part 2: ITR outcome — refund vs advance tax */}
             {result.itrRefund > 0 ? (
               <div style={{
-                background: 'linear-gradient(135deg, rgba(72,187,120,.12), rgba(72,187,120,.06))',
-                border: '1px solid rgba(72,187,120,.3)',
+                background: 'var(--success-dim)',
+                border: '1px solid var(--success)',
                 borderRadius: 'var(--radius-lg)',
                 padding: 'var(--space-4) var(--space-5)',
                 marginBottom: 'var(--space-3)',
               }}>
-                <div style={{ fontWeight: 800, fontSize: 16, color: '#48bb78', marginBottom: 4 }}>
+                <div style={{ fontWeight: 800, fontSize: 16, color: 'var(--success-text)', marginBottom: 4, fontVariantNumeric: 'tabular-nums' }}>
                   {inrFmt(result.itrRefund)} refund when you file ITR
                 </div>
                 <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
@@ -1104,13 +1104,13 @@ export function TaxRiskCalculator() {
               </div>
             ) : (
               <div style={{
-                background: 'rgba(237,137,54,.08)',
-                border: '1px solid rgba(237,137,54,.3)',
+                background: 'var(--warning-dim)',
+                border: '1px solid var(--warning)',
                 borderRadius: 'var(--radius-lg)',
                 padding: 'var(--space-4) var(--space-5)',
                 marginBottom: 'var(--space-3)',
               }}>
-                <div style={{ fontWeight: 800, fontSize: 16, color: '#ed8936', marginBottom: 4 }}>
+                <div style={{ fontWeight: 800, fontSize: 16, color: 'var(--warning-text)', marginBottom: 4, fontVariantNumeric: 'tabular-nums' }}>
                   {inrFmt(result.q2Due)} advance tax due by Sep 15 (Q2)
                 </div>
                 <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>

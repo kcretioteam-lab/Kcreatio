@@ -17,7 +17,7 @@ import MarkPaidDialog from '../components/features/payment/MarkPaidDialog.jsx';
 import CreditNoteDialog from '../components/features/invoice/CreditNoteDialog.jsx';
 import Input from '../components/ui/Input.jsx';
 import { LIMITS, sanitizeNumber } from '../utils/limits.js';
-import { limitText, TEXT_LIMITS } from '../utils/fieldFormats.js';
+import { limitText, TEXT_LIMITS, SAC_REGEX } from '../utils/fieldFormats.js';
 import Badge from '../components/ui/Badge.jsx';
 import Modal from '../components/ui/Modal.jsx';
 import InvoiceList from '../components/features/invoice/InvoiceList.jsx';
@@ -225,8 +225,9 @@ function getErrors(form, user) {
   if (form.brandPan && !/^[A-Z]{5}[0-9]{4}[A-Z]$/.test(form.brandPan)) e.brandPan = 'PAN should look like ABCDE1234F';
   if (!form.serviceDescription.trim() || form.serviceDescription.trim().length < 5)
                                                            e.serviceDescription = 'Description of services is mandatory';
-  if (!form.sacCode.trim())                                e.sacCode = 'SAC/HSN code is mandatory for service invoices';
-  const lines = form.serviceLines?.length ? form.serviceLines : [{ amount: form.baseAmount, description: form.serviceDescription }];
+  const lines = form.serviceLines?.length ? form.serviceLines : [{ amount: form.baseAmount, description: form.serviceDescription, sacCode: form.sacCode }];
+  if (lines.some(l => !String(l.sacCode ?? '').trim()))  e.sacCode = 'SAC code is mandatory for service invoices';
+  else if (lines.some(l => !SAC_REGEX.test(String(l.sacCode).trim()))) e.sacCode = 'SAC is 6 digits starting with 99, like 998399';
   if (lines.some(l => !(parseFloat(l.amount) > 0)))        e.baseAmount = 'Every service line needs an amount above ₹0';
   if (lines.some(l => parseFloat(l.amount) > 9999999))     e.baseAmount = 'Amount exceeds ₹99,99,999';
   if (!form.invoiceDate)                                   e.invoiceDate = 'Invoice date is required';
@@ -996,8 +997,11 @@ function NetInHandPanel({ calc }) {
           <span style={{ fontWeight: 700 }}>You receive</span>
           <span style={{ fontWeight: 700, color: 'var(--accent)' }}>{formatINRDecimal(netReceived)}</span>
         </div>
-        <div style={{ fontSize: 11, color: '#48bb78', marginTop: 2 }}>
+        <div style={{ fontSize: 'var(--text-xs)', color: 'var(--success-text)', marginTop: 2 }}>
           TDS credit at ITR: +{formatINRDecimal(tdsDeducted)} — not lost, claimable when you file
+        </div>
+        <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>
+          Collect Form 16A from the brand each quarter — it’s your proof of this TDS when you file
         </div>
       </div>
     </div>
@@ -1736,7 +1740,7 @@ export default function InvoicePage({ initialView }) {
                         </div>
                         {/* SAC Code last */}
                         <Input
-                          label="SAC Code" value={line.sacCode || '998399'}
+                          label="SAC Code" format="sac" value={line.sacCode ?? ''} error={line.sacCode ? undefined : 'SAC code is required (998399 for creator services)'}
                           onChange={e => { const lines=[...form.serviceLines]; lines[idx]={...lines[idx],sacCode:e.target.value}; update('serviceLines',lines); if(idx===0) update('sacCode',e.target.value); }}
                           placeholder="998399" tooltip="SAC 998399 = Content creation & influencer marketing services"
                         />
@@ -1773,7 +1777,9 @@ export default function InvoicePage({ initialView }) {
               {calc.base > 0 ? (
                 <div style={{ padding: 'var(--space-4)', background: 'var(--surface-2)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
                   <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 'var(--space-3)' }}>
-                    {calc.supplyType==='intrastate' ? 'Intrastate — CGST + SGST' : 'Interstate — IGST'}
+                    {!form.isExport && !(form.placeOfSupply || form.brandStateCode)
+                      ? 'Pick the brand’s state — GST shown as IGST until then'
+                      : calc.supplyType==='intrastate' ? 'Intrastate — CGST + SGST' : 'Interstate — IGST'}
                   </div>
                   {[
                     ...(showDiscount ? [['Subtotal', formatINRDecimal(calc.subtotal)], ['Less: Discount', ('−' + formatINRDecimal(calc.discountAmount))]] : []),
@@ -2794,7 +2800,7 @@ function ClassicPreview({ form, calc, invoiceNumber, user, template }) {
               ? form.serviceLines.map((line, i) => (
                 <tr key={i} style={{ borderBottom: '1px solid #f0f0f0' }}>
                   <td style={{ padding: 8, fontSize: 11 }}>{line.description || '—'}</td>
-                  <td style={{ padding: 8, fontFamily: 'monospace', fontSize: 10, color: '#555' }}>{line.sacCode || '998399'}</td>
+                  <td style={{ padding: 8, fontFamily: 'monospace', fontSize: 10, color: '#555' }}>{line.sacCode || '—'}</td>
                   <td style={{ padding: 8, fontSize: 10, color: '#555' }}>{line.gstRate || 18}%</td>
                   <td style={{ padding: 8, textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontWeight: 600 }}>{line.amount ? formatINR(parseFloat(line.amount)) : '—'}</td>
                 </tr>
@@ -2967,7 +2973,7 @@ function CorporatePreview({ form, calc, invoiceNumber, user, template }) {
                 <tr key={i} style={{ borderBottom: '1px solid #f0f0f0' }}>
                   <td style={{ padding: '6px 7px', fontSize: 10 }}>{i+1}</td>
                   <td style={{ padding: '6px 7px', fontSize: 10 }}>{line.description || '—'}</td>
-                  <td style={{ padding: '6px 7px', fontFamily: 'monospace', fontSize: 9, color: '#555' }}>{line.sacCode || '998399'}</td>
+                  <td style={{ padding: '6px 7px', fontFamily: 'monospace', fontSize: 9, color: '#555' }}>{line.sacCode || '—'}</td>
                   <td style={{ padding: '6px 7px', fontSize: 9, color: '#555' }}>{line.gstRate || 18}%</td>
                   <td style={{ padding: '6px 7px', textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontSize: 10 }}>{line.amount ? formatINR(parseFloat(line.amount)) : '—'}</td>
                   <td style={{ padding: '6px 7px', textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontWeight: 600, fontSize: 10 }}>{line.amount ? formatINR(parseFloat(line.amount)) : '—'}</td>
@@ -3066,7 +3072,7 @@ function MinimalPreview({ form, calc, invoiceNumber, user, template }) {
             ? form.serviceLines.map((line, i) => (
               <tr key={i} style={{ borderBottom: '1px solid #f0f0f0' }}>
                 <td style={{ padding: '6px', fontSize: 10 }}>{line.description || '—'}</td>
-                <td style={{ padding: '6px', fontFamily: 'monospace', fontSize: 9, color: '#888' }}>{line.sacCode || '998399'}</td>
+                <td style={{ padding: '6px', fontFamily: 'monospace', fontSize: 9, color: '#888' }}>{line.sacCode || '—'}</td>
                 <td style={{ padding: '6px', fontSize: 9, color: '#888' }}>{line.gstRate || 18}%</td>
                 <td style={{ padding: '6px', textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontWeight: 600, fontSize: 10 }}>{line.amount ? formatINR(parseFloat(line.amount)) : '—'}</td>
               </tr>

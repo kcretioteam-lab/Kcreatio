@@ -9,9 +9,14 @@ import { computeTax, estimateDeferralInterest, quickTaxEstimate, firstYearDeprec
 const router = Router();
 
 // PUBLIC — no auth required (used by landing page tax calculator)
+// Same limits as the landing-page widget (₹10 crore a month, 50 brands)
+const QUICK_MAX_MONTHLY = 100000000;
+const QUICK_MAX_BRANDS = 50;
+
 router.get('/quick-estimate', (req, res): void => {
-  const monthlyIncome = parseFloat(req.query.monthly_income as string) || 0;
-  const brandCount = parseInt(req.query.brand_count as string, 10) || 1;
+  const clamp = (v: number, max: number) => (Number.isFinite(v) ? Math.min(Math.max(v, 0), max) : 0);
+  const monthlyIncome = clamp(parseFloat(req.query.monthly_income as string), QUICK_MAX_MONTHLY);
+  const brandCount = clamp(parseInt(req.query.brand_count as string, 10), QUICK_MAX_BRANDS) || 1;
   res.json(quickTaxEstimate(monthlyIncome, brandCount));
 });
 

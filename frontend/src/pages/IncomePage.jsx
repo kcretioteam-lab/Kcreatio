@@ -13,6 +13,8 @@ import { LIMITS } from '../utils/limits.js';
 import { SkeletonTableRow } from '../components/ui/Skeleton.jsx';
 import EmptyState from '../components/ui/EmptyState.jsx';
 import PlanGate from '../components/ui/PlanGate.jsx';
+import { useAuth } from '../hooks/useAuth.jsx';
+import { canAccess } from '../utils/planConfig.js';
 import { CURRENT_FY, PREVIOUS_FY as PREV_FY } from '../utils/financialYear.js';
 import { taxYearLabel } from '../utils/taxLabels.js';
 import { readCache, writeCache } from '../utils/listCache.js';
@@ -24,10 +26,12 @@ const EMPTY_INCOME = () => ({ source: 'brand_deal', amount: '', description: '',
 const SELECT_STYLE = { padding: 'var(--space-2) var(--space-3)', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', color: 'var(--text-primary)', fontFamily: 'inherit' };
 export default function IncomePage() {
   const toast = useToast();
+  const { user } = useAuth();
+  const hasAccess = canAccess('income_dashboard', user?.plan);
   const isMobile = useIsMobile();
   const [entries, setEntries] = useState([]);
   const [summary, setSummary] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(hasAccess);   // Basic sees the PlanGate — nothing to load
   const [fy, setFY] = useState(CURRENT_FY);
   const [addOpen, setAddOpen] = useState(false);
   const [editingEntry, setEditingEntry] = useState(null);
@@ -37,7 +41,7 @@ export default function IncomePage() {
     ? Math.round(parseFloat(form.foreignAmount) * parseFloat(form.fxRate) * 100) / 100 : null;
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => { loadData(); }, [fy]);
+  useEffect(() => { if (hasAccess) loadData(); }, [fy, hasAccess]);
 
   async function loadData() {
     // Show the last copy straight away, then refresh

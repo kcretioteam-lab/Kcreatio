@@ -167,7 +167,7 @@ export function quickTaxEstimate(monthlyIncome: number, brandCount = 1) {
   const lateCount = Math.round(brandCount * 0.4);
   const form16aRisk = brandCount < 3
     ? `${Math.round(brandCount * 40)}% chance of delay`
-    : `~${lateCount} of ${brandCount} brand${lateCount !== 1 ? 's' : ''} likely late`;
+    : `~${lateCount} of ${brandCount} brand${brandCount !== 1 ? 's' : ''} likely late`;
   return { annual, estimatedTds, incomeTax: r.totalTax, advanceTaxOwed: r.netPayable, itrRefund: r.refund, q2Due, form16aRisk };
 }
 

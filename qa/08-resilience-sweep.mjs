@@ -5,7 +5,9 @@ const PAGES = ['/dashboard', '/invoices', '/invoices/new', '/tds', '/tax-planner
 const b = await browser();
 
 try {
-  await check('RES-01', async () => {
+  // SWEEP_PLAN=basic runs only the page sweep, as the (still Basic) QA account, before premium is approved
+  const planTag = process.env.SWEEP_PLAN ? `${process.env.SWEEP_PLAN}-` : '';
+  if (!planTag) await check('RES-01', async () => {
     const ctx = await b.newContext({ viewport: { width: 1440, height: 900 } });
     const out = {};
     for (const p of PAGES) {
@@ -38,7 +40,7 @@ try {
 
   const c = await login();
   for (const [label, vp] of [['desktop', { width: 1440, height: 900 }], ['mobile', { width: 390, height: 844 }]]) {
-    await check(`UI-SWEEP-${label}`, async () => {
+    await check(`UI-SWEEP-${planTag}${label}`, async () => {
       const ctx = await authedContext(b, c.jar, { viewport: vp, isMobile: label === 'mobile', hasTouch: label === 'mobile' });
       const out = {};
       for (const p of PAGES) {

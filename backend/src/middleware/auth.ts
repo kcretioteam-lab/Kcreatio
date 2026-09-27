@@ -8,8 +8,9 @@ export interface AuthRequest extends Request {
 }
 
 export function authenticate(req: AuthRequest, res: Response, next: NextFunction): void {
-  // Dev bypass: accept X-Dev-User-Id header when not in production
-  if (process.env.NODE_ENV !== 'production' && req.headers['x-dev-user-id']) {
+  // Dev bypass: accept X-Dev-User-Id only when NODE_ENV is explicitly 'development'. A staging or preview
+  // deploy that forgets to set NODE_ENV must not let anyone act as any user id.
+  if (process.env.NODE_ENV === 'development' && req.headers['x-dev-user-id']) {
     req.userId = req.headers['x-dev-user-id'] as string;
     req.userPlan = (req.headers['x-dev-plan'] as string) || 'pro';
     next();

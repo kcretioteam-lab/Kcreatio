@@ -14,7 +14,7 @@ function numToWordsBelowThousand(n: number): string {
   return ones[Math.floor(n / 100)] + ' Hundred' + (n % 100 ? ' ' + numToWordsBelowThousand(n % 100) : '');
 }
 
-function amountInWords(amount: number): string {
+export function amountInWords(amount: number): string {
   const totalPaise = Math.round(amount * 100);
   const n = Math.floor(totalPaise / 100);
   const paise = totalPaise % 100;
@@ -290,6 +290,15 @@ const CACHE_TTL_MS = 5 * 60 * 1000;
 function getChromePath(): string {
   if (process.env.CHROME_PATH) return process.env.CHROME_PATH;
   if (process.platform === 'darwin') return '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
+  if (process.platform === 'win32') {
+    const roots = [process.env.PROGRAMFILES, process.env['PROGRAMFILES(X86)'], process.env.LOCALAPPDATA].filter(Boolean);
+    for (const root of roots) {
+      for (const rel of ['Google/Chrome/Application/chrome.exe', 'Microsoft/Edge/Application/msedge.exe']) {
+        const p = `${root}/${rel}`;
+        try { require('fs').accessSync(p); return p; } catch { /* not found */ }
+      }
+    }
+  }
   if (process.platform === 'linux') {
     // Render/Ubuntu uses chromium-browser; fall back to google-chrome-stable for GCE-style envs
     for (const p of ['/usr/bin/chromium-browser', '/usr/bin/chromium', '/usr/bin/google-chrome-stable', '/usr/bin/google-chrome']) {

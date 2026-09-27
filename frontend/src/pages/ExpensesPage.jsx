@@ -11,6 +11,8 @@ import Input from '../components/ui/Input.jsx';
 import { SkeletonTableRow } from '../components/ui/Skeleton.jsx';
 import EmptyState from '../components/ui/EmptyState.jsx';
 import PlanGate from '../components/ui/PlanGate.jsx';
+import { useAuth } from '../hooks/useAuth.jsx';
+import { canAccess } from '../utils/planConfig.js';
 import { CURRENT_FY, PREVIOUS_FY as PREV_FY } from '../utils/financialYear.js';
 import { taxYearLabel } from '../utils/taxLabels.js';
 import { readCache, writeCache } from '../utils/listCache.js';
@@ -28,17 +30,19 @@ const EMPTY_EXPENSE = () => ({ category: 'software', amount: '', description: ''
 const CAT_LABELS = { equipment: 'Equipment', software: 'Software', travel: 'Travel', props: 'Props', marketing: 'Marketing', team: 'Team', subscription: 'Subscription', other: 'Other' };
 export default function ExpensesPage() {
   const toast = useToast();
+  const { user } = useAuth();
+  const hasAccess = canAccess('expense_tracker', user?.plan);
   const isMobile = useIsMobile();
   const [expenses, setExpenses] = useState([]);
   const [summary, setSummary] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(hasAccess);   // Basic sees the PlanGate — nothing to load
   const [fy, setFY] = useState(CURRENT_FY);
   const [addOpen, setAddOpen] = useState(false);
   const [editingEntry, setEditingEntry] = useState(null);
   const [form, setForm] = useState(EMPTY_EXPENSE);
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => { loadData(); }, [fy]);
+  useEffect(() => { if (hasAccess) loadData(); }, [fy, hasAccess]);
 
   async function loadData() {
     // Show the last copy straight away, then refresh
