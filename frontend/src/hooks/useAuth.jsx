@@ -19,7 +19,7 @@ const MOCK_USER = {
   invoice_prefix: 'ADM',
   plan: 'basic',   // Use 'pro' to test without watermark / feature gates
   trial_ends_at: null,
-  phone: '+91 98765 43210',
+  phone: '+91 00000 00000',
   show_phone_on_invoice: true,
   invoice_phone: '',
   invoice_email: '',

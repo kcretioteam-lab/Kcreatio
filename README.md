@@ -161,14 +161,14 @@ Connect Gmail once. App scans every 6 hours for payment confirmations, brand dea
 - **Smart Inbox** — Gmail auto-scan for payments, deal confirmations, TDS deductions, subscription expenses; keyword classifier with confidence scoring; provenance info icon on every detection; email timestamp on every card
 - **Manual email paste** — paste any missed email → classifier analyses it → one-click confirm
 - **Invoice auto-overdue** — scheduled daily job flips sent invoices to overdue automatically
-- **Deal stale alerts** — scheduled nudge when a deal is stuck >14 days in the same stage
+- **Deal stale alerts** — deal cards show an "Nd in stage" badge once a deal has sat in the same stage for more than 14 days (a scheduled email nudge is not built yet)
 - **Smart invoice pre-fill from deal** — navigate to new invoice with `deal_id` to auto-fill brand fields
 - **Bell badge** — TopBar bell shows live count of pending Smart Inbox items
 - **Tax Risk Calculator** (public, no account) — landing page widget that shows annual income → TDS deducted → amount received → ITR refund or advance tax owed. Uses actual new regime slabs + Section 87A rebate (FY 2025-26). Creators earning ≤ ₹12L/year see a green "₹X refund at ITR" banner instead of scary red numbers. Backed by `/api/v1/tax/quick-estimate` (no auth required).
 - **Invoice Compliance Panel** — sticky footer on the invoice form with live Rule 46 CGST compliance badges ("RULE 46 4/7" counters) and a blocking error list. Prevents non-compliant invoice saves.
 - **Net-in-Hand Breakdown** — below the Tax Calculation section on invoice form: shows exact amount brand pays, TDS deducted (10%), and net creator receives, with a Form 16A reminder.
 - **ITR Claimable Banner** — green callout at the top of the TDS page showing total TDS deducted for the FY and a reminder to collect Form 16A from all brands before filing.
-- **PDF watermark** — Basic plan PDFs carry a faint diagonal Kcreatio logo and a "kcreatio.com — upgrade for watermark-free invoices" footer (Puppeteer server-side, same watermark in the client-side fallback). Starter and above get clean PDFs.
+- **PDF watermark** — Basic plan PDFs carry a faint diagonal Kcreatio logo and a "Made with ease on kcreatio.com" footer — both from Puppeteer and from the pdfmake fallback used when Chrome is unavailable. Starter and above get clean PDFs.
 
 **Pending (requires Supabase credentials):**
 - Run DB migrations 001–015 (see `SETUP.md`)

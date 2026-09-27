@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Check, Clock } from 'lucide-react';
 import Modal from './Modal.jsx';
 import Input from './Input.jsx';
+import { LIMITS } from '../../utils/limits.js';
 import api, { getErrorMessage } from '../../utils/api.js';
 import { useToast } from '../../hooks/useToast.jsx';
 
@@ -91,8 +92,9 @@ export default function RequestPremiumModal({ isOpen, onClose, isPending, onSubm
             id="premium-followers"
             label="Follower / subscriber count"
             type="number"
-            min="0"
-            inputMode="numeric"
+            max={LIMITS.FOLLOWERS}
+            decimals={0}
+            currency={false}
             value={followers}
             onChange={e => setFollowers(e.target.value)}
             placeholder="e.g. 120000"

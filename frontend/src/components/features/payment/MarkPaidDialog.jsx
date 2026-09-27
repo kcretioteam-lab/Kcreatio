@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import Modal from '../../ui/Modal.jsx';
 import Input from '../../ui/Input.jsx';
+import { LIMITS } from '../../../utils/limits.js';
 import { formatINRDecimal } from '../../../utils/formatINR.js';
 import { tdsSectionLabel } from '../../../utils/taxLabels.js';
 import { getFinancialYear } from '../../../utils/financialYear.js';
@@ -112,9 +113,9 @@ export default function MarkPaidDialog({ isOpen, onClose, title, brandName, taxa
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 'var(--space-3)' }}>
-          <Input id="mp-tds" label="TDS amount (₹)" type="number" inputMode="decimal" min="0" step="0.01" value={tds} onChange={e => changeTds(e.target.value)}
+          <Input id="mp-tds" label="TDS amount (₹)" type="number" max={LIMITS.MONEY_LARGE} value={tds} onChange={e => changeTds(e.target.value)}
             hint="Check the brand’s payment advice — brands often deduct odd amounts." style={{ fontVariantNumeric: 'tabular-nums' }} />
-          <Input id="mp-received" label={barter ? 'Cash received, if any (₹)' : 'Amount received (₹) *'} type="number" inputMode="decimal" min="0" step="0.01" value={received} onChange={e => setReceived(e.target.value)}
+          <Input id="mp-received" label={barter ? 'Cash received, if any (₹)' : 'Amount received (₹) *'} type="number" max={LIMITS.MONEY_LARGE} value={received} onChange={e => setReceived(e.target.value)}
             hint={barter ? undefined : 'Got less than the full amount? Enter what arrived — the rest stays outstanding as a part payment.'}
             style={{ fontVariantNumeric: 'tabular-nums' }} />
         </div>

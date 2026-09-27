@@ -15,8 +15,10 @@ export const STATE_CODES = {
 };
 
 // Current states for pickers — legacy codes (25, 28) stay valid in GSTINs but aren't offered.
+// Sorted by code explicitly: object key order puts integer-like keys ('10'…'97') before '01'…'09'.
 export const INDIAN_STATES = Object.entries(STATE_CODES)
   .filter(([code]) => code !== '25' && code !== '28' && code !== '96')
+  .sort(([a], [b]) => a.localeCompare(b))
   .map(([code, name]) => ({ code, name }));
 
 // GST rates after the September 2025 rationalisation. 12% and 28% were removed.

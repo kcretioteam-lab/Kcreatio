@@ -9,9 +9,14 @@ import { computeTax, estimateDeferralInterest, quickTaxEstimate, firstYearDeprec
 const router = Router();
 
 // PUBLIC — no auth required (used by landing page tax calculator)
+// Same limits as the landing-page widget (₹10 crore a month, 50 brands)
+const QUICK_MAX_MONTHLY = 100000000;
+const QUICK_MAX_BRANDS = 50;
+
 router.get('/quick-estimate', (req, res): void => {
-  const monthlyIncome = parseFloat(req.query.monthly_income as string) || 0;
-  const brandCount = parseInt(req.query.brand_count as string, 10) || 1;
+  const clamp = (v: number, max: number) => (Number.isFinite(v) ? Math.min(Math.max(v, 0), max) : 0);
+  const monthlyIncome = clamp(parseFloat(req.query.monthly_income as string), QUICK_MAX_MONTHLY);
+  const brandCount = clamp(parseInt(req.query.brand_count as string, 10), QUICK_MAX_BRANDS) || 1;
   res.json(quickTaxEstimate(monthlyIncome, brandCount));
 });
 
@@ -50,8 +55,9 @@ router.get('/estimate', checkPlan('pro'), async (req: AuthRequest, res: Response
   const elapsed = Math.min(totalDays, Math.max(1, (now.getTime() - fyStart.getTime()) / 86400000));
   const factor = totalDays / elapsed;
   const manual = parseFloat(annualEstimate);
-  const projectedAnnual = Number.isFinite(manual) && manual >= 0 ? manual : Math.round(ytdIncome * factor);
-  const projectedExpenses = Number.isFinite(manual) ? 0 : Math.round(ytdExpenses * factor) + depreciation;
+  const useManual = Number.isFinite(manual) && manual >= 0 && manual <= 999999999;
+  const projectedAnnual = useManual ? manual : Math.round(ytdIncome * factor);
+  const projectedExpenses = useManual ? 0 : Math.round(ytdExpenses * factor) + depreciation;
 
   const regime: Regime = regimeParam === 'old' || regimeParam === 'new'
     ? regimeParam : (profile?.tax_regime === 'old' ? 'old' : 'new');
@@ -159,7 +165,7 @@ router.get('/deadlines', async (req: AuthRequest, res: Response): Promise<void> 
 const TaxPaymentSchema = z.object({
   quarter: z.enum(['Q1', 'Q2', 'Q3', 'Q4']),
   financialYear: z.string(),
-  amountPaid: z.number().positive(),
+  amountPaid: z.number().positive().max(99999999),
   paidDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   challanNumber: z.string().max(50).optional(),
 });

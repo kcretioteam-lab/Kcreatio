@@ -24,7 +24,8 @@ export interface ClassifierResult {
   reasons: string[];
   extracted: {
     brand_name?: string;
-    amount?: number;       // in rupees (not paise)
+    amount?: number;       // in rupees (not paise). payment: what reached the bank; tds: the taxable (gross) value
+    tds_amount?: number;   // TDS the email says was deducted
     tds_rate?: number;
     tan?: string;
     contact_email?: string;
@@ -71,8 +72,10 @@ function extractTAN(text: string): string | undefined {
 
 const TDS_RATE_REGEX = /(?:@|at|rate)\s*([0-9]+(?:\.[0-9]+)?)\s*%/i;
 
+const TDS_RATE_BEFORE_REGEX = /([0-9]+(?:\.[0-9]+)?)\s*%\s*(?:tds|tax deducted)/i;
+
 function extractTDSRate(text: string): number | undefined {
-  const match = text.match(TDS_RATE_REGEX);
+  const match = text.match(TDS_RATE_BEFORE_REGEX) ?? text.match(TDS_RATE_REGEX);
   if (match) {
     const val = parseFloat(match[1]);
     if (!isNaN(val) && val > 0 && val <= 100) return val;
@@ -81,6 +84,31 @@ function extractTDSRate(text: string): number | undefined {
   if (/194[JCH]/i.test(text)) return 10;
   return undefined;
 }
+
+// ── TDS / gross / net figures ─────────────────────────────────────────────────
+// A single "first amount" can't tell the TDS apart from the invoice value, so read them by context.
+
+const MONEY = '(?:INR|₹|Rs\\.?)\\s*([0-9][0-9,]*(?:\\.[0-9]{1,2})?)';
+const TDS_AMOUNT_PATTERNS = [
+  new RegExp(`tds\\s*(?:amount\\s*)?(?:of|:|-|=)?\\s*${MONEY}`, 'i'),   // TDS of Rs. 10,000
+  new RegExp(`${MONEY}\\s*(?:has been|have been|was|were|is)?\\s*(?:deducted|withheld)\\s*(?:as|towards|for)\\s*tds`, 'i'),   // ₹5,000 deducted as TDS
+  new RegExp(`tax deducted at source\\s*(?:of|:)?\\s*${MONEY}`, 'i'),
+];
+const GROSS_PATTERNS = [
+  new RegExp(`(?:invoice|bill|gross(?:\\s*amount)?|professional fees?|fees?)\\s*(?:amount|value)?\\s*(?:of|:|for|=)?\\s*${MONEY}`, 'i'),
+];
+
+const toNum = (raw: string) => { const v = parseFloat(raw.replace(/,/g, '')); return Number.isFinite(v) && v > 0 ? v : undefined; };
+function firstMatch(text: string, patterns: RegExp[]): number | undefined {
+  for (const p of patterns) { const m = text.match(p); if (m) { const v = toNum(m[1]); if (v) return v; } }
+  return undefined;
+}
+export function extractTdsAmount(text: string) { return firstMatch(text, TDS_AMOUNT_PATTERNS); }
+export function extractGrossAmount(text: string) { return firstMatch(text, GROSS_PATTERNS); }
+
+// Paise maths so ₹ figures don't drift
+const paise = (r: number) => Math.round(r * 100);
+const rupees = (p: number) => p / 100;
 
 // ── Sender domain helpers ──────────────────────────────────────────────────────
 
@@ -128,6 +156,13 @@ const PAYMENT_KEYWORDS = [
   'adsense payment', 'balance transferred', 'remittance received',
   'transaction successful', 'credit alert', 'money credited',
   'your account has been credited', 'inward neft',
+];
+
+// Payment wording that isn't a fixed phrase: bank rails and "processed/released/transferred ₹X"
+const PAYMENT_PATTERNS: [RegExp, string][] = [
+  [/\b(?:neft|imps|rtgs|utr)\b/i, 'bank transfer reference (NEFT/IMPS/RTGS/UTR)'],
+  [/\b(?:processed|released|transferred|remitted|disbursed)\b[^.\n]{0,60}(?:INR|₹|Rs\.?)\s*[0-9]/i, 'payment verb before an amount'],
+  [/(?:INR|₹|Rs\.?)\s*[0-9][0-9,.]*[^.\n]{0,60}\b(?:processed|released|transferred|remitted|disbursed)\b/i, 'amount before a payment verb'],
 ];
 
 const DEAL_CONFIRMED_KEYWORDS = [
@@ -193,9 +228,15 @@ export function classifyEmail(input: ClassifierInput): ClassifierResult {
   const reasons: string[] = [];
   const extracted: ClassifierResult['extracted'] = {};
 
-  // -- Check FORM 16A first (specific, avoid false-positives with TDS)
+  const tdsMatches = matchKeywords(fullText, TDS_KEYWORDS);
+  const tdsAmount = extractTdsAmount(fullText);
+  const grossAmount = extractGrossAmount(fullText);
+
+  // -- Form 16A: the certificate itself. An email that reports an actual deduction and merely
+  //    mentions Form 16A ("Form 16A will be issued quarterly") is a TDS notice, handled below.
   const form16aMatches = matchKeywords(fullText, FORM_16A_KEYWORDS);
-  if (form16aMatches.length) {
+  const reportsDeduction = tdsMatches.length > 0 && (tdsAmount != null || grossAmount != null);
+  if (form16aMatches.length && !reportsDeduction) {
     reasons.push(`Subject/body matched Form 16A keywords: "${form16aMatches[0]}"`);
     extracted.brand_name = fromName || undefined;
     extracted.contact_email = fromEmail || undefined;
@@ -203,15 +244,22 @@ export function classifyEmail(input: ClassifierInput): ClassifierResult {
   }
 
   // -- TDS deduction
-  const tdsMatches = matchKeywords(fullText, TDS_KEYWORDS);
   if (tdsMatches.length) {
     const tan = extractTAN(fullText);
-    const amount = extractAmount(fullText);
-    const tdsRate = extractTDSRate(fullText);
+    let tdsRate = extractTDSRate(fullText);
+    // amount = taxable (gross) value; derive whichever figure the email left out
+    let gross = grossAmount;
+    let tds = tdsAmount;
+    if (!gross && tds && tdsRate) gross = rupees(Math.round(paise(tds) * 100 / tdsRate));
+    if (!tds && gross && tdsRate) tds = rupees(Math.round(paise(gross) * tdsRate / 100));
+    if (gross && tds && !tdsRate) tdsRate = Math.round(tds / gross * 10000) / 100;
+    if (!gross && !tds) gross = extractAmount(fullText);   // one unlabelled amount — treat as the taxable value
 
     reasons.push(`Matched TDS keywords: "${tdsMatches.slice(0, 2).join('", "')}"`);
+    if (form16aMatches.length) reasons.push('Mentions Form 16A, but reports an actual deduction — treated as a TDS notice');
     if (tan) { reasons.push(`TAN found: ${tan}`); extracted.tan = tan; }
-    if (amount) { reasons.push(`Amount found: ₹${amount.toLocaleString('en-IN')}`); extracted.amount = amount; }
+    if (gross) { reasons.push(`Taxable value: ₹${gross.toLocaleString('en-IN')}`); extracted.amount = gross; }
+    if (tds) { reasons.push(`TDS deducted: ₹${tds.toLocaleString('en-IN')}`); extracted.tds_amount = tds; }
     if (tdsRate) { extracted.tds_rate = tdsRate; }
     extracted.brand_name = fromName || undefined;
     extracted.contact_email = fromEmail || undefined;
@@ -222,17 +270,29 @@ export function classifyEmail(input: ClassifierInput): ClassifierResult {
 
   // -- Payment received
   const paymentMatches = matchKeywords(fullText, PAYMENT_KEYWORDS);
-  if (paymentMatches.length) {
-    const amount = extractAmount(fullText);
+  // Looser wording ("we have processed ₹45,000", "via NEFT") — not for SaaS receipts / orders
+  const looksLikeReceipt = matchKeywords(fullText, EXPENSE_KEYWORDS).length > 0 || (fromEmail ? isSaaSSender(fromEmail) : false);
+  const patternHits = looksLikeReceipt ? [] : PAYMENT_PATTERNS.filter(([re]) => re.test(fullText)).map(([, why]) => why);
+  if (paymentMatches.length || patternHits.length) {
     const bankSender = fromEmail ? isBankSender(fromEmail) : false;
+    // amount = what reached the bank. With gross and TDS both stated, it's the difference.
+    let amount = grossAmount && tdsAmount ? rupees(paise(grossAmount) - paise(tdsAmount)) : extractAmount(fullText);
+    if (amount && tdsAmount && amount === tdsAmount) amount = undefined;
+    let tds = tdsAmount;
+    const tdsRate = /tds|tax deducted/i.test(fullText) ? extractTDSRate(fullText) : undefined;
+    // "₹45,000 … after 10% TDS": the ₹45,000 is net, so gross = net ÷ 0.9 and TDS = gross − net
+    if (!tds && amount && tdsRate && tdsRate < 100) tds = rupees(Math.round(paise(amount) * tdsRate / (100 - tdsRate)));
 
-    reasons.push(`Matched payment keywords: "${paymentMatches.slice(0, 2).join('", "')}"`);
+    if (paymentMatches.length) reasons.push(`Matched payment keywords: "${paymentMatches.slice(0, 2).join('", "')}"`);
+    for (const why of patternHits) reasons.push(`Matched payment wording: ${why}`);
     if (bankSender) reasons.push(`Sender domain matched known bank/fintech: ${domainFromEmail(fromEmail)}`);
-    if (amount) { reasons.push(`Amount found: ₹${amount.toLocaleString('en-IN')}`); extracted.amount = amount; }
+    if (amount) { reasons.push(`Amount received: ₹${amount.toLocaleString('en-IN')}`); extracted.amount = amount; }
+    if (tds) { reasons.push(`TDS deducted: ₹${tds.toLocaleString('en-IN')}`); extracted.tds_amount = tds; }
+    if (tdsRate) extracted.tds_rate = tdsRate;
     extracted.brand_name = fromName || undefined;
     extracted.contact_email = fromEmail || undefined;
 
-    const base = bankSender ? 0.85 : 0.60;
+    const base = bankSender ? 0.85 : paymentMatches.length ? 0.60 : 0.55;
     const confidence = amount ? Math.min(1, base + 0.08) : base;
     return { type: 'payment_received', confidence, reasons, extracted };
   }

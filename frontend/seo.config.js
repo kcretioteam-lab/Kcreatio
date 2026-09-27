@@ -1,5 +1,6 @@
 // Build-time SEO: robots.txt, sitemap.xml, and static HTML for public pages so search engines
 // and link previews (WhatsApp, LinkedIn) see real text without running JavaScript.
+// It is wrapped in .seo-prerender (visually hidden, see index.html) behind a boot loader, and
 // React replaces the #root contents on load, so users never see this markup.
 import { writeFileSync, readFileSync, mkdirSync } from 'fs';
 import path from 'path';
@@ -72,7 +73,7 @@ function pageHtml(template, page) {
     .replace('<link rel="canonical" href="' + SITE_URL + '/" />', `<link rel="canonical" href="${url}" />`)
     .replace('<meta property="og:url" content="' + SITE_URL + '/" />', `<meta property="og:url" content="${url}" />`)
     .replace('</head>', `${jsonLd}</head>`)
-    .replace('<div id="root"></div>', `<div id="root">${page.body}</div>`);
+    .replace('<div id="root">', `<div id="root"><div class="seo-prerender">${page.body}</div>`);
 }
 
 export default function seoPlugin() {

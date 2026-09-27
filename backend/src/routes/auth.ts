@@ -10,6 +10,7 @@ import { STATE_CODES, checkGstin, GSTIN_MESSAGES, panFromGstin } from '../lib/gs
 
 const PROFILE_FIELDS = 'id, name, email, plan, trial_ends_at, gstin, pan, business_name, business_address, state_code, invoice_prefix, gst_registered, legal_name, trade_name, tax_regime, presumptive, lut_number, phone, show_phone_on_invoice, invoice_phone, invoice_email, avatar_url';
 import { authenticate, AuthRequest } from '../middleware/auth.js';
+import { removeUserFiles } from '../services/userFiles.js';
 import { isDisposableEmail } from '../lib/disposableEmail.js';
 import { getFrontendUrl } from '../lib/env.js';
 import { signTokens, setTokenCookies, clearTokenCookies, startSession, touchSession, revokeSession, currentSessionId, RefreshPayload } from '../services/sessionService.js';
@@ -362,7 +363,7 @@ router.post('/refresh', async (req: Request, res: Response): Promise<void> => {
 router.get('/me', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
   const { data: user, error } = await supabase
     .from('users')
-    .select('id, name, email, plan, trial_ends_at, gstin, pan, business_name, business_address, state_code, invoice_prefix, gst_registered, legal_name, trade_name, tax_regime, presumptive, lut_number, created_at, phone, show_phone_on_invoice, invoice_phone, invoice_email, avatar_url, is_email_verified, social_links, social_verified, gmail_connected_email, marketing_emails')
+    .select('id, name, email, plan, trial_ends_at, gstin, pan, business_name, business_address, state_code, invoice_prefix, gst_registered, legal_name, trade_name, tax_regime, presumptive, lut_number, created_at, phone, show_phone_on_invoice, invoice_phone, invoice_email, avatar_url, is_email_verified, social_links, social_verified, gmail_connected_email, marketing_emails, token_version')
     .eq('id', req.userId!)
     .maybeSingle();
 
@@ -371,7 +372,21 @@ router.get('/me', authenticate, async (req: AuthRequest, res: Response): Promise
     return;
   }
 
-  res.json(user);
+  const { token_version, ...profile } = user;
+  // The plan inside the access token is fixed when it's issued. If it changed since (premium approved,
+  // trial ended), re-issue the session now so plan-gated features match straight away instead of
+  // after the next refresh. Skipped for the dev-bypass header, which carries no session.
+  let plan = profile.plan;
+  if (plan === 'trial' && profile.trial_ends_at && new Date(profile.trial_ends_at) < new Date()) plan = 'basic';
+  if (plan !== req.userPlan && req.cookies?.access_token && !req.headers['x-dev-user-id']) {
+    const sid = currentSessionId(req);
+    if (sid) {
+      const { accessToken, refreshToken } = signTokens(profile.id, plan, token_version || 0, sid);
+      setTokenCookies(res, accessToken, refreshToken);
+    }
+  }
+
+  res.json({ ...profile, plan });
 });
 
 // PUT /auth/profile
@@ -644,6 +659,16 @@ router.delete('/account', authenticate, async (req: AuthRequest, res: Response):
       const rzp = new Razorpay({ key_id: process.env.RAZORPAY_KEY_ID!, key_secret: process.env.RAZORPAY_KEY_SECRET! });
       await (rzp.subscriptions as any).cancel(user.subscription_id, false);
     } catch { /* Non-blocking */ }
+  }
+
+  // Uploaded documents (Form 16A, signatures, avatar) go too. Done first: if it fails nothing has been
+  // deleted yet, so the user can simply retry instead of leaving files behind with no account.
+  try {
+    await removeUserFiles(userId);
+  } catch (err) {
+    console.error('[DELETE_ACCOUNT] Storage cleanup failed:', err);
+    res.status(500).json({ error: 'INTERNAL_ERROR', message: 'Couldn’t delete your uploaded files. Please try again.', statusCode: 500 });
+    return;
   }
 
   const { error } = await supabase.from('users').delete().eq('id', userId);

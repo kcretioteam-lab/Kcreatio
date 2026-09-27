@@ -14,7 +14,7 @@ function numToWordsBelowThousand(n: number): string {
   return ones[Math.floor(n / 100)] + ' Hundred' + (n % 100 ? ' ' + numToWordsBelowThousand(n % 100) : '');
 }
 
-function amountInWords(amount: number): string {
+export function amountInWords(amount: number): string {
   const totalPaise = Math.round(amount * 100);
   const n = Math.floor(totalPaise / 100);
   const paise = totalPaise % 100;
@@ -157,7 +157,7 @@ function buildInvoiceHtml(inv: InvoiceForPdf, user: UserForPdf, plan?: string): 
   .hdr-right { text-align: right; font-size: 11px; opacity: .9; line-height: 1.7; }
   .rc { display: inline-block; background: rgba(255,255,255,.2); border-radius: 4px; padding: 2px 7px; font-size: 9px; margin-top: 6px; letter-spacing: .06em; }
   .body { border: 1px solid #e5e5e5; border-top: none; padding: 20px 24px; border-radius: 0 0 8px 8px; }
-  .parties { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+  .parties { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); overflow-wrap: anywhere; gap: 16px; margin-bottom: 16px; }
   .party-label { font-size: 8px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: #999; margin-bottom: 6px; }
   .party-name { font-weight: 700; font-size: 13px; margin-bottom: 3px; }
   .party-detail { font-size: 10px; color: #555; margin-top: 1px; }
@@ -290,6 +290,15 @@ const CACHE_TTL_MS = 5 * 60 * 1000;
 function getChromePath(): string {
   if (process.env.CHROME_PATH) return process.env.CHROME_PATH;
   if (process.platform === 'darwin') return '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
+  if (process.platform === 'win32') {
+    const roots = [process.env.PROGRAMFILES, process.env['PROGRAMFILES(X86)'], process.env.LOCALAPPDATA].filter(Boolean);
+    for (const root of roots) {
+      for (const rel of ['Google/Chrome/Application/chrome.exe', 'Microsoft/Edge/Application/msedge.exe']) {
+        const p = `${root}/${rel}`;
+        try { require('fs').accessSync(p); return p; } catch { /* not found */ }
+      }
+    }
+  }
   if (process.platform === 'linux') {
     // Render/Ubuntu uses chromium-browser; fall back to google-chrome-stable for GCE-style envs
     for (const p of ['/usr/bin/chromium-browser', '/usr/bin/chromium', '/usr/bin/google-chrome-stable', '/usr/bin/google-chrome']) {

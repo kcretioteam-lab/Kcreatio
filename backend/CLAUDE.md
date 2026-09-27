@@ -13,8 +13,8 @@
 
 ## Auth middleware
 ```typescript
-// auth.ts — accepts X-Dev-User-Id header in non-production
-if (process.env.NODE_ENV !== 'production' && req.headers['x-dev-user-id']) {
+// auth.ts — accepts X-Dev-User-Id header only when NODE_ENV is 'development'
+if (process.env.NODE_ENV === 'development' && req.headers['x-dev-user-id']) {
   req.userId = req.headers['x-dev-user-id'];
   req.userPlan = 'pro';
   next(); return;

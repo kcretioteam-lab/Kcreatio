@@ -9,9 +9,12 @@ import { formatINR, formatINRCompact } from '../utils/formatINR.js';
 import Badge from '../components/ui/Badge.jsx';
 import Modal from '../components/ui/Modal.jsx';
 import Input from '../components/ui/Input.jsx';
+import { LIMITS } from '../utils/limits.js';
 import { SkeletonTableRow } from '../components/ui/Skeleton.jsx';
 import EmptyState from '../components/ui/EmptyState.jsx';
 import PlanGate from '../components/ui/PlanGate.jsx';
+import { useAuth } from '../hooks/useAuth.jsx';
+import { canAccess } from '../utils/planConfig.js';
 import { CURRENT_FY, PREVIOUS_FY as PREV_FY } from '../utils/financialYear.js';
 import { taxYearLabel } from '../utils/taxLabels.js';
 import { readCache, writeCache } from '../utils/listCache.js';
@@ -23,10 +26,12 @@ const EMPTY_INCOME = () => ({ source: 'brand_deal', amount: '', description: '',
 const SELECT_STYLE = { padding: 'var(--space-2) var(--space-3)', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', color: 'var(--text-primary)', fontFamily: 'inherit' };
 export default function IncomePage() {
   const toast = useToast();
+  const { user } = useAuth();
+  const hasAccess = canAccess('income_dashboard', user?.plan);
   const isMobile = useIsMobile();
   const [entries, setEntries] = useState([]);
   const [summary, setSummary] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(hasAccess);   // Basic sees the PlanGate — nothing to load
   const [fy, setFY] = useState(CURRENT_FY);
   const [addOpen, setAddOpen] = useState(false);
   const [editingEntry, setEditingEntry] = useState(null);
@@ -36,7 +41,7 @@ export default function IncomePage() {
     ? Math.round(parseFloat(form.foreignAmount) * parseFloat(form.fxRate) * 100) / 100 : null;
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => { loadData(); }, [fy]);
+  useEffect(() => { if (hasAccess) loadData(); }, [fy, hasAccess]);
 
   async function loadData() {
     // Show the last copy straight away, then refresh
@@ -128,7 +133,7 @@ export default function IncomePage() {
         </div>
       )}
 
-      {chartData.length > 0 && (
+      {chartData.some(d => Number(d.amount) > 0) && (
         <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: 'var(--space-5)', marginBottom: 'var(--space-5)' }}>
           <div className="label" style={{ marginBottom: 'var(--space-4)' }}>Monthly Income</div>
           <div role="img" aria-label="Monthly income bar chart">
@@ -246,8 +251,8 @@ export default function IncomePage() {
           {isForeign ? (
             <>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)' }}>
-                <Input id="inc-foreign" label={`Amount (${form.currency}) *`} type="number" value={form.foreignAmount} onChange={e => setForm(p => ({...p, foreignAmount: e.target.value}))} style={{ fontVariantNumeric: 'tabular-nums' }} />
-                <Input id="inc-fx" label={`₹ per 1 ${form.currency} *`} type="number" value={form.fxRate} onChange={e => setForm(p => ({...p, fxRate: e.target.value}))} hint="Rate your bank credited at" style={{ fontVariantNumeric: 'tabular-nums' }} />
+                <Input id="inc-foreign" label={`Amount (${form.currency}) *`} type="number" max={LIMITS.FOREIGN_AMOUNT} value={form.foreignAmount} onChange={e => setForm(p => ({...p, foreignAmount: e.target.value}))} style={{ fontVariantNumeric: 'tabular-nums' }} />
+                <Input id="inc-fx" label={`₹ per 1 ${form.currency} *`} type="number" max={LIMITS.FX_RATE} decimals={4} value={form.fxRate} onChange={e => setForm(p => ({...p, fxRate: e.target.value}))} hint="Rate your bank credited at" style={{ fontVariantNumeric: 'tabular-nums' }} />
               </div>
               {convertedAmount && <div style={{ fontSize: 'var(--text-sm)', color: 'var(--text-body)' }}>Logged as <strong style={{ fontVariantNumeric: 'tabular-nums' }}>{formatINR(convertedAmount)}</strong></div>}
               <label style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'flex-start', fontSize: 'var(--text-sm)', color: 'var(--text-body)', cursor: 'pointer' }}>

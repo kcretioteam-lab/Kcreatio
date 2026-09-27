@@ -199,12 +199,18 @@ router.post('/:id/mark-paid', validateBody(MarkPaidSchema), async (req: AuthRequ
 
 // DELETE /deals/:id
 router.delete('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
-  // Atomically delete linked income entries first
-  await supabase
-    .from('income')
-    .delete()
-    .eq('deal_id', req.params.id)
-    .eq('user_id', req.userId!);
+  // A deal marked paid without an invoice owns its income and TDS rows — remove both, or the TDS
+  // would stay behind as ITR credit for income that no longer exists. Rows recorded against an
+  // invoice belong to that invoice and stay (their deal_id is cleared by the foreign key).
+  for (const table of ['tds_records', 'income'] as const) {
+    const { error: linkedErr } = await supabase
+      .from(table)
+      .delete()
+      .eq('deal_id', req.params.id)
+      .eq('user_id', req.userId!)
+      .is('invoice_id', null);
+    if (linkedErr) { res.status(500).json({ error: 'INTERNAL_ERROR', message: 'Couldn’t delete the deal’s payment records. Please try again.' }); return; }
+  }
 
   const { error } = await supabase
     .from('deals')

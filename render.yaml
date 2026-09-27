@@ -55,6 +55,12 @@ services:
         sync: false
       - key: FRONTEND_URL
         sync: false
+      # Public base URL of this API — builds the premium-approval link and lets its confirm form post back
+      - key: API_URL
+        value: https://kcreatio-backend.onrender.com
+      # Premium access requests are emailed here
+      - key: ADMIN_EMAIL
+        sync: false
       # Comma-separated in FRONTEND_URL (for CORS). PRIMARY_FRONTEND_URL picks
       # the one origin used to build actual links (password reset, OAuth
       # redirects, confirmation emails) — see backend/src/lib/env.ts.

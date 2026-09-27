@@ -25,6 +25,11 @@
     { "name": "₹15L with ₹1.5L TDS → partial refund", "input": { "grossReceipts": 1500000, "tdsPaid": 150000 }, "expected": { "taxableIncome": 1500000, "totalTax": 109200, "netPayable": 0, "refund": 40800 } },
     { "name": "₹15L with ₹1L TDS → below ₹10k, no advance tax", "input": { "grossReceipts": 1500000, "tdsPaid": 100000 }, "expected": { "taxableIncome": 1500000, "totalTax": 109200, "netPayable": 9200, "refund": 0, "instalments": [0, 0, 0, 0] } },
     { "name": "₹20L with ₹2L TDS → below ₹10k, no advance tax", "input": { "grossReceipts": 2000000, "tdsPaid": 200000 }, "expected": { "taxableIncome": 2000000, "totalTax": 208000, "netPayable": 8000, "refund": 0, "instalments": [0, 0, 0, 0] } },
-    { "name": "₹20L with ₹1L TDS → 15/45/75/100 instalments", "input": { "grossReceipts": 2000000, "tdsPaid": 100000 }, "expected": { "taxableIncome": 2000000, "totalTax": 208000, "netPayable": 108000, "refund": 0, "instalments": [16200, 32400, 32400, 27000] } }
+    { "name": "₹20L with ₹1L TDS → 15/45/75/100 instalments", "input": { "grossReceipts": 2000000, "tdsPaid": 100000 }, "expected": { "taxableIncome": 2000000, "totalTax": 208000, "netPayable": 108000, "refund": 0, "instalments": [16200, 32400, 32400, 27000] } },
+    { "name": "New regime ₹50L exactly → no surcharge", "input": { "grossReceipts": 5000000 }, "expected": { "taxableIncome": 5000000, "baseTax": 1080000, "surcharge": 0, "totalTax": 1123200 } },
+    { "name": "New regime ₹50.1L → surcharge limited by marginal relief", "input": { "grossReceipts": 5010000 }, "expected": { "taxableIncome": 5010000, "baseTax": 1083000, "surcharge": 7000, "cess": 43600, "totalTax": 1133600 } },
+    { "name": "New regime ₹60L → 10% surcharge", "input": { "grossReceipts": 6000000 }, "expected": { "taxableIncome": 6000000, "baseTax": 1380000, "surcharge": 138000, "cess": 60720, "totalTax": 1578720 } },
+    { "name": "New regime ₹6Cr → surcharge capped at 25%", "input": { "grossReceipts": 60000000 }, "expected": { "taxableIncome": 60000000, "baseTax": 17580000, "surcharge": 4395000, "cess": 879000, "totalTax": 22854000 } },
+    { "name": "Old regime ₹6Cr → 37% surcharge", "input": { "grossReceipts": 60000000, "regime": "old" }, "expected": { "taxableIncome": 60000000, "baseTax": 17812500, "surcharge": 6590625, "cess": 976125, "totalTax": 25379250 } }
   ]
 }

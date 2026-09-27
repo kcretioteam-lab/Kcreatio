@@ -6,6 +6,16 @@ import MobileNav from './MobileNav.jsx';
 
 const TABLET_BP = 1024;
 const MOBILE_BP = 768;
+const SIDEBAR_KEY = 'kcreatio:sidebar_collapsed';
+
+// The user's own choice wins; without one, start collapsed on tablet-sized screens
+function initialCollapsed() {
+  try {
+    const saved = localStorage.getItem(SIDEBAR_KEY);
+    if (saved !== null) return saved === '1';
+  } catch { /* storage blocked — fall through */ }
+  return window.innerWidth < TABLET_BP;
+}
 
 const PAGE_TITLES = {
   '/dashboard': 'Dashboard',
@@ -20,9 +30,8 @@ const PAGE_TITLES = {
 };
 
 export default function AppShell({ children }) {
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(initialCollapsed);
   const [isMobile, setIsMobile] = useState(window.innerWidth < MOBILE_BP);
-  const [isTablet, setIsTablet] = useState(window.innerWidth < TABLET_BP && window.innerWidth >= MOBILE_BP);
   const location = useLocation();
   const pageTitle = PAGE_TITLES[location.pathname] || (location.pathname.startsWith('/invoices/') ? 'Invoice' : 'Dashboard');
 
@@ -30,11 +39,27 @@ export default function AppShell({ children }) {
     const onResize = () => {
       const w = window.innerWidth;
       setIsMobile(w < MOBILE_BP);
-      setIsTablet(w >= MOBILE_BP && w < TABLET_BP);
       if (w < TABLET_BP) setCollapsed(true);
     };
     window.addEventListener('resize', onResize, { passive: true });
     return () => window.removeEventListener('resize', onResize);
+  }, []);
+
+  const toggleSidebar = () => setCollapsed((c) => {
+    try { localStorage.setItem(SIDEBAR_KEY, c ? '0' : '1'); } catch { /* not remembered, still toggles */ }
+    return !c;
+  });
+
+  // Ctrl+B / Cmd+B toggles the sidebar (same shortcut as most editors)
+  useEffect(() => {
+    const onKey = (e) => {
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'b') {
+        e.preventDefault();
+        toggleSidebar();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
   }, []);
 
   // ── Donezo-style: outer bg, inner rounded card ──────────────────────────────
@@ -58,8 +83,8 @@ export default function AppShell({ children }) {
         {/* Sidebar */}
         {!isMobile && (
           <Sidebar
-            collapsed={collapsed || isTablet}
-            onToggle={() => setCollapsed((c) => !c)}
+            collapsed={collapsed}
+            onToggle={toggleSidebar}
           />
         )}
 
