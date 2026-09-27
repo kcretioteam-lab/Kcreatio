@@ -70,16 +70,24 @@ export default function TDSPage() {
     e.preventDefault();
     if (!form.brandName || !form.invoiceAmount || !form.paymentDate) { toast.error('Fill all required fields'); return; }
     setSaving(true);
+    const body = {
+      brandName: form.brandName,
+      brandTan: form.brandTan || undefined,
+      invoiceAmount: parseFloat(form.invoiceAmount),
+      tdsRate: parseFloat(form.tdsRate),
+      tdsAmount: tdsAmount,
+      section: tdsSectionLabel(form.tdsRate === '10' ? '194J' : '194C', getFinancialYear(new Date(form.paymentDate))).replace(/^Sec /, ''),
+      paymentDate: form.paymentDate,
+    };
     try {
-      await api.post('/tds', {
-        brandName: form.brandName,
-        brandTan: form.brandTan || undefined,
-        invoiceAmount: parseFloat(form.invoiceAmount),
-        tdsRate: parseFloat(form.tdsRate),
-        tdsAmount: tdsAmount,
-        section: tdsSectionLabel(form.tdsRate === '10' ? '194J' : '194C', getFinancialYear(new Date(form.paymentDate))).replace(/^Sec /, ''),
-        paymentDate: form.paymentDate,
-      });
+      try {
+        await api.post('/tds', body);
+      } catch (err) {
+        // Same entry already exists — only save a second copy if it really is a separate deduction
+        if (err.response?.data?.error !== 'DUPLICATE') throw err;
+        if (!window.confirm(`${err.response.data.message} Add it anyway? Only do this if it’s a separate deduction — duplicates overstate your TDS credit.`)) return;
+        await api.post('/tds', { ...body, allowDuplicate: true });
+      }
       toast.success('TDS record added');
       setAddOpen(false);
       setForm({ brandName: '', brandTan: '', invoiceAmount: '', tdsRate: '10', tdsAmount: '', paymentDate: format(new Date(), 'yyyy-MM-dd') });
@@ -334,7 +342,7 @@ export default function TDSPage() {
       <Modal isOpen={addOpen} onClose={() => setAddOpen(false)} title="Add TDS Record">
         <form onSubmit={handleAdd} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }} noValidate>
           <Input id="tds-brand" label="Brand Name *" value={form.brandName} onChange={e => setForm(p => ({...p, brandName: e.target.value}))} placeholder="Glowleaf Naturals Pvt Ltd" />
-          <Input id="tds-tan" label="Brand TAN (optional)" value={form.brandTan} onChange={e => setForm(p => ({...p, brandTan: e.target.value.toUpperCase()}))} placeholder="BLRA12345B" maxLength={10} />
+          <Input id="tds-tan" format="tan" label="Brand TAN (optional)" value={form.brandTan} onChange={e => setForm(p => ({...p, brandTan: e.target.value.toUpperCase()}))} placeholder="BLRA12345B" maxLength={10} />
           <Input id="tds-amount" label="Taxable value, before GST (₹) *" type="number" value={form.invoiceAmount} onChange={e => setForm(p => ({...p, invoiceAmount: e.target.value, tdsAmount: ''}))} placeholder="45000" hint="TDS is worked out on the amount before GST." style={{ fontVariantNumeric: 'tabular-nums' }} />
           <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 'var(--space-3)' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>

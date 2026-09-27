@@ -1,0 +1,13 @@
+{
+  "name": "kcreatio-qa",
+  "private": true,
+  "type": "module",
+  "description": "End-to-end QA suite for Kcreatio (see ../TEST_PLAN.md)",
+  "scripts": {
+    "e2e": "node run.mjs"
+  },
+  "dependencies": {
+    "pdfjs-dist": "^4.10.38",
+    "playwright": "1.58.0"
+  }
+}

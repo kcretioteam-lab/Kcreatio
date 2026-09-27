@@ -6,6 +6,7 @@ import { authenticate, AuthRequest } from '../middleware/auth.js';
 import { partialWithoutDefaults } from '../lib/zodUtils.js';
 import { validateBody } from '../middleware/validateBody.js';
 import { getFrontendUrl } from '../lib/env.js';
+import { escapeHtml } from '../lib/html.js';
 import { markPaid, MarkPaidSchema } from '../services/paymentService.js';
 import { logInvoiceEvent } from '../services/auditLog.js';
 import { nextRecurringDate } from '../lib/dates.js';
@@ -113,6 +114,7 @@ router.get('/confirm-payment/:token', async (req: ExpressRequest, res: Response)
 router.use(authenticate);
 
 const CreateInvoiceSchema = z.object({
+  clientRequestId: z.string().uuid().optional(),   // same id on a retry → the existing invoice is returned
   brandName: z.string().min(1).max(200).trim(),
   brandGstin: gstinField.nullish().or(z.literal('')),
   brandAddress: z.string().min(1).max(500).trim(),
@@ -134,7 +136,7 @@ const CreateInvoiceSchema = z.object({
   templateId: z.string().max(20).default('classic'),
   paymentTerms: z.string().max(100).default('Net 30'),
   purchaseOrderNumber: z.string().max(100).nullish(),
-  discountValue: z.number().min(0).nullish(),
+  discountValue: z.number().min(0).max(9999999).nullish(),
   discountType: z.enum(['flat', 'percent']).nullish(),
   // Bank details
   includeBankDetails: z.boolean().default(false),
@@ -247,8 +249,27 @@ router.get('/', async (req: AuthRequest, res: Response): Promise<void> => {
 });
 
 // POST /invoices
+// Set to false if migration 019 hasn't been run, so saving still works without retry protection
+let clientRequestIdColumn = true;
+const missingClientRequestIdColumn = (err: { code?: string; message?: string } | null) =>
+  Boolean(err && (err.code === 'PGRST204' || err.code === '42703') && err.message?.includes('client_request_id'));
+
+async function findByClientRequestId(userId: string, clientRequestId: string) {
+  if (!clientRequestIdColumn) return null;
+  const { data, error } = await supabase.from('invoices').select('*')
+    .eq('user_id', userId).eq('client_request_id', clientRequestId).maybeSingle();
+  if (missingClientRequestIdColumn(error)) clientRequestIdColumn = false;
+  return error ? null : data;
+}
+
 router.post('/', validateBody(CreateInvoiceSchema), async (req: AuthRequest, res: Response): Promise<void> => {
   const body = req.body;
+
+  // A retry of a save that already went through (only the response was lost) — return that invoice
+  if (body.clientRequestId) {
+    const existing = await findByClientRequestId(req.userId!, body.clientRequestId);
+    if (existing) { res.status(200).json(existing); return; }
+  }
 
   // ── Plan enforcement (runs before DB calls) ───────────────────────────────
   const plan = (req.userPlan || 'basic') as Plan;
@@ -400,11 +421,21 @@ router.post('/', validateBody(CreateInvoiceSchema), async (req: AuthRequest, res
       reminders_enabled: Boolean(body.remindersEnabled),
       recurring: body.recurring || null,
       next_recurring_on: body.recurring ? nextRecurringDate(body.invoiceDate, body.recurring) : null,
+      ...(body.clientRequestId && clientRequestIdColumn ? { client_request_id: body.clientRequestId } : {}),
     })
     .select()
     .single();
 
   let { data: invoice, error } = await insertInvoice();
+  if (missingClientRequestIdColumn(error)) {
+    clientRequestIdColumn = false;
+    ({ data: invoice, error } = await insertInvoice());
+  }
+  // The same request raced in twice — return the copy that won
+  if (error?.code === '23505' && error.message?.includes('client_request_id')) {
+    const existing = await findByClientRequestId(req.userId!, body.clientRequestId);
+    if (existing) { res.status(200).json(existing); return; }
+  }
   // Unique (user_id, invoice_number) clash — e.g. two tabs saving at once — take the next number and retry
   for (let attempt = 0; attempt < 3 && error?.code === '23505'; attempt++) {
     invoiceNumber = await nextInvoiceNumber(req.userId!, prefix, fyCode);
@@ -460,7 +491,8 @@ router.get('/:id/pdf', pdfRateLimit, async (req: AuthRequest, res: Response): Pr
   if (!user) { res.status(404).json({ error: 'NOT_FOUND', message: 'User not found' }); return; }
 
   try {
-    const cacheKey = `${invoice.id}:${invoice.updated_at || invoice.created_at}`;
+    // Plan is part of the key so an upgrade (or downgrade) never serves the other plan's cached copy
+    const cacheKey = `${invoice.id}:${invoice.updated_at || invoice.created_at}:${req.userPlan || 'basic'}`;
     const pdfBuffer = await generateInvoicePdfWithPuppeteer(invoice, user, cacheKey, req.userPlan);
 
     res.setHeader('Content-Type', 'application/pdf');
@@ -486,6 +518,9 @@ router.get('/:id/pdf', pdfRateLimit, async (req: AuthRequest, res: Response): Pr
           stateCode: invoice.brand_state_code,
         },
         serviceDescription: invoice.service_description,
+        sacCode: invoice.sac_code,
+        reverseCharge: invoice.reverse_charge,
+        plan: req.userPlan,
         gst: {
           baseAmount: invoice.base_amount,
           gstRate: invoice.gst_rate,
@@ -709,10 +744,10 @@ router.post('/:id/send', async (req: AuthRequest, res: Response): Promise<void> 
 
   const html = `
     <div style="font-family:Inter,sans-serif;max-width:480px;margin:0 auto;padding:32px;background:#07080F;color:#F0F1F8;border-radius:12px;">
-      <div style="font-size:22px;font-weight:700;margin-bottom:8px;color:#E8921A;">${user.business_name || user.name}</div>
-      <h2 style="font-size:18px;font-weight:600;margin:0 0 8px;">GST Invoice ${inv.invoice_number}</h2>
-      <p style="color:#94a3b8;margin:0 0 8px;">Dear ${inv.brand_name},</p>
-      <p style="color:#94a3b8;margin:0 0 24px;">Please find the GST invoice for <strong style="color:#F0F1F8;">${amount}</strong> for services rendered. Kindly process payment at your earliest convenience.</p>
+      <div style="font-size:22px;font-weight:700;margin-bottom:8px;color:#E8921A;">${escapeHtml(user.business_name || user.name)}</div>
+      <h2 style="font-size:18px;font-weight:600;margin:0 0 8px;">GST Invoice ${escapeHtml(inv.invoice_number)}</h2>
+      <p style="color:#94a3b8;margin:0 0 8px;">Dear ${escapeHtml(inv.brand_name)},</p>
+      <p style="color:#94a3b8;margin:0 0 24px;">Please find the GST invoice for <strong style="color:#F0F1F8;">${escapeHtml(amount)}</strong> for services rendered. Kindly process payment at your earliest convenience.</p>
       <p style="color:#64748b;font-size:12px;margin:0;">This is a GST-compliant invoice generated via Kcreatio.</p>
     </div>`;
 

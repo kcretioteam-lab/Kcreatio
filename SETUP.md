@@ -36,6 +36,7 @@ npm run install:all
    - `backend/migrations/016_payment_integrity_tax_profile.sql` — atomic mark-paid functions, Tax Profile fields, invoice line items. **Run before deploying the backend** — `/auth/me` reads the new columns.
    - `backend/migrations/017_security_2fa_sessions_audit.sql` — two-factor sign-in, signed-in sessions, invoice audit log
    - `backend/migrations/018_creator_features.sql` — barter deals, foreign income, export invoices, part payments, credit notes, reminders, recurring invoices, TDS/expense fields
+   - `backend/migrations/019_invoice_client_request_id.sql` — lets a retried "Save invoice" return the invoice already created instead of making a duplicate
 
 3. Create a Storage bucket named **`invoice-signatures`** (public read):
    - Go to Storage → New bucket → Name: `invoice-signatures` → Public: ON
@@ -158,7 +159,7 @@ kcreatio/
 │   │   ├── services/  # invoiceService (GST calc), puppeteerPdfService (PDF + watermark)
 │   │   ├── middleware/ # authenticate, validateBody
 │   │   └── lib/       # supabase client
-│   └── migrations/    # 001–018 SQL files, run in Supabase SQL Editor
+│   └── migrations/    # 001–019 SQL files, run in Supabase SQL Editor
 └── SETUP.md           # This file
 ```
 

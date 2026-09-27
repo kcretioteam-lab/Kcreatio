@@ -3,6 +3,7 @@
  */
 import { useState, useEffect, useRef } from 'react';
 import { quickTaxEstimate } from '../utils/taxCalc.js';
+import { sanitizeNumber } from '../utils/limits.js';
 import { Link } from 'react-router-dom';
 import {
   FileText, TrendingDown, Calendar, Briefcase,
@@ -892,6 +893,13 @@ function inrFmt(n) {
   return '₹' + Math.round(n).toLocaleString('en-IN');
 }
 
+// Calculator input limits: ₹10 crore a month, 50 brands a month
+const MAX_MONTHLY = 100000000;
+const MAX_BRANDS = 50;
+
+// Whole numbers only; keystrokes past `max` are refused (null)
+const clampDigits = (raw, max) => sanitizeNumber(raw, { max, decimals: 0 });
+
 export function TaxRiskCalculator() {
   const [monthly, setMonthly] = useState('');
   const [brands, setBrands] = useState('');
@@ -902,8 +910,16 @@ export function TaxRiskCalculator() {
   function handleEstimate(e) {
     e.preventDefault();
     const m = parseFloat(monthly) || 0;
-    const b = parseInt(brands, 10) || 1;
-    if (m <= 0) return;
+    const b = brands === '' ? 1 : parseInt(brands, 10);
+    let msg = '';
+    if (!(m > 0)) msg = 'Enter a monthly income above ₹0 to see your numbers.';
+    else if (m > MAX_MONTHLY) msg = `Monthly income can be at most ${inrFmt(MAX_MONTHLY)} (₹10 crore).`;
+    else if (!(b >= 1 && b <= MAX_BRANDS)) msg = `Brands per month must be between 1 and ${MAX_BRANDS}.`;
+    if (msg) {
+      setResult(null);
+      setError(msg);
+      return;
+    }
     setError('');
     setResult(quickTaxEstimate(m, b));
   }
@@ -940,7 +956,7 @@ export function TaxRiskCalculator() {
           Enter your monthly earnings — see exactly what brands deduct, what you receive, and what you get back at ITR. No account needed.
         </p>
 
-        <form onSubmit={handleEstimate} style={{
+        <form onSubmit={handleEstimate} noValidate style={{
           display: 'flex',
           gap: 'var(--space-3)',
           justifyContent: 'center',
@@ -958,11 +974,21 @@ export function TaxRiskCalculator() {
               }}>₹</span>
               <input
                 id="calc-monthly"
-                type="number"
+                type="text"
                 inputMode="numeric"
-                min="0"
+                autoComplete="off"
                 value={monthly}
-                onChange={e => setMonthly(e.target.value)}
+                onChange={e => {
+                  const next = clampDigits(e.target.value, MAX_MONTHLY);
+                  if (next === null) {
+                    setError(`Monthly income can be at most ${inrFmt(MAX_MONTHLY)} (₹10 crore).`);
+                    return;
+                  }
+                  setMonthly(next);
+                  // A stale estimate must not stay on screen once the income is cleared or 0
+                  if (!(Number(next) > 0)) setResult(null);
+                  setError('');
+                }}
                 placeholder="50000"
                 required
                 style={{
@@ -984,12 +1010,20 @@ export function TaxRiskCalculator() {
             </label>
             <input
               id="calc-brands"
-              type="number"
+              type="text"
               inputMode="numeric"
-              min="1"
-              max="50"
+              autoComplete="off"
               value={brands}
-              onChange={e => setBrands(e.target.value)}
+              onChange={e => {
+                const next = clampDigits(e.target.value, MAX_BRANDS);
+                if (next === null) {
+                  setError(`Brands per month can be at most ${MAX_BRANDS}.`);
+                  return;
+                }
+                setBrands(next);
+                if (next === '0') setResult(null);
+                setError('');
+              }}
               placeholder="3"
               style={{
                 padding: '10px 12px',
@@ -1035,8 +1069,8 @@ export function TaxRiskCalculator() {
             }}>
               {[
                 { label: 'Annual income', value: inrFmt(result.annual), color: 'var(--text-primary)', note: 'before any deductions' },
-                { label: 'TDS brands deduct', value: inrFmt(result.estimatedTds), color: '#e53e3e', note: '10% of fees (Sec 393, formerly 194J)' },
-                { label: 'You actually receive', value: inrFmt(result.annual - result.estimatedTds), color: '#48bb78', note: 'paid into your account' },
+                { label: 'TDS brands deduct', value: inrFmt(result.estimatedTds), color: 'var(--danger-text)', note: '10% of fees (Sec 393, formerly 194J)' },
+                { label: 'You actually receive', value: inrFmt(result.annual - result.estimatedTds), color: 'var(--success-text)', note: 'paid into your account' },
               ].map(({ label, value, color, note }) => (
                 <div key={label} style={{
                   background: 'var(--bg-card)',
@@ -1045,7 +1079,7 @@ export function TaxRiskCalculator() {
                   padding: 'var(--space-4)',
                 }}>
                   <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 6, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.06em' }}>{label}</div>
-                  <div style={{ fontSize: 22, fontWeight: 800, color, marginBottom: 4 }}>{value}</div>
+                  <div style={{ fontSize: 22, fontWeight: 800, color, marginBottom: 4, fontVariantNumeric: 'tabular-nums' }}>{value}</div>
                   <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{note}</div>
                 </div>
               ))}
@@ -1054,13 +1088,13 @@ export function TaxRiskCalculator() {
             {/* Part 2: ITR outcome — refund vs advance tax */}
             {result.itrRefund > 0 ? (
               <div style={{
-                background: 'linear-gradient(135deg, rgba(72,187,120,.12), rgba(72,187,120,.06))',
-                border: '1px solid rgba(72,187,120,.3)',
+                background: 'var(--success-dim)',
+                border: '1px solid var(--success)',
                 borderRadius: 'var(--radius-lg)',
                 padding: 'var(--space-4) var(--space-5)',
                 marginBottom: 'var(--space-3)',
               }}>
-                <div style={{ fontWeight: 800, fontSize: 16, color: '#48bb78', marginBottom: 4 }}>
+                <div style={{ fontWeight: 800, fontSize: 16, color: 'var(--success-text)', marginBottom: 4, fontVariantNumeric: 'tabular-nums' }}>
                   {inrFmt(result.itrRefund)} refund when you file ITR
                 </div>
                 <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
@@ -1070,13 +1104,13 @@ export function TaxRiskCalculator() {
               </div>
             ) : (
               <div style={{
-                background: 'rgba(237,137,54,.08)',
-                border: '1px solid rgba(237,137,54,.3)',
+                background: 'var(--warning-dim)',
+                border: '1px solid var(--warning)',
                 borderRadius: 'var(--radius-lg)',
                 padding: 'var(--space-4) var(--space-5)',
                 marginBottom: 'var(--space-3)',
               }}>
-                <div style={{ fontWeight: 800, fontSize: 16, color: '#ed8936', marginBottom: 4 }}>
+                <div style={{ fontWeight: 800, fontSize: 16, color: 'var(--warning-text)', marginBottom: 4, fontVariantNumeric: 'tabular-nums' }}>
                   {inrFmt(result.q2Due)} advance tax due by Sep 15 (Q2)
                 </div>
                 <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>

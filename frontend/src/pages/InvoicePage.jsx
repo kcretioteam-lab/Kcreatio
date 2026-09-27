@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { format, addDays } from 'date-fns';
-import { Plus, FileText, Check, AlertCircle, Eye, Download, X, HelpCircle, ChevronUp, ChevronDown, ChevronsUpDown, Lock, Save, Mail, Trash2, Sun, Moon } from 'lucide-react';
+import { Plus, FileText, Check, AlertCircle, Eye, Download, X, HelpCircle, ChevronUp, ChevronDown, ChevronsUpDown, Lock, Save, Mail, Trash2, Sun, Moon, WifiOff, RefreshCw, FileDown } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth.jsx';
 import { useToast } from '../hooks/useToast.jsx';
 import UsageBar from '../components/ui/UsageBar.jsx';
@@ -16,6 +16,8 @@ import { CURRENT_FY } from '../utils/financialYear.js';
 import MarkPaidDialog from '../components/features/payment/MarkPaidDialog.jsx';
 import CreditNoteDialog from '../components/features/invoice/CreditNoteDialog.jsx';
 import Input from '../components/ui/Input.jsx';
+import { LIMITS, sanitizeNumber } from '../utils/limits.js';
+import { limitText, TEXT_LIMITS, SAC_REGEX } from '../utils/fieldFormats.js';
 import Badge from '../components/ui/Badge.jsx';
 import Modal from '../components/ui/Modal.jsx';
 import InvoiceList from '../components/features/invoice/InvoiceList.jsx';
@@ -223,8 +225,9 @@ function getErrors(form, user) {
   if (form.brandPan && !/^[A-Z]{5}[0-9]{4}[A-Z]$/.test(form.brandPan)) e.brandPan = 'PAN should look like ABCDE1234F';
   if (!form.serviceDescription.trim() || form.serviceDescription.trim().length < 5)
                                                            e.serviceDescription = 'Description of services is mandatory';
-  if (!form.sacCode.trim())                                e.sacCode = 'SAC/HSN code is mandatory for service invoices';
-  const lines = form.serviceLines?.length ? form.serviceLines : [{ amount: form.baseAmount, description: form.serviceDescription }];
+  const lines = form.serviceLines?.length ? form.serviceLines : [{ amount: form.baseAmount, description: form.serviceDescription, sacCode: form.sacCode }];
+  if (lines.some(l => !String(l.sacCode ?? '').trim()))  e.sacCode = 'SAC code is mandatory for service invoices';
+  else if (lines.some(l => !SAC_REGEX.test(String(l.sacCode).trim()))) e.sacCode = 'SAC is 6 digits starting with 99, like 998399';
   if (lines.some(l => !(parseFloat(l.amount) > 0)))        e.baseAmount = 'Every service line needs an amount above ₹0';
   if (lines.some(l => parseFloat(l.amount) > 9999999))     e.baseAmount = 'Amount exceeds ₹99,99,999';
   if (!form.invoiceDate)                                   e.invoiceDate = 'Invoice date is required';
@@ -264,7 +267,7 @@ function AutosaveIndicator({ lastSaved }) {
   }, [lastSaved]);
   if (!label) return null;
   return (
-    <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)', display: 'flex', alignItems: 'center', gap: 4 }}>
+    <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)', display: 'flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' }}>
       <Save size={11} aria-hidden="true" />
       {label}
     </span>
@@ -298,7 +301,7 @@ function buildClassicHTML(inv, user, t, plan) {
   .hdr-right { text-align: right; font-size: 11px; opacity: .9; line-height: 1.7; }
   .rc { display: inline-block; background: rgba(255,255,255,.2); border-radius: 4px; padding: 2px 7px; font-size: 9px; margin-top: 6px; letter-spacing: .06em; }
   .body { border: 1px solid #e5e5e5; border-top: none; padding: 20px 24px; border-radius: 0 0 8px 8px; }
-  .parties { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+  .parties { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); overflow-wrap: anywhere; gap: 16px; margin-bottom: 16px; }
   .party-label { font-size: 8px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: #999; margin-bottom: 6px; }
   .party-name { font-weight: 700; font-size: 13px; margin-bottom: 3px; }
   .party-detail { font-size: 10px; color: #555; margin-top: 1px; }
@@ -446,13 +449,13 @@ function buildCorporateHTML(inv, user, t, plan) {
   .hdr-right .inv-label { font-size: 9px; letter-spacing: .14em; text-transform: uppercase; opacity: .7; }
   .hdr-right .inv-num { font-size: 15px; font-weight: 700; }
   .orig { display: inline-block; font-size: 8px; letter-spacing: .08em; text-transform: uppercase; border: 1px solid rgba(255,255,255,.5); padding: 2px 6px; border-radius: 3px; margin-top: 4px; }
-  .info-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0; border-bottom: 2px solid ${t.headerColor}; }
+  .info-row { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); overflow-wrap: anywhere; gap: 0; border-bottom: 2px solid ${t.headerColor}; }
   .info-cell { padding: 12px 16px; }
   .info-cell:first-child { border-right: 1px solid #e5e5e5; }
   .info-label { font-size: 8px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: #999; margin-bottom: 4px; }
   .info-val { font-size: 11px; color: #333; }
   .info-val strong { font-size: 13px; color: #111; }
-  .detail-row { display: grid; grid-template-columns: 1fr 1fr; background: #f8f8f8; border-bottom: 1px solid #e5e5e5; }
+  .detail-row { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); overflow-wrap: anywhere; background: #f8f8f8; border-bottom: 1px solid #e5e5e5; }
   .detail-cell { padding: 6px 16px; font-size: 10px; }
   .detail-cell .dl { color: #888; }
   .detail-cell .dv { color: #333; font-weight: 500; }
@@ -466,7 +469,7 @@ function buildCorporateHTML(inv, user, t, plan) {
   .trow span:last-child { font-variant-numeric: tabular-nums; }
   .tfinal { display: flex; justify-content: space-between; padding: 8px 12px; background: ${t.headerColor}; color: #fff; }
   .tfinal span:last-child { font-weight: 800; font-size: 14px; font-variant-numeric: tabular-nums; }
-  .footer-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-top: 20px; }
+  .footer-row { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); overflow-wrap: anywhere; gap: 12px; margin-top: 20px; }
   .footer-sect { font-size: 10px; }
   .footer-sect .fh { font-weight: 700; font-size: 9px; text-transform: uppercase; letter-spacing: .06em; color: #999; margin-bottom: 6px; }
   .notes { margin-top: 10px; padding: 8px 12px; background: #f9f9f9; border-radius: 4px; font-size: 10px; color: #555; }
@@ -609,7 +612,7 @@ function buildMinimalHTML(inv, user, t, plan) {
   .meta-row .m { }
   .meta-row .ml { font-weight: 700; color: #888; font-size: 9px; letter-spacing:.06em; text-transform:uppercase; }
   .meta-row .mv { color: #222; font-size: 11px; }
-  .parties { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 14px; padding: 10px; background: #f8f8f8; border-radius: 4px; }
+  .parties { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); overflow-wrap: anywhere; gap: 16px; margin-bottom: 14px; padding: 10px; background: #f8f8f8; border-radius: 4px; }
   .party-lbl { font-size: 8px; font-weight:700; letter-spacing:.1em; text-transform:uppercase; color:#999; margin-bottom:4px; }
   .party-name { font-weight: 700; font-size: 12px; }
   .party-d { font-size: 10px; color: #666; }
@@ -625,7 +628,7 @@ function buildMinimalHTML(inv, user, t, plan) {
   .tfinal span:last-child { color: ${t.accentColor}; font-size: 13px; font-variant-numeric: tabular-nums; }
   .cb { clear: both; }
   .notes { margin-top: 12px; padding: 8px 12px; background: #f9f9f9; border-radius: 4px; font-size: 10px; color: #555; line-height: 1.6; }
-  .btm { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-top: 20px; font-size: 10px; }
+  .btm { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); overflow-wrap: anywhere; gap: 12px; margin-top: 20px; font-size: 10px; }
   .btm-lbl { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: #999; margin-bottom: 6px; }
   @page { margin: 0; size: A4 portrait; }
   * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; }
@@ -741,6 +744,13 @@ ${inv.include_terms && inv.terms_text ? `
 </body></html>`;
 }
 
+// True when the request never got a usable answer: offline, connection refused, timed out, or the
+// host is up but the app isn't (Render returns 502/503/504 while the service starts)
+function isServerUnreachable(err) {
+  if (err?.code === 'ERR_CANCELED') return false;
+  return !err?.response || [502, 503, 504].includes(err.response.status);
+}
+
 // Save a PDF blob. On phones, open the native share sheet (Save to Files / WhatsApp / Drive);
 // fall back to a normal download if sharing isn't supported or is refused.
 async function savePdfBlob(blob, filename) {
@@ -760,13 +770,22 @@ async function savePdfBlob(blob, filename) {
   setTimeout(() => URL.revokeObjectURL(url), 60000);
 }
 
-function downloadInvoicePDF(inv, user, template, plan) {
+// Stamps a built invoice as a draft: no "TAX INVOICE" heading and a large DRAFT mark on every page,
+// so a preview made while the server is unreachable can't be passed off as the GST tax invoice.
+function markAsDraft(html) {
+  const stamp = '<div style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-30deg);font:800 120px/1 sans-serif;letter-spacing:8px;color:rgba(220,38,38,0.14);pointer-events:none;z-index:9999">DRAFT</div>'
+    + '<div style="position:fixed;top:0;left:0;right:0;padding:4px;text-align:center;font:600 10px sans-serif;color:#b91c1c;background:#fee2e2">DRAFT — not a tax invoice. The final invoice and its number are issued once it is saved.</div>';
+  return html.replaceAll('TAX INVOICE', 'DRAFT — NOT A TAX INVOICE').replace('</body>', `${stamp}</body>`);
+}
+
+function downloadInvoicePDF(inv, user, template, plan, { draft = false } = {}) {
   const t = template || TEMPLATES[0];
   const effectiveT = { ...t, accentColor: inv.invoiceAccentColor || t.accentColor };
   let html;
   if (effectiveT.layout === 'corporate') html = buildCorporateHTML(inv, user, effectiveT, plan);
   else if (effectiveT.layout === 'minimal') html = buildMinimalHTML(inv, user, effectiveT, plan);
   else html = buildClassicHTML(inv, user, effectiveT, plan);
+  if (draft) html = markAsDraft(html);
 
   // Use Blob URL — avoids popup blocker issues with document.write
   const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
@@ -978,8 +997,11 @@ function NetInHandPanel({ calc }) {
           <span style={{ fontWeight: 700 }}>You receive</span>
           <span style={{ fontWeight: 700, color: 'var(--accent)' }}>{formatINRDecimal(netReceived)}</span>
         </div>
-        <div style={{ fontSize: 11, color: '#48bb78', marginTop: 2 }}>
+        <div style={{ fontSize: 'var(--text-xs)', color: 'var(--success-text)', marginTop: 2 }}>
           TDS credit at ITR: +{formatINRDecimal(tdsDeducted)} — not lost, claimable when you file
+        </div>
+        <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>
+          Collect Form 16A from the brand each quarter — it’s your proof of this TDS when you file
         </div>
       </div>
     </div>
@@ -1037,6 +1059,11 @@ export default function InvoicePage({ initialView }) {
   const sigCanvasRef = useRef(null);
   const typePreviewRef = useRef(null);
   const [lastDraftSaved, setLastDraftSaved] = useState(null);
+  // 'save' | 'download' while a save is waiting for the server to be reachable again. The invoice is
+  // never saved only in this browser (its number must come from the server); the draft stays here.
+  const [pendingSave, setPendingSave] = useState(null);
+  // Sent with each new invoice so a retry of a save that did reach the server can't create a duplicate
+  const saveRequestIdRef = useRef(crypto.randomUUID());
   const { theme, toggleTheme } = useTheme();
   const [showBrandPicker, setShowBrandPicker] = useState(false);
   const [sigTab, setSigTab] = useState('draw');
@@ -1076,6 +1103,19 @@ export default function InvoicePage({ initialView }) {
     }, 600);
     return () => clearTimeout(autosaveTimer.current);
   }, [form, view]);
+
+  // Retry a save that failed because the server was unreachable: as soon as the browser is back online,
+  // and every 30s (on Render the backend may be waking up while the device itself is online).
+  // A ref keeps the listener pointed at the latest form and handlers.
+  const retryRef = useRef(null);
+  retryRef.current = () => retryPendingSave({ silent: true });
+  useEffect(() => {
+    if (!pendingSave || view === 'list') return;
+    const retry = () => retryRef.current?.();
+    const id = setInterval(retry, 30000);
+    window.addEventListener('online', retry);
+    return () => { clearInterval(id); window.removeEventListener('online', retry); };
+  }, [pendingSave, view]);
 
   // Update typed-signature canvas preview whenever text or font changes
   useEffect(() => {
@@ -1292,15 +1332,10 @@ export default function InvoicePage({ initialView }) {
   const showErr = (f) => touched[f] && formErrors[f];
 
   // ── Core save logic ────────────────────────────────────────────────────────
-  async function doSave() {
-    const allTouched = Object.keys(EMPTY_FORM).reduce((a,k) => ({...a,[k]:true}), {});
-    setTouched(allTouched);
-    if (!complete) { toast.error('Please fill all required fields'); return null; }
-    setSubmitting(true);
-
+  function buildPayload() {
     const c = calcGST(form, user);
     const invNum = nextNumber;
-    const payload = {
+    return {
       invoice_number: invNum, brand_name: form.brandName.trim(),
       brand_gstin: form.brandGstin.trim()||null, brand_address: form.brandAddress.trim(),
       brand_state_code: form.brandStateCode, brand_pan: form.brandPan.trim()||null,
@@ -1332,13 +1367,24 @@ export default function InvoicePage({ initialView }) {
       signatory_image_url: form.signatoryImageUrl||null,
       seller_business_name: user?.business_name||user?.name||null,
     };
+  }
+
+  // opts.mode: 'save' | 'download' (what to resume after a retry); opts.silent: background retry —
+  // no full-screen loader and no toasts unless something actually changes
+  async function doSave(opts = {}) {
+    if (!opts.silent) setTouched(Object.keys(EMPTY_FORM).reduce((a,k) => ({...a,[k]:true}), {}));
+    if (!complete) { if (!opts.silent) toast.error('Please fill all required fields'); return null; }
+    setSubmitting(true);
+
+    const payload = buildPayload();
+    const reqConfig = { silent: Boolean(opts.silent) };
 
     // Upload images before saving if they're still base64 data URLs
     if (payload.signatory_image_url?.startsWith('data:')) {
       try {
         const parts = payload.signatory_image_url.split(',');
         const mimeType = parts[0].split(';')[0].split(':')[1];
-        const { data: upData } = await api.post('/upload/signature', { imageBase64: parts[1], mimeType });
+        const { data: upData } = await api.post('/upload/signature', { imageBase64: parts[1], mimeType }, reqConfig);
         payload.signatory_image_url = upData.url;
       } catch { /* keep data url if upload fails */ }
     }
@@ -1346,7 +1392,7 @@ export default function InvoicePage({ initialView }) {
       try {
         const parts = payload.upi_scanner_url.split(',');
         const mimeType = parts[0].split(';')[0].split(':')[1];
-        const { data: upData } = await api.post('/upload/scanner', { imageBase64: parts[1], mimeType });
+        const { data: upData } = await api.post('/upload/scanner', { imageBase64: parts[1], mimeType }, reqConfig);
         payload.upi_scanner_url = upData.url;
       } catch { /* keep data url if upload fails */ }
     }
@@ -1355,6 +1401,7 @@ export default function InvoicePage({ initialView }) {
     try {
       const isRemoteEdit = Boolean(editingId);
       const body = {
+        clientRequestId: isRemoteEdit ? undefined : saveRequestIdRef.current,
         brandName: payload.brand_name, brandGstin: payload.brand_gstin,
         brandAddress: payload.brand_address, brandStateCode: payload.brand_state_code,
         brandPan: payload.brand_pan,
@@ -1394,37 +1441,46 @@ export default function InvoicePage({ initialView }) {
         sellerBusinessName: payload.seller_business_name,
       };
       const res = isRemoteEdit
-        ? await api.put(`/invoices/${editingId}`, body)
-        : await api.post('/invoices', body);
+        ? await api.put(`/invoices/${editingId}`, body, reqConfig)
+        : await api.post('/invoices', body, reqConfig);
       saved = { ...payload, ...res.data, id: res.data.id };
     } catch (err) {
-      // Never save only to this browser — an invoice number must come from the server.
-      toast.error(getErrorMessage(err, 'Couldn’t save the invoice — check your connection and try again.'));
       setSubmitting(false);
+      // Never save only to this browser — an invoice number must come from the server. Keep the
+      // draft here and retry when the server is back (see the pendingSave effect).
+      if (isServerUnreachable(err)) {
+        if (!opts.silent) toast.warning('Can’t reach the server. Your draft is saved on this device — the invoice will be saved as soon as the connection is back.');
+        setPendingSave(opts.mode || 'save');
+        return null;
+      }
+      setPendingSave(null);
+      toast.error(getErrorMessage(err, 'Couldn’t save the invoice — please try again.'));
       return null;
     }
     setSubmitting(false);
+    setPendingSave(null);
+    saveRequestIdRef.current = crypto.randomUUID();
     refreshUsage();
     return saved;
   }
 
-  async function handleSave(e) {
+  async function handleSave(e, opts = {}) {
     e?.preventDefault();
-    const inv = await doSave();
+    const inv = await doSave({ ...opts, mode: 'save' });
     if (!inv) return;
     try { localStorage.removeItem(draftKey()); } catch {}
     setLastDraftSaved(null);
-    toast.success(editingId ? 'Invoice updated' : 'Invoice saved');
+    toast.success(opts.silent ? `Connection is back — invoice ${inv.invoice_number || ''} saved` : editingId ? 'Invoice updated' : 'Invoice saved');
     resetAndGoList();
   }
 
-  async function handleSaveAndDownload(e) {
+  async function handleSaveAndDownload(e, opts = {}) {
     e?.preventDefault();
-    const inv = await doSave();
+    const inv = await doSave({ ...opts, mode: 'download' });
     if (!inv) return;
     try { localStorage.removeItem(draftKey()); } catch {}
     setLastDraftSaved(null);
-    toast.success('Invoice saved — downloading PDF…');
+    toast.success(opts.silent ? `Connection is back — invoice ${inv.invoice_number || ''} saved, downloading PDF…` : 'Invoice saved — downloading PDF…');
     resetAndGoList();
     setTimeout(async () => {
       pdfAbortRef.current?.abort();
@@ -1443,6 +1499,16 @@ export default function InvoicePage({ initialView }) {
     }, 300);
   }
 
+  function retryPendingSave(opts = {}) {
+    if (!pendingSave || submitting) return;
+    (pendingSave === 'download' ? handleSaveAndDownload : handleSave)(null, opts);
+  }
+
+  // Offline preview for the brand: built in the browser, stamped DRAFT, no invoice number
+  function handleDownloadDraft() {
+    downloadInvoicePDF({ ...buildPayload(), invoice_number: 'DRAFT' }, user, effectiveTemplate, user?.plan, { draft: true });
+  }
+
   function handleDiscardDraft() {
     if (!window.confirm('Discard this draft? Everything you entered will be lost.')) return;
     clearTimeout(autosaveTimer.current);
@@ -1453,6 +1519,7 @@ export default function InvoicePage({ initialView }) {
   }
 
   function resetAndGoList() {
+    setPendingSave(null);
     setForm({ ...EMPTY_FORM });
     setTouched({});
     setEditingId(null);
@@ -1588,19 +1655,19 @@ export default function InvoicePage({ initialView }) {
                   <FileText size={12} aria-hidden="true" /> Load Saved Brand
                 </button>
               </div>
-              <Input id="brandName" label="Brand / Company Name *" value={form.brandName} onChange={e => update('brandName', e.target.value)} onBlur={() => touch('brandName')} error={showErr('brandName')} placeholder="Glowleaf Naturals Pvt Ltd" tooltip="Legal name of the brand or company you are billing. Must match their GST registration exactly for B2B invoices." />
-              <Input id="brandGstin" label="Brand GSTIN" value={form.brandGstin} onChange={e => update('brandGstin', e.target.value.toUpperCase().slice(0,15))} onBlur={() => touch('brandGstin')} error={showErr('brandGstin')} placeholder="27ABCDE1234F1Z0" hint={form.brandGstin.length === 15 && !gstinError(form.brandGstin) ? '✓ GSTIN checks out' : 'Mandatory for B2B input tax credit'} maxLength={15} tooltip="15-digit GST Identification Number of the brand. Format: 2 digits state code + 10 digit PAN + 1 digit entity number + Z + 1 check digit. Required for B2B input tax credit." style={form.brandGstin.length === 15 && !gstinError(form.brandGstin) ? { borderColor: 'var(--success)', boxShadow: '0 0 0 3px var(--success-dim)' } : {}} />
-              <Input id="brandPan" label="Brand PAN" value={form.brandPan} onChange={e => update('brandPan', e.target.value.toUpperCase().slice(0,10))} onBlur={() => touch('brandPan')} error={showErr('brandPan')} placeholder="ABCDE1234F" maxLength={10} tooltip="10-character Permanent Account Number of the brand. Optional but useful for TDS reconciliation and Form 26AS." />
+              <Input id="brandName" format="name" label="Brand / Company Name *" value={form.brandName} onChange={e => update('brandName', e.target.value)} onBlur={() => touch('brandName')} error={showErr('brandName')} placeholder="Glowleaf Naturals Pvt Ltd" tooltip="Legal name of the brand or company you are billing. Must match their GST registration exactly for B2B invoices." />
+              <Input id="brandGstin" format="gstin" label="Brand GSTIN" value={form.brandGstin} onChange={e => update('brandGstin', e.target.value.toUpperCase().slice(0,15))} onBlur={() => touch('brandGstin')} error={showErr('brandGstin')} placeholder="27ABCDE1234F1Z0" hint={form.brandGstin.length === 15 && !gstinError(form.brandGstin) ? '✓ GSTIN checks out' : 'Mandatory for B2B input tax credit'} maxLength={15} tooltip="15-digit GST Identification Number of the brand. Format: 2 digits state code + 10 digit PAN + 1 digit entity number + Z + 1 check digit. Required for B2B input tax credit." style={form.brandGstin.length === 15 && !gstinError(form.brandGstin) ? { borderColor: 'var(--success)', boxShadow: '0 0 0 3px var(--success-dim)' } : {}} />
+              <Input id="brandPan" format="pan" label="Brand PAN" value={form.brandPan} onChange={e => update('brandPan', e.target.value.toUpperCase().slice(0,10))} onBlur={() => touch('brandPan')} error={showErr('brandPan')} placeholder="ABCDE1234F" maxLength={10} tooltip="10-character Permanent Account Number of the brand. Optional but useful for TDS reconciliation and Form 26AS." />
               <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 'var(--space-3)' }}>
-                <Input id="brandEmail" label="Brand Email (optional)" type="email" value={form.brandEmail} onChange={e => update('brandEmail', e.target.value)} placeholder="accounts@brand.com" tooltip="Brand's billing or accounts email address. Optional — appears on invoice for reference." />
-                <Input id="brandPhone" label="Brand Contact No. (optional)" type="tel" value={form.brandPhone} onChange={e => update('brandPhone', e.target.value)} placeholder="+91 98765 43210" tooltip="Brand contact number. Optional — appears on invoice for reference." />
+                <Input id="brandEmail" format="email" label="Brand Email (optional)" type="email" value={form.brandEmail} onChange={e => update('brandEmail', e.target.value)} placeholder="accounts@brand.com" tooltip="Brand's billing or accounts email address. Optional — appears on invoice for reference." />
+                <Input id="brandPhone" format="phone" label="Brand Contact No. (optional)" type="tel" value={form.brandPhone} onChange={e => update('brandPhone', e.target.value)} placeholder="+91 XXXXX XXXXX" tooltip="Brand contact number. Optional — appears on invoice for reference." />
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
                   <label htmlFor="brandAddress" style={{ fontSize: 'var(--text-sm)', fontWeight: 500, color: 'var(--text-body)' }}>Brand Address <span style={{ color: 'var(--danger-text)', fontWeight: 700 }} aria-hidden="true">*</span></label>
                   <Tooltip text="Complete registered address of the brand. Must include city, state, and PIN code. Mandatory on GST invoices per Rule 46." />
                 </div>
-                <textarea id="brandAddress" value={form.brandAddress} onChange={e => update('brandAddress', e.target.value)} onBlur={() => touch('brandAddress')} rows={2} placeholder="123, Business Park, Mumbai, Maharashtra - 400001"
+                <textarea id="brandAddress" value={form.brandAddress} onChange={e => update('brandAddress', limitText(e.target.value, TEXT_LIMITS.address))} onBlur={() => touch('brandAddress')} rows={2} placeholder="123, Business Park, Mumbai, Maharashtra - 400001"
                   style={{ padding: 'var(--space-2) var(--space-3)', background: 'var(--surface-2)', border: (showErr('brandAddress') ? '1px solid var(--danger)' : '1px solid var(--border)'), borderRadius: 'var(--radius-md)', color: 'var(--text-primary)', fontSize: 'var(--text-base)', resize: 'vertical', fontFamily: 'inherit' }} />
                 {showErr('brandAddress') && <span role="alert" style={{ fontSize: 'var(--text-xs)', color: 'var(--danger-text)' }}>{formErrors.brandAddress}</span>}
               </div>
@@ -1640,7 +1707,7 @@ export default function InvoicePage({ initialView }) {
                         value={line.description}
                         onChange={e => {
                           const lines = [...form.serviceLines];
-                          lines[idx] = { ...lines[idx], description: e.target.value };
+                          lines[idx] = { ...lines[idx], description: limitText(e.target.value, TEXT_LIMITS.description) };
                           update('serviceLines', lines);
                           if (idx === 0) update('serviceDescription', e.target.value);
                         }}
@@ -1656,7 +1723,7 @@ export default function InvoicePage({ initialView }) {
                             <Tooltip text="Taxable value before GST for this service line." />
                           </div>
                           <input type="text" inputMode="decimal" value={line.amount} onBlur={() => touch('baseAmount')}
-                            onChange={e => { const v=e.target.value.replace(/[^0-9.]/g,'').replace(/(\..*)\./g,'$1'); const lines=[...form.serviceLines]; lines[idx]={...lines[idx],amount:v}; update('serviceLines',lines); if(idx===0) update('baseAmount',v); }}
+                            onChange={e => { const v=sanitizeNumber(e.target.value); if(v===null) return; const lines=[...form.serviceLines]; lines[idx]={...lines[idx],amount:v}; update('serviceLines',lines); if(idx===0) update('baseAmount',v); }}
                             placeholder="45000"
                             style={{ padding: 'var(--space-2)', background: 'var(--surface)', border: (!line.amount && touched.baseAmount ? '1px solid var(--danger)' : '1px solid var(--border)'), borderRadius: 'var(--radius-md)', color: 'var(--text-primary)', fontSize: 'var(--text-sm)', fontFamily: 'inherit', fontVariantNumeric: 'tabular-nums', outline: 'none' }}
                           />
@@ -1673,7 +1740,7 @@ export default function InvoicePage({ initialView }) {
                         </div>
                         {/* SAC Code last */}
                         <Input
-                          label="SAC Code" value={line.sacCode || '998399'}
+                          label="SAC Code" format="sac" value={line.sacCode ?? ''} error={line.sacCode ? undefined : 'SAC code is required (998399 for creator services)'}
                           onChange={e => { const lines=[...form.serviceLines]; lines[idx]={...lines[idx],sacCode:e.target.value}; update('serviceLines',lines); if(idx===0) update('sacCode',e.target.value); }}
                           placeholder="998399" tooltip="SAC 998399 = Content creation & influencer marketing services"
                         />
@@ -1696,7 +1763,7 @@ export default function InvoicePage({ initialView }) {
               {/* Discount input */}
               <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'flex-end', marginBottom: 'var(--space-3)' }}>
                 <div style={{ flex: 1 }}>
-                  <Input id="discountValue" label="Discount (optional)" type="number" min="0" value={form.discountValue || ''} onChange={e => update('discountValue', e.target.value)} placeholder={form.discountType === 'percent' ? 'e.g. 10' : 'e.g. 500'} tooltip="Apply a discount before GST calculation. Choose flat INR amount or percentage." />
+                  <Input id="discountValue" label="Discount (optional)" type="number" max={form.discountType === 'percent' ? LIMITS.PERCENT : LIMITS.MONEY} currency={form.discountType !== 'percent'} value={form.discountValue || ''} onChange={e => update('discountValue', e.target.value)} placeholder={form.discountType === 'percent' ? 'e.g. 10' : 'e.g. 500'} tooltip="Apply a discount before GST calculation. Choose flat INR amount or percentage." />
                 </div>
                 <div style={{ display: 'flex', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', overflow: 'hidden', marginBottom: '1px' }}>
                   {[['flat', '₹'], ['percent', '%']].map(([val, lbl]) => (
@@ -1710,7 +1777,9 @@ export default function InvoicePage({ initialView }) {
               {calc.base > 0 ? (
                 <div style={{ padding: 'var(--space-4)', background: 'var(--surface-2)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
                   <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 'var(--space-3)' }}>
-                    {calc.supplyType==='intrastate' ? 'Intrastate — CGST + SGST' : 'Interstate — IGST'}
+                    {!form.isExport && !(form.placeOfSupply || form.brandStateCode)
+                      ? 'Pick the brand’s state — GST shown as IGST until then'
+                      : calc.supplyType==='intrastate' ? 'Intrastate — CGST + SGST' : 'Interstate — IGST'}
                   </div>
                   {[
                     ...(showDiscount ? [['Subtotal', formatINRDecimal(calc.subtotal)], ['Less: Discount', ('−' + formatINRDecimal(calc.discountAmount))]] : []),
@@ -1794,7 +1863,7 @@ export default function InvoicePage({ initialView }) {
             <Sect title="Notes">
               <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
                 <label htmlFor="notes" style={{ fontSize: 'var(--text-sm)', fontWeight: 500, color: 'var(--text-body)' }}>Internal Notes</label>
-                <textarea id="notes" value={form.notes} onChange={e => update('notes', e.target.value)} rows={2} placeholder="PO reference, special instructions..."
+                <textarea id="notes" value={form.notes} onChange={e => update('notes', limitText(e.target.value, TEXT_LIMITS.notes))} rows={2} placeholder="PO reference, special instructions..."
                   style={{ padding: 'var(--space-2) var(--space-3)', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', color: 'var(--text-primary)', fontSize: 'var(--text-base)', resize: 'vertical', fontFamily: 'inherit' }} />
               </div>
             </Sect>
@@ -1842,8 +1911,8 @@ export default function InvoicePage({ initialView }) {
                         <Input id="accountHolderName" label="Account Holder Name" value={form.accountHolderName} onChange={e => update('accountHolderName', e.target.value)} placeholder="Your full name or business name" />
                       </div>
                       <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 'var(--space-3)' }}>
-                        <Input id="accountNumber" label="Account Number" value={form.accountNumber} onChange={e => update('accountNumber', e.target.value)} placeholder="1234567890" tooltip="Your bank account number for NEFT/RTGS/IMPS transfers" />
-                        <Input id="ifscCode" label="IFSC Code" value={form.ifscCode} onChange={e => update('ifscCode', e.target.value.toUpperCase())} placeholder="HDFC0001234" tooltip="11-character bank branch code for NEFT/RTGS" maxLength={11} />
+                        <Input id="accountNumber" format="account" label="Account Number" value={form.accountNumber} onChange={e => update('accountNumber', e.target.value)} placeholder="1234567890" tooltip="Your bank account number for NEFT/RTGS/IMPS transfers" />
+                        <Input id="ifscCode" format="ifsc" label="IFSC Code" value={form.ifscCode} onChange={e => update('ifscCode', e.target.value.toUpperCase())} placeholder="HDFC0001234" tooltip="11-character bank branch code for NEFT/RTGS" maxLength={11} />
                       </div>
                     </>
                   )}
@@ -1857,8 +1926,8 @@ export default function InvoicePage({ initialView }) {
                           <Input id="accountHolderName2" label="Account Holder" value={form.accountHolderName} onChange={e => update('accountHolderName', e.target.value)} placeholder="Your Name" />
                         </div>
                         <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 'var(--space-3)' }}>
-                          <Input id="accountNumber2" label="Account Number" value={form.accountNumber} onChange={e => update('accountNumber', e.target.value)} placeholder="1234567890" />
-                          <Input id="ifscCode2" label="IFSC Code" value={form.ifscCode} onChange={e => update('ifscCode', e.target.value.toUpperCase())} placeholder="HDFC0001234" maxLength={11} />
+                          <Input id="accountNumber2" format="account" label="Account Number" value={form.accountNumber} onChange={e => update('accountNumber', e.target.value)} placeholder="1234567890" />
+                          <Input id="ifscCode2" format="ifsc" label="IFSC Code" value={form.ifscCode} onChange={e => update('ifscCode', e.target.value.toUpperCase())} placeholder="HDFC0001234" maxLength={11} />
                         </div>
                       </div>
                     </details>
@@ -1906,7 +1975,7 @@ export default function InvoicePage({ initialView }) {
                   {/* Manual UPI entry */}
                   {(savedUpiIds.length === 0 || selectedUpiId === 'manual' || !selectedUpiId) && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-                      <Input id="upiId" label="UPI ID" value={form.upiId} onChange={e => update('upiId', e.target.value)} placeholder="yourname@okicici" tooltip="UPI ID for instant payment" />
+                      <Input id="upiId" format="upi" label="UPI ID" value={form.upiId} onChange={e => update('upiId', e.target.value)} placeholder="yourname@okicici" tooltip="UPI ID for instant payment" />
                       {/* UPI QR Scanner upload */}
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
@@ -2109,10 +2178,25 @@ export default function InvoicePage({ initialView }) {
           padding: isMobile ? 'var(--space-2) var(--space-3)' : 'var(--space-1) var(--space-5)',
           flexShrink: 0,
         }}>
+          {pendingSave && (
+            <div role="status" style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 'var(--space-2)', maxWidth: 1200, margin: '0 auto var(--space-2)', padding: 'var(--space-2) var(--space-3)', background: 'var(--warning-dim)', border: '1px solid var(--warning)', borderRadius: 'var(--radius-md)', fontSize: 'var(--text-xs)', color: 'var(--text-primary)' }}>
+              <WifiOff size={14} aria-hidden="true" style={{ color: 'var(--warning-text)', flexShrink: 0 }} />
+              <span style={{ flex: '1 1 240px' }}>
+                Can’t reach the server. Your draft is saved on this device, and the invoice will be saved{pendingSave === 'download' ? ' and downloaded' : ''} automatically when the connection is back.
+              </span>
+              <button type="button" className="inv-btn inv-btn--secondary" onClick={() => retryPendingSave()} disabled={submitting}>
+                <RefreshCw size={14} aria-hidden="true" /> {submitting ? 'Trying…' : 'Retry now'}
+              </button>
+              <button type="button" className="inv-btn inv-btn--secondary" onClick={handleDownloadDraft} title="A preview stamped DRAFT, with no invoice number — not a tax invoice">
+                <FileDown size={14} aria-hidden="true" /> Download draft PDF
+              </button>
+            </div>
+          )}
           {/* Single compact row: status (compliance, hint, autosave) left · actions right */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', maxWidth: 1200, margin: '0 auto', width: '100%', flexWrap: isMobile ? 'wrap' : 'nowrap' }}>
+          {/* Wraps instead of overlapping: when status + buttons don't fit, the buttons move to a second line */}
+          <div style={{ display: 'flex', alignItems: 'center', columnGap: 'var(--space-3)', rowGap: 'var(--space-2)', maxWidth: 1200, margin: '0 auto', width: '100%', flexWrap: 'wrap' }}>
           {!isMobile && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', flex: '1 1 auto', minWidth: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', flex: '1 1 auto' }}>
               <CompliancePanel form={form} user={user} />
               {!complete && Object.keys(touched).length > 0 ? (
                 <span title="Fill all required (*) fields to enable invoice creation" style={{ fontSize: 'var(--text-xs)', color: 'var(--warning-text)', display: 'flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
@@ -2122,7 +2206,7 @@ export default function InvoicePage({ initialView }) {
               ) : lastDraftSaved && <AutosaveIndicator lastSaved={lastDraftSaved} />}
             </div>
           )}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', flex: isMobile ? '1 1 100%' : '0 0 auto', flexWrap: isMobile ? 'wrap' : 'nowrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', flex: isMobile ? '1 1 100%' : '0 0 auto', marginLeft: 'auto', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
             {/* Leave editor — draft is autosaved, so Close is safe; Discard is the explicit destructive path */}
             {!editingId && lastDraftSaved && (
               <button type="button" className="inv-btn inv-btn--danger" onClick={handleDiscardDraft} title="Delete this draft and go back to the invoice list">
@@ -2132,7 +2216,7 @@ export default function InvoicePage({ initialView }) {
             <button
               type="button"
               className="inv-btn inv-btn--secondary"
-              onClick={() => navigate('/invoices')}
+              onClick={() => { setPendingSave(null); navigate('/invoices'); }}
               title={editingId ? 'Close without saving changes' : 'Close — your draft is saved and will be restored next time'}
             >
               <X size={14} aria-hidden="true" /> Close
@@ -2671,7 +2755,7 @@ function ClassicPreview({ form, calc, invoiceNumber, user, template }) {
 
       <div style={{ padding: '18px 22px' }}>
         {/* Parties */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 16 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', overflowWrap: 'anywhere', gap: 14, marginBottom: 16 }}>
           <div>
             <div style={{ fontSize: 8, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#999', marginBottom: 5 }}>SUPPLIER</div>
             <div style={{ fontWeight: 700, marginBottom: 2 }}>{user?.business_name || user?.name || '—'}</div>
@@ -2716,7 +2800,7 @@ function ClassicPreview({ form, calc, invoiceNumber, user, template }) {
               ? form.serviceLines.map((line, i) => (
                 <tr key={i} style={{ borderBottom: '1px solid #f0f0f0' }}>
                   <td style={{ padding: 8, fontSize: 11 }}>{line.description || '—'}</td>
-                  <td style={{ padding: 8, fontFamily: 'monospace', fontSize: 10, color: '#555' }}>{line.sacCode || '998399'}</td>
+                  <td style={{ padding: 8, fontFamily: 'monospace', fontSize: 10, color: '#555' }}>{line.sacCode || '—'}</td>
                   <td style={{ padding: 8, fontSize: 10, color: '#555' }}>{line.gstRate || 18}%</td>
                   <td style={{ padding: 8, textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontWeight: 600 }}>{line.amount ? formatINR(parseFloat(line.amount)) : '—'}</td>
                 </tr>
@@ -2848,7 +2932,7 @@ function CorporatePreview({ form, calc, invoiceNumber, user, template }) {
       </div>
 
       {/* Two-column info row */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', borderBottom: `2px solid ${template.headerColor}` }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', overflowWrap: 'anywhere', borderBottom: `2px solid ${template.headerColor}` }}>
         <div style={{ padding: '10px 14px', borderRight: '1px solid #e5e5e5' }}>
           <div style={{ fontSize: 8, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#999', marginBottom: 4 }}>Customer Details</div>
           <div style={{ fontWeight: 700, fontSize: 11 }}>{form.brandName || 'Brand Name'}</div>
@@ -2889,7 +2973,7 @@ function CorporatePreview({ form, calc, invoiceNumber, user, template }) {
                 <tr key={i} style={{ borderBottom: '1px solid #f0f0f0' }}>
                   <td style={{ padding: '6px 7px', fontSize: 10 }}>{i+1}</td>
                   <td style={{ padding: '6px 7px', fontSize: 10 }}>{line.description || '—'}</td>
-                  <td style={{ padding: '6px 7px', fontFamily: 'monospace', fontSize: 9, color: '#555' }}>{line.sacCode || '998399'}</td>
+                  <td style={{ padding: '6px 7px', fontFamily: 'monospace', fontSize: 9, color: '#555' }}>{line.sacCode || '—'}</td>
                   <td style={{ padding: '6px 7px', fontSize: 9, color: '#555' }}>{line.gstRate || 18}%</td>
                   <td style={{ padding: '6px 7px', textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontSize: 10 }}>{line.amount ? formatINR(parseFloat(line.amount)) : '—'}</td>
                   <td style={{ padding: '6px 7px', textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontWeight: 600, fontSize: 10 }}>{line.amount ? formatINR(parseFloat(line.amount)) : '—'}</td>
@@ -2957,7 +3041,7 @@ function MinimalPreview({ form, calc, invoiceNumber, user, template }) {
       </div>
 
       {/* Parties */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12, padding: 8, background: '#f8f8f8', borderRadius: 4 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', overflowWrap: 'anywhere', gap: 12, marginBottom: 12, padding: 8, background: '#f8f8f8', borderRadius: 4 }}>
         <div>
           <div style={{ fontSize: 7, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#999', marginBottom: 3 }}>Bill From</div>
           <div style={{ fontWeight: 700, fontSize: 11 }}>{user?.business_name || user?.name || '—'}</div>
@@ -2988,7 +3072,7 @@ function MinimalPreview({ form, calc, invoiceNumber, user, template }) {
             ? form.serviceLines.map((line, i) => (
               <tr key={i} style={{ borderBottom: '1px solid #f0f0f0' }}>
                 <td style={{ padding: '6px', fontSize: 10 }}>{line.description || '—'}</td>
-                <td style={{ padding: '6px', fontFamily: 'monospace', fontSize: 9, color: '#888' }}>{line.sacCode || '998399'}</td>
+                <td style={{ padding: '6px', fontFamily: 'monospace', fontSize: 9, color: '#888' }}>{line.sacCode || '—'}</td>
                 <td style={{ padding: '6px', fontSize: 9, color: '#888' }}>{line.gstRate || 18}%</td>
                 <td style={{ padding: '6px', textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontWeight: 600, fontSize: 10 }}>{line.amount ? formatINR(parseFloat(line.amount)) : '—'}</td>
               </tr>

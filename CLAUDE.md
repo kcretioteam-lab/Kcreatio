@@ -14,7 +14,7 @@ cd backend && node -r dotenv/config dist/server.js   # http://localhost:4000
 ## Dev bypass (no login needed)
 - `useAuth.jsx` exports MOCK_USER — pre-filled user state
 - `api.js` sends `X-Dev-User-Id: dev-bypass-user` header in dev mode
-- Backend `auth.ts` middleware accepts this header when `NODE_ENV !== 'production'`
+- Backend `auth.ts` middleware accepts this header only when `NODE_ENV === 'development'`
 - `fetchUser()` only clears user on 401/403, not 5xx — MOCK_USER survives missing Supabase
 
 ## Architecture
@@ -35,7 +35,12 @@ cd backend && node -r dotenv/config dist/server.js   # http://localhost:4000
 - Plans: Basic (free, unlimited watermarked invoices) / Starter ₹299 / Pro ₹599. Business plan is paused (commented out)
 - Payments disabled: signup = Basic; users request 28 days of Pro via `usePremiumRequest().openRequest()` → `premium_requests` table + admin email with Approve link (sets plan='trial'). Never link to Razorpay checkout until payments are re-enabled
 - All API inputs validated with Zod before touching DB
+- Numeric fields: `<Input type="number" max={LIMITS.X}>` (default max ₹99,99,999, `decimals`, `currency` props) or `sanitizeNumber()` from `frontend/src/utils/limits.js` — never a raw `<input type="number">` (ESLint blocks it). Every `LIMITS` value mirrors a backend Zod `.max()`; change both together
+- Formatted fields: `<Input format="gstin|pan|tan|ifsc|mobile|phone|account|upi|email">` (`frontend/src/utils/fieldFormats.js`) strips invalid characters as you type and validates on blur. Every new field of these kinds must use it
 - Every DB query scoped with `user_id` filter
+- User-controlled text in email/HTML goes through `escapeHtml()` from `backend/src/lib/html.ts` (brand/business names, invoice numbers, user-agent strings, links)
+- Smart Inbox detections are applied only through `applyDetection()` in `backend/src/services/detectionService.ts` — it throws if the record can't be saved, so a detection is never marked accepted without one
+- On startup the backend logs `[SCHEMA] … is missing — run 0NN_….sql` for migrations the code depends on (`backend/src/lib/schemaCheck.ts`); add new required columns there
 - CSS: use `var(--token)` always — no hardcoded hex or px values
 - Icons: Lucide only — never mix libraries
 - No component libraries (MUI, Chakra, ShadCN)
@@ -50,6 +55,7 @@ cd backend && node -r dotenv/config dist/server.js   # http://localhost:4000
 - 018: barter/foreign income/export invoices, invoice_payments + record_invoice_payment(), credit_notes, reminders, recurring
 - 017: users.totp_* (2FA), user_sessions, invoice_audit_log
 - 016: mark_invoice_paid / mark_deal_paid functions, Tax Profile fields (tax_regime, presumptive, gst_registered, LUT), invoices.line_items
+- 019: invoices.client_request_id — retried invoice saves return the existing invoice (no duplicates)
 
 ## GST compliance (Rule 46 CGST Rules 2017)
 - CGST+SGST for intrastate (same state supplier+brand), IGST for interstate

@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Loader2, Check, AlertTriangle, ChevronDown, ChevronUp } from 'lucide-react';
 import api from '../utils/api.js';
+import { sanitizeNumber } from '../utils/limits.js';
+import { FORMATS } from '../utils/fieldFormats.js';
 import { useToast } from '../hooks/useToast.jsx';
 
 export default function ManualPasteModal({ onClose, onDetectionCreated }) {
@@ -157,7 +159,7 @@ export default function ManualPasteModal({ onClose, onDetectionCreated }) {
                       <input
                         type="email" value={form.from_email}
                         placeholder="e.g. noreply@hdfcbank.com"
-                        onChange={e => setForm(f => ({ ...f, from_email: e.target.value }))}
+                        onChange={e => setForm(f => ({ ...f, from_email: FORMATS.email.clean(e.target.value) }))}
                         style={{ padding: '8px 12px', background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', color: 'var(--text-primary)', fontSize: 'var(--text-sm)' }}
                       />
                     </label>
@@ -264,10 +266,11 @@ export default function ManualPasteModal({ onClose, onDetectionCreated }) {
                 {hasAmount ? 'Amount (₹) — confirm or edit' : 'Almost there — what was the amount?'}
               </span>
               <input
-                type="number"
+                type="text"
+                inputMode="decimal"
                 value={editAmount}
                 placeholder="Enter the amount in ₹"
-                onChange={e => setEditAmount(e.target.value)}
+                onChange={e => { const v = sanitizeNumber(e.target.value); if (v !== null) setEditAmount(v); }}
                 style={{
                   padding: '9px 12px', background: 'var(--input-bg)',
                   border: `1px solid ${!hasAmount ? 'var(--warning)' : 'var(--border)'}`,

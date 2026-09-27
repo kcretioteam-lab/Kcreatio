@@ -16,10 +16,16 @@ import dealsRoutes from './routes/deals.js';
 import incomeRoutes from './routes/income.js';
 import expensesRoutes from './routes/expenses.js';
 // import paymentsRoutes from './routes/payments.js'; // Payments disabled — premium is granted on request
-import premiumRequestsRoutes from './routes/premiumRequests.js';
+import premiumRequestsRoutes, { approvalRouter } from './routes/premiumRequests.js';
 import usageRoutes from './routes/usage.js';
 import notificationsRoutes from './routes/notifications.js';
 import exportRoutes from './routes/export.js';
+import { checkSchema } from './lib/schemaCheck.js';
+
+// A promise nobody awaited must never take the whole API down (one bad PDF render used to)
+process.on('unhandledRejection', (reason) => console.error('[unhandledRejection]', reason));
+
+class CorsRejected extends Error {}
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -57,11 +63,15 @@ if (process.env.NODE_ENV !== 'production') {
   allowedOrigins.push('http://localhost:5174', 'http://localhost:5175');
 }
 
+// Premium approval pages: opened from the admin email and authorised by the signed token in the link,
+// never by cookies — so they sit outside CORS (the confirm form posts with Origin: null).
+app.use('/api/v1/premium-requests', approvalRouter);
+
 app.use(
   cors({
     origin: (origin, callback) => {
       if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
-      callback(new Error(`CORS: origin ${origin} not allowed`));
+      callback(new CorsRejected(`CORS: origin ${origin} not allowed`));
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
@@ -129,12 +139,18 @@ app.use((req, res) => {
 
 // Global error handler
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  // A disallowed origin is a client problem, not a server fault
+  if (err instanceof CorsRejected) {
+    res.status(403).json({ error: 'FORBIDDEN', message: 'Origin not allowed', statusCode: 403 });
+    return;
+  }
   console.error('Unhandled error:', err);
   res.status(500).json({ error: 'INTERNAL_ERROR', message: 'An unexpected error occurred', statusCode: 500 });
 });
 
 app.listen(PORT, () => {
   console.log(`Kcreatio backend running on port ${PORT}`);
+  checkSchema().catch(err => console.error('[SCHEMA] Check failed:', err));
 
   // Start background cron jobs (only in production or when explicitly enabled)
   if (process.env.NODE_ENV === 'production' || process.env.ENABLE_JOBS === 'true') {

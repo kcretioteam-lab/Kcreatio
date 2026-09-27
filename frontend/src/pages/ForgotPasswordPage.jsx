@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../utils/api.js';
+import { FORMATS } from '../utils/fieldFormats.js';
 import LogoMark from '../components/ui/LogoMark.jsx';
 
 export default function ForgotPasswordPage() {
@@ -57,7 +58,7 @@ export default function ForgotPasswordPage() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
                 <label htmlFor="reset-email" style={{ fontSize: 'var(--text-sm)', fontWeight: 500, color: 'var(--text-body)' }}>Email address</label>
                 <input
-                  id="reset-email" type="email" value={email} onChange={e => setEmail(e.target.value)}
+                  id="reset-email" type="email" value={email} onChange={e => setEmail(FORMATS.email.clean(e.target.value))}
                   autoComplete="email" placeholder="you@example.com"
                   style={{ padding: 'var(--space-2) var(--space-3)', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', color: 'var(--text-primary)', fontSize: 'var(--text-base)', outline: 'none', transition: 'border-color var(--duration-fast), box-shadow var(--duration-fast)' }}
                   onFocus={e => { e.target.style.borderColor = 'var(--border-focus)'; e.target.style.boxShadow = '0 0 0 3px var(--accent-dim)'; }}

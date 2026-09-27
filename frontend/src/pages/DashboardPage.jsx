@@ -39,14 +39,17 @@ export default function DashboardPage() {
   async function loadDashboard() {
     setLoading(true);
     try {
-      const [incSummary, tdsSum, deadlines, invoices, deals] = await Promise.all([
-        api.get('/income/summary', { params: { fy: CURRENT_FY } }),
+      // Income summary is Pro-only — asking for it on Basic only produces a 403. Each call is settled
+      // on its own so one failure doesn't leave the whole dashboard empty.
+      const settled = await Promise.allSettled([
+        hasIncomeDashboard ? api.get('/income/summary', { params: { fy: CURRENT_FY } }) : Promise.resolve({ data: null }),
         api.get('/tds/summary', { params: { fy: CURRENT_FY } }),
         api.get('/tax/deadlines'),
         api.get('/invoices', { params: { limit: 5 } }),
         api.get('/deals'),
       ]);
-      setData({ incSummary: incSummary.data, tdsSum: tdsSum.data, deadlines: deadlines.data.deadlines, gstThreshold: deadlines.data.gstThreshold, recentInvoices: invoices.data.invoices, deals: deals.data.deals });
+      const [incSummary, tdsSum, deadlines, invoices, deals] = settled.map(r => (r.status === 'fulfilled' ? r.value.data : null));
+      setData({ incSummary, tdsSum, deadlines: deadlines?.deadlines, gstThreshold: deadlines?.gstThreshold, recentInvoices: invoices?.invoices, deals: deals?.deals });
     } catch {
       // Dashboard loads partial data gracefully
     } finally {

@@ -197,7 +197,7 @@ export default function DealsPage() {
       <Modal isOpen={addOpen} onClose={() => setAddOpen(false)} title="New Brand Deal">
         <form onSubmit={handleCreate} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }} noValidate>
           <Input id="deal-brand" label="Brand Name *" value={form.brandName} onChange={e => setForm(p => ({...p, brandName: e.target.value}))} placeholder="Glowleaf Naturals Pvt Ltd" maxLength={120} />
-          <Input id="deal-email" label="Brand Contact Email" type="email" value={form.brandContactEmail} onChange={e => setForm(p => ({...p, brandContactEmail: e.target.value}))} />
+          <Input id="deal-email" format="email" label="Brand Contact Email" type="email" value={form.brandContactEmail} onChange={e => setForm(p => ({...p, brandContactEmail: e.target.value}))} />
           <fieldset style={{ border: 'none', padding: 0, margin: 0, display: 'flex', gap: 'var(--space-4)', flexWrap: 'wrap' }}>
             <legend style={{ fontSize: 'var(--text-sm)', fontWeight: 500, color: 'var(--text-body)', marginBottom: 'var(--space-2)' }}>Paid in</legend>
             {[['cash', 'Money'], ['barter', 'Products (barter / gifted)']].map(([v, l]) => (

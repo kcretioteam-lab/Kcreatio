@@ -4,7 +4,7 @@ import { sendAdvanceTaxReminder } from '../services/emailService.js';
 import { scanInbox } from '../services/gmailService.js';
 import { hasFeature } from '../config/plans.js';
 import { startInvoiceJobs } from './invoiceJobs.js';
-import { recordDetectedPayment } from '../services/paymentService.js';
+import { applyDetection } from '../services/detectionService.js';
 import { getFinancialYear } from '../services/invoiceService.js';
 
 // ── Advance Tax Reminder Cron ─────────────────────────────────────────────────
@@ -56,6 +56,10 @@ export function startAdvanceTaxReminderJob() {
             .select('amount_due')
             .eq('user_id', pref.user_id)
             .eq('quarter', inst.quarter)
+            .eq('type', 'advance_tax')
+            .eq('financial_year', getFinancialYear(new Date()))
+            .order('created_at', { ascending: false })
+            .limit(1)
             .maybeSingle();
 
           await sendAdvanceTaxReminder(user.email, {
@@ -158,7 +162,8 @@ export function startGmailScanJob() {
               result.type !== 'deal_inquiry' &&
               hasFeature('gmail_auto_apply', user.plan)
             ) {
-              await applyDetectionBackground(inserted.id, user.id, result.type, result.extracted);
+              await applyDetection(inserted.id, user.id, result.type, result.extracted, 'auto_applied')
+                .catch(err => console.error('[AUTO_APPLY] Failed — left for review:', inserted.id, err));
             }
           }
 
@@ -175,67 +180,6 @@ export function startGmailScanJob() {
       console.error('[CRON] Gmail scan job error:', err);
     }
   });
-}
-
-// Lightweight auto-apply runner used by the background cron job.
-// Mirrors the logic in emailDetections.ts but inlined here to avoid circular imports.
-async function applyDetectionBackground(
-  detectionId: string,
-  userId: string,
-  detectedType: string,
-  data: Record<string, any>,
-) {
-  const now = new Date().toISOString();
-  const today = new Date();
-  const todayStr = today.toISOString().split('T')[0];
-  const fy = getFinancialYear(today);
-
-  const updates: Record<string, any> = { status: 'auto_applied', reviewed_at: now };
-
-  try {
-    if (detectedType === 'payment_received' && data.amount) {
-      const { invoiceId, income } = await recordDetectedPayment(
-        userId, Number(data.amount), detectionId, data.brand_name ?? 'Payment auto-detected via Smart Inbox',
-      );
-      if (invoiceId) updates.linked_invoice_id = invoiceId;
-      if (income) updates.linked_income_id = income.id;
-
-    } else if (detectedType === 'tds_deduction' && data.amount) {
-      const tdsAmount = data.tds_rate ? data.amount * (data.tds_rate / 100) : data.amount * 0.10;
-
-      const { data: tds } = await supabase.from('tds_records').insert({
-        user_id: userId,
-        brand_name: data.brand_name ?? 'Unknown Brand',
-        brand_tan: data.tan ?? null,
-        invoice_amount: data.amount,
-        tds_rate: data.tds_rate ?? 10,
-        tds_amount: tdsAmount,
-        received_amount: data.amount - tdsAmount,
-        form_16a_status: 'awaiting',
-        financial_year: fy,
-        payment_date: todayStr,
-        extracted_data: { detection_id: detectionId },
-      }).select('id').single();
-
-      if (tds) updates.linked_tds_id = tds.id;
-
-    } else if (detectedType === 'expense' && data.amount) {
-      await supabase.from('expenses').insert({
-        user_id: userId,
-        category: 'subscription',
-        amount: data.amount,
-        description: data.description ?? 'Auto-detected via Smart Inbox',
-        expense_date: todayStr,
-        financial_year: fy,
-        extracted_data: { detection_id: detectionId },
-      });
-    }
-
-    await supabase.from('email_detections').update(updates).eq('id', detectionId);
-
-  } catch (err) {
-    console.error('[AUTO_APPLY] Error applying detection:', detectionId, err);
-  }
 }
 
 export function startAllJobs() {
