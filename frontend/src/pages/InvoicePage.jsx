@@ -10,8 +10,8 @@ import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { useTheme } from '../App.jsx';
 import api, { getErrorMessage } from '../utils/api.js';
 import { formatINR, formatINRDecimal, amountInWords } from '../utils/formatINR.js';
-import { STATE_CODES, INDIAN_STATES, GST_RATES, gstinError, supplierStateCode, stateLabel, FOREIGN_STATE_CODE } from '../utils/gst.js';
-import { tdsSectionLabel } from '../utils/taxLabels.js';
+import { STATE_CODES, INDIAN_STATES, GST_RATES, gstinError, supplierStateCode, supplierName, panFromGstin, stateLabel, FOREIGN_STATE_CODE } from '../utils/gst.js';
+import { tdsSectionLabel, taxYearLabel } from '../utils/taxLabels.js';
 import { CURRENT_FY } from '../utils/financialYear.js';
 import MarkPaidDialog from '../components/features/payment/MarkPaidDialog.jsx';
 import CreditNoteDialog from '../components/features/invoice/CreditNoteDialog.jsx';
@@ -341,7 +341,7 @@ function buildClassicHTML(inv, user, t, plan) {
   <div class="parties">
     <div>
       <div class="party-label">Supplier (From)</div>
-      <div class="party-name">${user?.business_name || user?.name || '—'}</div>
+      <div class="party-name">${supplierName(user) || '—'}</div>
       ${user?.gstin ? `<div class="party-detail">GSTIN: <strong>${user.gstin}</strong></div>` : ''}
       ${user?.pan ? `<div class="party-detail">PAN: ${user.pan}</div>` : ''}
       ${displayEmail ? `<div class="party-detail">Email: ${displayEmail}</div>` : ''}
@@ -415,7 +415,7 @@ function buildClassicHTML(inv, user, t, plan) {
     <div style="text-align:center;min-width:180px">
       ${inv.signatory_image_url ? `<img src="${inv.signatory_image_url}" style="height:48px;max-width:160px;object-fit:contain;margin-bottom:4px;border:1px solid #ddd;border-radius:4px;background:#fff;padding:4px" />` : ''}
       <div style="border-top:1px solid #1a1a1a;padding-top:6px;font-size:10px;color:#333">
-        <div><strong>For ${inv.seller_business_name || user?.business_name || user?.name || 'Creator'}</strong></div>
+        <div><strong>For ${inv.seller_business_name || supplierName(user) || 'Creator'}</strong></div>
         ${inv.signatory_name?`<div style="color:#666">Authorized Signatory: ${inv.signatory_name}</div>`:'<div style="color:#666">Authorized Signatory</div>'}
       </div>
     </div>
@@ -481,7 +481,7 @@ function buildCorporateHTML(inv, user, t, plan) {
 </head><body>
 <div class="hdr">
   <div class="hdr-co">
-    <div class="co-name">${user?.business_name || user?.name || '—'}</div>
+    <div class="co-name">${supplierName(user) || '—'}</div>
     ${user?.gstin ? `<div class="co-gstin">GSTIN: ${user.gstin}</div>` : ''}
     ${user?.business_address ? `<div style="font-size:10px;opacity:.8;margin-top:4px">${user.business_address}</div>` : ''}
     ${supState ? `<div style="font-size:10px;opacity:.75;margin-top:2px">State: ${stateMap[supState] || ''} | Code: ${supState}</div>` : ''}
@@ -571,7 +571,7 @@ ${inv.notes ? `<div class="notes"><strong>Notes:</strong> ${inv.notes}</div>` : 
     <div style="margin-top:8px">
       ${inv.signatory_image_url ? `<img src="${inv.signatory_image_url}" style="height:40px;max-width:120px;object-fit:contain;border:1px solid #ddd;background:#fff;padding:3px" />` : ''}
       <div style="border-top:1px solid #1a1a1a;padding-top:5px;font-size:9px">
-        <div><strong>For ${inv.seller_business_name || user?.business_name || user?.name || 'Creator'}</strong></div>
+        <div><strong>For ${inv.seller_business_name || supplierName(user) || 'Creator'}</strong></div>
         <div style="color:#666">Authorized Signatory${inv.signatory_name ? ': '+inv.signatory_name : ''}</div>
       </div>
     </div>` : ''}
@@ -638,7 +638,7 @@ function buildMinimalHTML(inv, user, t, plan) {
 </head><body>
 <div class="top">
   <div>
-    <div class="co-name">${user?.business_name || user?.name || '—'}</div>
+    <div class="co-name">${supplierName(user) || '—'}</div>
     <div class="co-sub">
       ${user?.gstin ? `GSTIN: ${user.gstin}` : ''}
       ${user?.pan ? ` · PAN: ${user.pan}` : ''}
@@ -665,7 +665,7 @@ function buildMinimalHTML(inv, user, t, plan) {
 <div class="parties">
   <div>
     <div class="party-lbl">Bill From</div>
-    <div class="party-name">${user?.business_name || user?.name || '—'}</div>
+    <div class="party-name">${supplierName(user) || '—'}</div>
     ${user?.gstin ? `<div class="party-d">GSTIN: ${user.gstin}</div>` : ''}
     ${supState ? `<div class="party-d">State: ${stateMap[supState] || ''} | Code: ${supState}</div>` : ''}
   </div>
@@ -730,7 +730,7 @@ ${inv.notes ? `<div class="notes"><strong>Notes:</strong> ${inv.notes}</div>` : 
     ${inv.include_signatory ? `
     ${inv.signatory_image_url ? `<img src="${inv.signatory_image_url}" style="height:36px;max-width:110px;object-fit:contain;border:1px solid #ddd;background:#fff;padding:3px" />` : ''}
     <div style="border-top:1px solid #1a1a1a;padding-top:4px;font-size:9px">
-      <div><strong>For ${inv.seller_business_name || user?.business_name || user?.name || 'Creator'}</strong></div>
+      <div><strong>For ${inv.seller_business_name || supplierName(user) || 'Creator'}</strong></div>
       <div style="color:#666">Authorized Signatory${inv.signatory_name ? ': '+inv.signatory_name : ''}</div>
     </div>` : ''}
   </div>
@@ -1329,6 +1329,21 @@ export default function InvoicePage({ initialView }) {
     setTouched(p => ({ ...p, [field]: true }));
   }, []);
   const touch = (field) => setTouched(p => ({ ...p, [field]: true }));
+  // A valid brand GSTIN tells us the brand's state and PAN — fill them in, as the Tax Profile does.
+  // The PAN is only replaced if it's empty or was itself taken from the previous GSTIN.
+  const changeBrandGstin = (value) => {
+    const gstin = value.toUpperCase().slice(0, 15);
+    setForm(p => {
+      const next = { ...p, brandGstin: gstin };
+      if (gstin.length === 15 && !gstinError(gstin)) {
+        next.brandStateCode = gstin.slice(0, 2);
+        if (!p.isExport && (!p.placeOfSupply || p.placeOfSupply === p.brandStateCode)) next.placeOfSupply = next.brandStateCode;
+        if (!p.brandPan || p.brandPan === panFromGstin(p.brandGstin)) next.brandPan = panFromGstin(gstin);
+      }
+      return next;
+    });
+    setTouched(p => ({ ...p, brandGstin: true }));
+  };
   const showErr = (f) => touched[f] && formErrors[f];
 
   // ── Core save logic ────────────────────────────────────────────────────────
@@ -1365,7 +1380,7 @@ export default function InvoicePage({ initialView }) {
       // Signatory
       include_signatory: form.includeSignatory, signatory_name: form.signatoryName||null,
       signatory_image_url: form.signatoryImageUrl||null,
-      seller_business_name: user?.business_name||user?.name||null,
+      seller_business_name: supplierName(user)||null,
     };
   }
 
@@ -1576,11 +1591,13 @@ export default function InvoicePage({ initialView }) {
   }
 
   async function recordInvoicePayment(body) {
-    await api.post(`/invoices/${payingInvoice.id}/mark-paid`, body);
-    const fy = CURRENT_FY;
-    toast.success(`${payingInvoice.invoice_number}: payment recorded · income${body.tdsDeducted > 0 ? ' and TDS' : ''} logged for ${fy}`);
+    const res = await api.post(`/invoices/${payingInvoice.id}/mark-paid`, body);
+    toast.success(res.data?.already_counted
+      ? `${payingInvoice.invoice_number} marked paid · linked to the deal payment you already recorded (not counted twice)`
+      : `${payingInvoice.invoice_number}: payment recorded · income${body.tdsDeducted > 0 ? ' and TDS' : ''} logged for ${taxYearLabel(CURRENT_FY)}`);
     setPayingInvoice(null);
     loadInvoices();
+    refreshUsage(); // a TDS entry may have been added
   }
 
   // Mobile detection for invoice form
@@ -1640,7 +1657,7 @@ export default function InvoicePage({ initialView }) {
 
             <Sect title="Creator (Your Details)" collapsible defaultOpen={false}>
               <div style={{ padding: 'var(--space-3)', background: 'var(--surface-2)', borderRadius: 'var(--radius-md)', fontSize: 'var(--text-sm)', display: 'flex', flexDirection: 'column', gap: 3 }}>
-                <div style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{user?.business_name||user?.name||'—'}</div>
+                <div style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{supplierName(user)||'—'}</div>
                 {user?.gstin ? <div style={{ color: 'var(--text-muted)' }}>GSTIN: <span style={{ fontFamily: 'monospace', color: 'var(--text-body)' }}>{user.gstin}</span></div> : <div style={{ color: 'var(--danger-text)', fontSize: 12 }}>⚠ GSTIN not set</div>}
                 {user?.pan && <div style={{ color: 'var(--text-muted)' }}>PAN: <span style={{ fontFamily: 'monospace' }}>{user.pan}</span></div>}
                 {user?.business_address && <div style={{ color: 'var(--text-muted)', lineHeight: 1.4 }}>{user.business_address}</div>}
@@ -1656,7 +1673,7 @@ export default function InvoicePage({ initialView }) {
                 </button>
               </div>
               <Input id="brandName" format="name" label="Brand / Company Name *" value={form.brandName} onChange={e => update('brandName', e.target.value)} onBlur={() => touch('brandName')} error={showErr('brandName')} placeholder="Glowleaf Naturals Pvt Ltd" tooltip="Legal name of the brand or company you are billing. Must match their GST registration exactly for B2B invoices." />
-              <Input id="brandGstin" format="gstin" label="Brand GSTIN" value={form.brandGstin} onChange={e => update('brandGstin', e.target.value.toUpperCase().slice(0,15))} onBlur={() => touch('brandGstin')} error={showErr('brandGstin')} placeholder="27ABCDE1234F1Z0" hint={form.brandGstin.length === 15 && !gstinError(form.brandGstin) ? '✓ GSTIN checks out' : 'Mandatory for B2B input tax credit'} maxLength={15} tooltip="15-digit GST Identification Number of the brand. Format: 2 digits state code + 10 digit PAN + 1 digit entity number + Z + 1 check digit. Required for B2B input tax credit." style={form.brandGstin.length === 15 && !gstinError(form.brandGstin) ? { borderColor: 'var(--success)', boxShadow: '0 0 0 3px var(--success-dim)' } : {}} />
+              <Input id="brandGstin" format="gstin" label="Brand GSTIN" value={form.brandGstin} onChange={e => changeBrandGstin(e.target.value)} onBlur={() => touch('brandGstin')} error={showErr('brandGstin')} placeholder="27ABCDE1234F1Z0" hint={form.brandGstin.length === 15 && !gstinError(form.brandGstin) ? `✓ ${stateLabel(form.brandGstin.slice(0, 2))} · state and PAN filled in` : 'Mandatory for B2B input tax credit'} maxLength={15} tooltip="15-digit GST Identification Number of the brand. Format: 2 digits state code + 10 digit PAN + 1 digit entity number + Z + 1 check digit. Required for B2B input tax credit." style={form.brandGstin.length === 15 && !gstinError(form.brandGstin) ? { borderColor: 'var(--success)', boxShadow: '0 0 0 3px var(--success-dim)' } : {}} />
               <Input id="brandPan" format="pan" label="Brand PAN" value={form.brandPan} onChange={e => update('brandPan', e.target.value.toUpperCase().slice(0,10))} onBlur={() => touch('brandPan')} error={showErr('brandPan')} placeholder="ABCDE1234F" maxLength={10} tooltip="10-character Permanent Account Number of the brand. Optional but useful for TDS reconciliation and Form 26AS." />
               <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 'var(--space-3)' }}>
                 <Input id="brandEmail" format="email" label="Brand Email (optional)" type="email" value={form.brandEmail} onChange={e => update('brandEmail', e.target.value)} placeholder="accounts@brand.com" tooltip="Brand's billing or accounts email address. Optional — appears on invoice for reference." />
@@ -2758,7 +2775,7 @@ function ClassicPreview({ form, calc, invoiceNumber, user, template }) {
         <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', overflowWrap: 'anywhere', gap: 14, marginBottom: 16 }}>
           <div>
             <div style={{ fontSize: 8, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#999', marginBottom: 5 }}>SUPPLIER</div>
-            <div style={{ fontWeight: 700, marginBottom: 2 }}>{user?.business_name || user?.name || '—'}</div>
+            <div style={{ fontWeight: 700, marginBottom: 2 }}>{supplierName(user) || '—'}</div>
             {user?.gstin && <div style={{ fontSize: 10, color: '#555' }}>GSTIN: {user.gstin}</div>}
             {user?.pan && <div style={{ fontSize: 10, color: '#555' }}>PAN: {user.pan}</div>}
             {(() => { const e = (user?.show_phone_on_invoice === false && user?.invoice_email) ? user.invoice_email : user?.email; return e ? <div style={{ fontSize: 10, color: '#555' }}>Email: {e}</div> : null; })()}
@@ -2891,7 +2908,7 @@ function ClassicPreview({ form, calc, invoiceNumber, user, template }) {
                 <img src={form.signatoryImageUrl} alt="Signature" style={{ height: 40, maxWidth: 150, objectFit: 'contain', marginBottom: 4 }} />
               )}
               <div style={{ borderTop: '1px solid #1a1a1a', paddingTop: 5, fontSize: 10, color: '#333' }}>
-                <div style={{ fontWeight: 700 }}>For {user?.business_name || user?.name || 'Creator'}</div>
+                <div style={{ fontWeight: 700 }}>For {supplierName(user) || 'Creator'}</div>
                 <div style={{ color: '#666', marginTop: 2 }}>Authorized Signatory{form.signatoryName ? `: ${form.signatoryName}` : ''}</div>
               </div>
             </div>
@@ -2919,7 +2936,7 @@ function CorporatePreview({ form, calc, invoiceNumber, user, template }) {
       {/* Header — full-width colored band */}
       <div style={{ background: template.headerColor, padding: '16px 20px', color: '#fff', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
-          <div style={{ fontSize: 15, fontWeight: 800, letterSpacing: '-0.02em' }}>{user?.business_name || user?.name || '—'}</div>
+          <div style={{ fontSize: 15, fontWeight: 800, letterSpacing: '-0.02em' }}>{supplierName(user) || '—'}</div>
           {user?.gstin && <div style={{ fontSize: 9, opacity: 0.8, marginTop: 2 }}>GSTIN: {user.gstin}</div>}
           {user?.business_address && <div style={{ fontSize: 9, opacity: 0.75, marginTop: 2, lineHeight: 1.4 }}>{user.business_address}</div>}
           <StateLine code={supplierStateCode(user)} style={{ fontSize: 9, opacity: 0.75 }} />
@@ -3022,7 +3039,7 @@ function MinimalPreview({ form, calc, invoiceNumber, user, template }) {
       {/* Top: company left, invoice right */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
         <div>
-          <div style={{ fontSize: 16, fontWeight: 800, color: '#111', letterSpacing: '-0.02em' }}>{user?.business_name || user?.name || '—'}</div>
+          <div style={{ fontSize: 16, fontWeight: 800, color: '#111', letterSpacing: '-0.02em' }}>{supplierName(user) || '—'}</div>
           {user?.gstin && <div style={{ fontSize: 9, color: '#888', marginTop: 1 }}>GSTIN: {user.gstin}</div>}
         </div>
         <div style={{ textAlign: 'right' }}>
@@ -3044,7 +3061,7 @@ function MinimalPreview({ form, calc, invoiceNumber, user, template }) {
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', overflowWrap: 'anywhere', gap: 12, marginBottom: 12, padding: 8, background: '#f8f8f8', borderRadius: 4 }}>
         <div>
           <div style={{ fontSize: 7, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#999', marginBottom: 3 }}>Bill From</div>
-          <div style={{ fontWeight: 700, fontSize: 11 }}>{user?.business_name || user?.name || '—'}</div>
+          <div style={{ fontWeight: 700, fontSize: 11 }}>{supplierName(user) || '—'}</div>
           {user?.business_address && <div style={{ fontSize: 9, color: '#666' }}>{user.business_address}</div>}
           <StateLine code={supplierStateCode(user)} style={{ fontSize: 9, color: '#666' }} />
         </div>

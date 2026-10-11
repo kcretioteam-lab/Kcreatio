@@ -108,128 +108,10 @@ export function FlowCanvas({ active, style: sx }) {
   );
 }
 
-// ─── FlowPipeline ─────────────────────────────────────────────────────────────
-
-const PIPELINE_STEPS = [
-  { num: '①', title: 'Brand Deal arrives',  desc: 'Inquiry logged in your CRM.' },
-  { num: '②', title: 'Invoice sent',         desc: '30 seconds. GST compliant.' },
-  { num: '③', title: 'TDS logged',           desc: 'The exact amount the brand deducted.' },
-  { num: '④', title: 'Income tracked',       desc: 'Taxable value logged, GST kept separate.' },
-  { num: '⑤', title: 'CA export ready',      desc: 'One ZIP for your CA at ITR time.' },
-];
-
-const BEFORE_AFTER_STATS = [
-  { value: '30 seconds',  label: 'to generate a compliant invoice', was: '45 minutes' },
-  { value: '₹0 lost',     label: 'in untracked TDS this year',       was: '₹40,000+' },
-  { value: '0 penalties', label: 'in missed advance tax',            was: '₹3,600/quarter' },
-];
-
-export function FlowPipeline() {
-  const sectionRef = useRef(null);
-  const [stepVisible, setStepVisible] = useState(Array(PIPELINE_STEPS.length).fill(false));
-  const [lineVisible, setLineVisible] = useState(Array(PIPELINE_STEPS.length - 1).fill(false));
-  const fired = useRef(false);
-
-  useEffect(() => {
-    const el = sectionRef.current;
-    if (!el) return;
-    const observer = new IntersectionObserver(([entry]) => {
-      if (entry.isIntersecting && !fired.current) {
-        fired.current = true;
-        observer.disconnect();
-        if (reduced()) {
-          setStepVisible(Array(PIPELINE_STEPS.length).fill(true));
-          setLineVisible(Array(PIPELINE_STEPS.length - 1).fill(true));
-          return;
-        }
-        PIPELINE_STEPS.forEach((_, i) => {
-          setTimeout(() => setStepVisible(prev => { const n = [...prev]; n[i] = true; return n; }), i * 120);
-          if (i < PIPELINE_STEPS.length - 1)
-            setTimeout(() => setLineVisible(prev => { const n = [...prev]; n[i] = true; return n; }), i * 120 + 60);
-        });
-      }
-    }, { threshold: 0.15 });
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, []);
-
-  return (
-    <section ref={sectionRef} role="region" aria-label="How Kcreatio works — pipeline"
-      style={{ maxWidth: 1100, margin: '0 auto', padding: 'var(--space-20) var(--space-6)', textAlign: 'center' }}
-    >
-      <style>{`
-        .fp-pipeline { display:flex; flex-direction:row; align-items:flex-start; justify-content:center; gap:0; }
-        .fp-step-wrap { display:flex; flex-direction:row; align-items:flex-start; }
-        .fp-connector { display:flex; flex-direction:column; align-items:center; padding-top:24px; flex-shrink:0; }
-        .fp-connector-line { width:40px; height:2px; background:var(--accent); transform-origin:left center; transition:transform 400ms var(--ease-decelerate); }
-        .fp-connector-arrow { color:var(--accent); font-size:var(--text-base); margin-top:-1px; line-height:1; }
-        @media (max-width:767px) {
-          .fp-pipeline { flex-direction:column; align-items:flex-start; padding-left:var(--space-4); }
-          .fp-step-wrap { flex-direction:row; }
-          .fp-connector { flex-direction:row; align-items:center; padding-top:0; padding-left:23px; height:28px; }
-          .fp-connector-line { width:2px; height:28px; transform-origin:top center; }
-          .fp-connector-arrow { display:none; }
-        }
-      `}</style>
-
-      <p className="label" style={{ color: 'var(--accent)', marginBottom: 'var(--space-4)' }}>YOUR FLOW</p>
-      <h2 style={{ fontSize: 'var(--text-2xl)', fontWeight: 700, color: 'var(--text-primary)', marginBottom: 'var(--space-12)', lineHeight: 1.2 }}>
-        One deal. One flow.{' '}
-        <span style={{ color: 'var(--accent)' }}>Zero spreadsheets.</span>
-      </h2>
-
-      <div className="fp-pipeline" role="list">
-        {PIPELINE_STEPS.map((step, i) => (
-          <div key={step.num} className="fp-step-wrap" role="listitem">
-            <div style={{
-              display: 'flex', flexDirection: 'column', alignItems: 'center',
-              width: 160, flexShrink: 0,
-              opacity: stepVisible[i] ? 1 : 0,
-              transform: stepVisible[i] ? 'translateY(0)' : 'translateY(20px)',
-              transition: reduced() ? 'none' : 'opacity 400ms var(--ease-decelerate), transform 400ms var(--ease-decelerate)',
-            }}>
-              <div aria-hidden="true" style={{
-                width: 50, height: 50, borderRadius: 'var(--radius-full)',
-                background: i === 0 ? 'var(--accent)' : 'var(--surface-2)',
-                border: `2px solid ${i === 0 ? 'var(--accent)' : 'rgba(232,146,26,0.35)'}`,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: 'var(--text-lg)', color: i === 0 ? '#fff' : 'var(--accent)',
-                fontWeight: 700, flexShrink: 0, marginBottom: 'var(--space-3)',
-              }}>{step.num}</div>
-              <div style={{ fontSize: 'var(--text-sm)', fontWeight: 700, color: 'var(--text-primary)', marginBottom: 'var(--space-1)', textAlign: 'center' }}>{step.title}</div>
-              <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', lineHeight: 1.5, textAlign: 'center', maxWidth: 130 }}>{step.desc}</div>
-            </div>
-            {i < PIPELINE_STEPS.length - 1 && (
-              <div className="fp-connector" aria-hidden="true">
-                <div className="fp-connector-line" style={{ transform: lineVisible[i] ? 'scaleX(1) scaleY(1)' : 'scaleX(0) scaleY(0)' }} />
-                <span className="fp-connector-arrow">›</span>
-              </div>
-            )}
-          </div>
-        ))}
-      </div>
-
-      <Reveal delay={200}>
-        <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 'var(--space-5)', marginTop: 'var(--space-12)', paddingTop: 'var(--space-10)', borderTop: '1px solid var(--border)' }}>
-          {BEFORE_AFTER_STATS.map((stat) => (
-            <div key={stat.value} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: 'var(--space-5) var(--space-6)', textAlign: 'center', minWidth: 200, flex: '1 1 200px', maxWidth: 280 }}>
-              <div style={{ fontSize: 'var(--text-2xl)', fontWeight: 800, color: 'var(--accent)', fontVariantNumeric: 'tabular-nums', lineHeight: 1.1, marginBottom: 'var(--space-1)' }}>{stat.value}</div>
-              <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-body)', marginBottom: 'var(--space-2)' }}>{stat.label}</div>
-              <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', fontVariantNumeric: 'tabular-nums' }}>
-                was: <span style={{ textDecoration: 'line-through', color: 'var(--text-disabled)' }}>{stat.was}</span>
-              </div>
-            </div>
-          ))}
-        </div>
-      </Reveal>
-    </section>
-  );
-}
-
 // ─── Act5Impact ───────────────────────────────────────────────────────────────
 
 const IMPACTS = [
-  { icon: FileText, color: '#60a5fa', headline: 'Send a professional invoice in 30 seconds.', subline: 'GST auto-calculated. Rule 46-compliant. Your brand\'s finance team gets exactly what they need.', stat: '30s', statLabel: 'avg send time' },
+  { icon: FileText, color: '#60a5fa', headline: 'Send a professional invoice in 30 seconds.', subline: 'GST auto-calculated. Rule 46-compliant. Your brand\'s finance team gets exactly what they need.', stat: '30s', statLabel: 'to create' },
   { icon: Shield, color: '#4ade80', headline: 'The right GST, every time.', subline: 'CGST + SGST or IGST — Kcreatio picks the right one from your state and your brand’s GSTIN, and checks the codes match.', stat: 'Auto', statLabel: 'CGST / SGST / IGST' },
   { icon: TrendingDown, color: '#a78bfa', headline: 'Every rupee tracked. No surprises.', subline: 'Log the TDS each brand deducts (usually 1–10%), track which Form 16As are still pending, and see your total TDS credit before ITR.', stat: 'Sec 393', statLabel: 'TDS tracked per brand' },
   { icon: Calendar, color: '#fb923c', headline: 'Never miss an advance tax deadline.', subline: 'Quarterly amounts worked out from your real income, with reminders before Jun 15, Sep 15, Dec 15 and Mar 15. Free plan gets the March reminder.', stat: '4', statLabel: 'deadlines a year' },
@@ -302,11 +184,11 @@ export function Act5Impact() {
         <Reveal>
           <div style={{ textAlign: 'center', marginBottom: 40 }}>
             <h2 style={{ fontSize: 'clamp(32px, 5vw, 60px)', fontWeight: 900, lineHeight: 1.1, letterSpacing: '-0.03em', color: 'var(--text-primary)', marginBottom: 16 }}>
-              Not features.<br />
-              <span style={{ background: 'linear-gradient(135deg, #E8921A, #f59e0b)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Life improvements.</span>
+              What changes<br />
+              <span style={{ background: 'linear-gradient(135deg, #E8921A, #f59e0b)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>after your first month.</span>
             </h2>
             <p style={{ fontSize: 'clamp(15px, 1.8vw, 18px)', color: 'var(--text-body)', lineHeight: 1.7, maxWidth: 500, margin: '0 auto' }}>
-              Every tool in Kcreatio is designed to give you back time, money, and mental space.
+              Less time on paperwork, no TDS left unclaimed, and no surprise tax bill in March.
             </p>
           </div>
         </Reveal>
@@ -386,8 +268,8 @@ export function DashboardReveal() {
 
       <div style={{ textAlign: 'center', marginBottom: 'var(--space-10)' }}>
         <h2 style={{ fontSize: 'var(--text-2xl)', fontWeight: 700, color: 'var(--text-primary)', marginBottom: 'var(--space-3)' }}>
-          Your dashboard.{' '}
-          <span style={{ background: 'linear-gradient(135deg, #E8921A, #f59e0b)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>In 3 months.</span>
+          Income, TDS and tax deadlines.{' '}
+          <span style={{ background: 'linear-gradient(135deg, #E8921A, #f59e0b)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>One screen.</span>
         </h2>
         <p style={{ fontSize: 'var(--text-base)', color: 'var(--text-muted)' }}>Sample dashboard — this is what yours looks like once you log a few deals.</p>
       </div>
@@ -430,7 +312,7 @@ export function DashboardReveal() {
         <div style={cardStyle(3)}>
           <div className="label" style={{ color: 'var(--text-muted)', marginBottom: 'var(--space-3)' }}>NEXT TAX DEADLINE</div>
           <div style={{ fontSize: 'var(--text-2xl)', fontWeight: 800, color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.02em', lineHeight: 1.1 }}>Sep 15</div>
-          <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', marginTop: 'var(--space-2)', marginBottom: 'var(--space-3)', fontVariantNumeric: 'tabular-nums' }}>Q3 Advance Tax · ₹18,400 due</div>
+          <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', marginTop: 'var(--space-2)', marginBottom: 'var(--space-3)', fontVariantNumeric: 'tabular-nums' }}>Q2 Advance Tax · ₹18,400 due</div>
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: 'var(--space-1)', padding: '3px var(--space-3)', background: 'var(--warning-dim)', color: 'var(--warning-text)', borderRadius: 'var(--radius-full)', fontSize: 'var(--text-xs)', fontWeight: 700 }}>
             14 days away
           </div>
@@ -494,7 +376,7 @@ export function ComparisonTable() {
       <style>{`.cmp-desktop { display:block; overflow-x:auto; } .cmp-mobile { display:none; } @media (max-width:640px) { .cmp-desktop { display:none; } .cmp-mobile { display:flex; flex-direction:column; gap:var(--space-3); } }`}</style>
       <Reveal>
         <p style={{ fontSize: 'var(--text-xs)', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--accent)', textAlign: 'center', margin: '0 auto var(--space-4)' }}>WHY KCREATIO</p>
-        <h2 style={{ fontSize: 'var(--text-2xl)', fontWeight: 700, color: 'var(--text-primary)', textAlign: 'center', margin: '0 auto var(--space-10)' }}>Built for this. Nothing else comes close.</h2>
+        <h2 style={{ fontSize: 'var(--text-2xl)', fontWeight: 700, color: 'var(--text-primary)', textAlign: 'center', margin: '0 auto var(--space-10)' }}>Accounting apps were built for shops, not brand deals.</h2>
       </Reveal>
       <div className="cmp-desktop">
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 'var(--text-sm)' }}>
@@ -529,7 +411,7 @@ const PLANS = [
   // Paid plans disabled for now — premium is granted on request
   // { name: 'Starter', price: '₹299', period: '/month', desc: 'For creators with regular brand deals.', color: '#34d399', features: ['Watermark-free invoices, all 7 templates', 'Unlimited TDS + Form 16A tracker', 'Smart Inbox (Gmail auto-detect)', 'All 4 advance tax reminders', 'Expense tracker'], cta: 'Start 28-day free trial', href: '/register' },
   // { name: 'Creator Pro', price: '₹599', period: '/month', desc: 'For serious creators managing real brand business.', color: '#E8921A', highlight: true, features: ['Everything in Starter', 'Advance tax calculator', 'P&L + income dashboard', 'ITR-ready export (ZIP)', 'Smart Inbox auto-apply'], cta: 'Start 28-day free trial', href: '/register' },
-  { name: 'Creator Pro', price: '₹0', period: ' for 28 days', desc: 'Request 28 days of Pro from inside the app — free, no card needed. We review every request personally.', color: '#E8921A', highlight: true, features: ['Watermark-free invoices, all 7 templates', 'Unlimited TDS + Form 16A tracker', 'Advance tax calculator', 'P&L + income dashboard', 'ITR-ready export (ZIP)', 'Smart Inbox (Gmail auto-detect)'], cta: 'Start free · request Pro', href: '/register' },
+  { name: 'Creator Pro', price: '₹0', period: ' for 28 days', desc: 'Request 28 days of Pro from inside the app — free, no card needed. We approve requests within 24 hours.', color: '#E8921A', highlight: true, features: ['Watermark-free invoices, all 7 templates', 'Unlimited TDS + Form 16A tracker', 'Advance tax calculator', 'P&L + income dashboard', 'ITR-ready export (ZIP)', 'Smart Inbox (Gmail auto-detect)'], cta: 'Start free · request Pro', href: '/register' },
   // Business/Agency plan paused
   // { name: 'Agency', price: '₹1,999', period: '/month', desc: 'For MCNs, talent managers, and creator agencies.', color: '#a78bfa', features: ['Everything in Pro', 'Up to 20 creators', 'Team access', 'White-label invoices', 'Dedicated account manager'], cta: 'Contact us', href: '/register' },
 ];
@@ -640,7 +522,7 @@ export function InvoiceShowcase() {
           <Reveal delay={80}>
             <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.15em', color: 'var(--accent)', textTransform: 'uppercase', marginBottom: 16 }}>The invoice</div>
             <h2 id="invoice-title" style={{ fontSize: 'clamp(28px, 4vw, 44px)', fontWeight: 900, lineHeight: 1.1, letterSpacing: '-0.03em', color: 'var(--text-primary)', margin: '0 0 16px' }}>
-              What your brand's finance team receives.
+              The GST invoice your brand's finance team receives.
             </h2>
             <p style={{ fontSize: 16, color: 'var(--text-body)', lineHeight: 1.7, margin: '0 0 28px' }}>
               Brands hold payment until the invoice is right. Kcreatio fills in the parts creators usually get wrong.
@@ -691,7 +573,7 @@ const FAQ_ITEMS = [
   },
   {
     q: 'How does the GST calculation actually work?',
-    a: 'Kcreatio reads the first two digits of both GSTINs (yours and the brand\'s) and automatically applies CGST+SGST for intrastate deals, IGST for interstate. SAC code 998399 is pre-filled. Every invoice is Rule 46 CGST Rules 2017 compliant — no manual math, ever.',
+    a: 'Kcreatio reads the first two digits of both GSTINs (yours and the brand\'s) and automatically applies CGST+SGST for intrastate deals, IGST for interstate. SAC code 998399 is pre-filled, and every field Rule 46 of the CGST Rules 2017 asks for is on the invoice. No manual maths.',
   },
   {
     q: 'What about TDS? Do I need to track it manually?',
@@ -801,12 +683,12 @@ export function Act7Return() {
       <div style={{ position: 'relative', zIndex: 2, maxWidth: 660 }}>
         <Reveal>
           <h2 style={{ fontSize: 'clamp(36px, 6vw, 72px)', fontWeight: 900, lineHeight: 1.05, letterSpacing: '-0.04em', color: 'var(--text-primary)', margin: '0 0 24px' }}>
-            Spend your energy<br />
-            <span style={{ background: 'linear-gradient(135deg, #E8921A 0%, #f59e0b 50%, #E8921A 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundSize: '200% 100%', animation: 'v6shimmer 4s ease infinite' }}>creating.</span>
+            Create.<br />
+            <span style={{ background: 'linear-gradient(135deg, #E8921A 0%, #f59e0b 50%, #E8921A 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundSize: '200% 100%', animation: 'v6shimmer 4s ease infinite' }}>Everything else flows.</span>
           </h2>
           <p style={{ fontSize: 'clamp(16px, 2vw, 20px)', color: 'var(--text-body)', lineHeight: 1.7, maxWidth: 520, margin: '0 auto 48px', fontWeight: 400 }}>
-            We'll handle the business behind it.<br />
-            Invoices. GST. TDS. Taxes. Running quietly, so you never have to stop.
+            Kcreatio keeps the business side in order.<br />
+            Invoices, GST, TDS and advance tax, tracked in the background and ready for your CA.
           </p>
         </Reveal>
         <Reveal delay={200}>
@@ -814,11 +696,11 @@ export function Act7Return() {
             onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-3px) scale(1.03)'; e.currentTarget.style.boxShadow = '0 20px 56px rgba(232,146,26,0.5)'; }}
             onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = '0 12px 40px rgba(232,146,26,0.4)'; }}
           >
-            Get Started Free <Zap size={18} />
+            Make your first invoice free <Zap size={18} />
           </Link>
         </Reveal>
         <Reveal delay={350}>
-          <p style={{ marginTop: 20, fontSize: 13, color: 'var(--text-muted)' }}>No credit card. No setup. 60-second onboarding.</p>
+          <p style={{ marginTop: 20, fontSize: 13, color: 'var(--text-muted)' }}>No credit card. Free plan never expires.</p>
         </Reveal>
         <Reveal delay={450}>
           <div style={{ display: 'flex', gap: 24, justifyContent: 'center', flexWrap: 'wrap', marginTop: 48 }}>
@@ -856,7 +738,7 @@ export function Footer() {
               <span style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: 15 }}>Kcreatio</span>
             </div>
             <p style={{ fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.7 }}>
-              The financial operating system for Indian content creators. Built for creators, by people who care about them.
+              The finance app for Indian creators who work with brands. GST invoices, TDS tracking and advance tax in one place.
             </p>
           </div>
           {[
@@ -1114,7 +996,7 @@ export function TaxRiskCalculator() {
                   {inrFmt(result.q2Due)} advance tax due by Sep 15 (Q2)
                 </div>
                 <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
-                  Income tax ({inrFmt(result.incomeTax)}) exceeds TDS ({inrFmt(result.estimatedTds)}) — {inrFmt(result.advanceTaxOwed)} still owed this FY.
+                  Income tax ({inrFmt(result.incomeTax)}) exceeds TDS ({inrFmt(result.estimatedTds)}) — {inrFmt(result.advanceTaxOwed)} still owed this tax year.
                   Missing Q2 triggers 234C interest.
                 </div>
               </div>
@@ -1133,7 +1015,7 @@ export function TaxRiskCalculator() {
             }}>
               <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
                 <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>Form 16A: </span>
-                {result.form16aRisk} beyond Jun 30 — collect before filing to claim your refund
+                collect one from each of your {result.brands} brand{result.brands !== 1 ? 's' : ''} (due within 15 days of their quarterly TDS return) and check the TDS shows in your AIS before you file
               </div>
             </div>
           </div>

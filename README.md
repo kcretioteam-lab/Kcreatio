@@ -2,7 +2,7 @@
 
 > **"Generate GST-compliant invoices for brand deals in 30 seconds. Never miss a TDS deduction or advance tax deadline again."**
 
-The financial operating system for Indian content creators.
+The finance app for Indian creators who work with brands: brand deal to tax return, sorted.
 
 ---
 
@@ -27,7 +27,7 @@ Indian creators earning ₹5L–₹50L/year face legally mandated business-grade
 | Problem | Pain Score |
 |---------|-----------|
 | GST registration + GSTR-1/3B/9 filing. Brands hold payment until you send a compliant invoice. | 9/10 |
-| TDS reconciliation — brands deduct 10% under Section 194J, most never send Form 16A | 9/10 |
+| TDS reconciliation — brands deduct 10% under Section 393 of the Income-tax Act 2025 (formerly 194J), most never send Form 16A | 9/10 |
 | Advance tax shock — owe >₹10K? Must pay quarterly. Most find out in March. Late = 1% monthly interest | 8/10 |
 | No tool exists for this specific use case | — |
 

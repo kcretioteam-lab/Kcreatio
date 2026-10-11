@@ -18,7 +18,7 @@ import {
   CREATOR_GST_CONFIG,
   InvoiceLine,
 } from '../services/invoiceService.js';
-import { GST_RATES, DEFAULT_GST_RATE, checkGstin, GSTIN_MESSAGES, supplierStateCode, FOREIGN_STATE_CODE } from '../lib/gst.js';
+import { GST_RATES, DEFAULT_GST_RATE, checkGstin, GSTIN_MESSAGES, supplierStateCode, supplierName, FOREIGN_STATE_CODE } from '../lib/gst.js';
 import { generateInvoicePdf } from '../services/pdfService.js';
 import { generateInvoicePdfWithPuppeteer, warmBrowser } from '../services/puppeteerPdfService.js';
 import { PLAN_LIMITS, Plan } from '../config/plans.js';
@@ -506,7 +506,7 @@ router.get('/:id/pdf', pdfRateLimit, async (req: AuthRequest, res: Response): Pr
         invoiceDate: invoice.invoice_date,
         dueDate: invoice.due_date,
         seller: {
-          name: user.business_name || user.name,
+          name: supplierName(user),
           gstin: user.gstin,
           address: user.business_address,
           stateCode: supplierStateCode(user) ?? undefined,
@@ -711,7 +711,7 @@ router.delete('/:id', async (req: AuthRequest, res: Response): Promise<void> => 
 async function getUser(userId: string) {
   const { data } = await supabase
     .from('users')
-    .select('id, name, email, business_name, gstin, pan, business_address, state_code, invoice_prefix, lut_number, phone, show_phone_on_invoice, invoice_phone, invoice_email, gmail_access_token, gmail_refresh_token, gmail_connected_email')
+    .select('id, name, email, business_name, legal_name, trade_name, gstin, pan, business_address, state_code, invoice_prefix, lut_number, phone, show_phone_on_invoice, invoice_phone, invoice_email, gmail_access_token, gmail_refresh_token, gmail_connected_email')
     .eq('id', userId)
     .maybeSingle();
   return data;
@@ -785,13 +785,46 @@ router.post('/:id/send', async (req: AuthRequest, res: Response): Promise<void> 
 
 // POST /invoices/:id/mark-paid — records the payment: status, income (taxable value) and TDS, atomically
 router.post('/:id/mark-paid', validateBody(MarkPaidSchema), async (req: AuthRequest, res: Response): Promise<void> => {
-  const result = await markPaid('invoice', req.userId!, String(req.params.id), req.body);
+  const invoiceId = String(req.params.id);
+  const { data: inv } = await supabase.from('invoices').select('id, deal_id, brand_name')
+    .eq('id', invoiceId).eq('user_id', req.userId!).maybeSingle();
+  if (!inv) { res.status(404).json({ error: 'NOT_FOUND', message: 'Invoice not found' }); return; }
+
+  // An invoice that isn't linked to a deal can still be for a deal that was already marked paid
+  // (deal paid first, invoice raised later). Counting both would log the income and TDS twice.
+  if (!inv.deal_id && req.body.linkDealId) {
+    const { data: deal } = await supabase.from('deals').select('id').eq('id', req.body.linkDealId).eq('user_id', req.userId!).maybeSingle();
+    if (!deal) { res.status(404).json({ error: 'NOT_FOUND', message: 'Deal not found' }); return; }
+    await supabase.from('invoices').update({ deal_id: deal.id }).eq('id', inv.id).eq('user_id', req.userId!);
+  } else if (!inv.deal_id && !req.body.separatePayment && inv.brand_name?.trim()) {
+    const { data: paidDeals } = await supabase.from('deals').select('id, brand_name')
+      .eq('user_id', req.userId!).eq('status', 'paid').ilike('brand_name', inv.brand_name.trim().replace(/[\\%_]/g, (c: string) => `\\${c}`));
+    const ids = (paidDeals || []).map(d => d.id);
+    if (ids.length) {
+      const { data: prior } = await supabase.from('income').select('deal_id, amount, income_date')
+        .eq('user_id', req.userId!).in('deal_id', ids).is('invoice_id', null)
+        .order('income_date', { ascending: false }).limit(1).maybeSingle();
+      if (prior) {
+        res.status(409).json({
+          error: 'POSSIBLE_DUPLICATE',
+          message: `A payment from ${inv.brand_name} of ₹${Number(prior.amount).toLocaleString('en-IN')} was already recorded on the deal (${prior.income_date}). Is this the same payment?`,
+          dealId: prior.deal_id,
+        });
+        return;
+      }
+    }
+  }
+
+  const result = await markPaid('invoice', req.userId!, invoiceId, req.body);
   if (!result.ok) { res.status(result.status).json({ error: result.error, message: result.message }); return; }
-  const { data } = await supabase.from('invoices').select('*').eq('id', String(req.params.id)).eq('user_id', req.userId!).single();
-  await logInvoiceEvent(req, req.userId!, data || { id: String(req.params.id) }, data?.status === 'paid' ? 'paid' : 'part_paid', {
-    payment_date: req.body.paymentDate, amount_received: req.body.amountReceived, tds: req.body.tdsDeducted,
+  const { data } = await supabase.from('invoices').select('*').eq('id', invoiceId).eq('user_id', req.userId!).single();
+  // No income row for this payment means the deal's earlier payment was linked instead (migration 020)
+  const { data: newIncome } = await supabase.from('income').select('id').eq('user_id', req.userId!).eq('payment_id', result.id).limit(1);
+  const alreadyCounted = !newIncome?.length;
+  await logInvoiceEvent(req, req.userId!, data || { id: invoiceId }, data?.status === 'paid' ? 'paid' : 'part_paid', {
+    payment_date: req.body.paymentDate, amount_received: req.body.amountReceived, tds: req.body.tdsDeducted, already_counted: alreadyCounted,
   });
-  res.json(data);
+  res.json({ ...data, already_counted: alreadyCounted });
 });
 
 // POST /invoices/:id/payment-confirm-token — generate one-time brand confirmation link

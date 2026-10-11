@@ -47,6 +47,8 @@ export default function TDSPage() {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => { loadData(); }, [fy]);
+  // Entries also come from marking invoices/deals paid and from Smart Inbox, so recount on every visit
+  useEffect(() => { refreshUsage(); }, [refreshUsage]);
 
   async function loadData() {
     // Show the last copy straight away, then refresh
@@ -182,7 +184,7 @@ export default function TDSPage() {
               {formatINR(summary.netTdsCredit)} claimable at ITR
             </div>
             <div style={{ fontSize: 'var(--text-sm)', color: 'var(--text-secondary)', marginTop: 4 }}>
-              Total TDS deducted this FY — fully recoverable when you file your ITR
+              Total TDS deducted this tax year — fully recoverable when you file your ITR
             </div>
           </div>
           <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', maxWidth: 220, textAlign: 'right' }}>

@@ -5,6 +5,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import MarkPaidDialog from '../components/features/payment/MarkPaidDialog.jsx';
 import api, { getErrorMessage } from '../utils/api.js';
 import { useToast } from '../hooks/useToast.jsx';
+import { useUsage } from '../hooks/useUsage.jsx';
 import { formatINR } from '../utils/formatINR.js';
 import Badge from '../components/ui/Badge.jsx';
 import Modal from '../components/ui/Modal.jsx';
@@ -31,6 +32,7 @@ export default function DealsPage() {
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [payingDeal, setPayingDeal] = useState(null);
   const navigate = useNavigate();
+  const { refresh: refreshUsage } = useUsage();
 
   useEffect(() => {
     loadDeals();
@@ -103,6 +105,7 @@ export default function DealsPage() {
     setPayingDeal(null);
     setDeals(prev => prev.map(d => d.id === deal.id ? { ...d, status: 'paid' } : d));
     setSelectedDeal(cur => (cur?.id === deal.id ? { ...cur, status: 'paid', invoice: cur.invoice && { ...cur.invoice, status: 'paid' } } : cur));
+    refreshUsage(); // a TDS entry may have been added
   }
 
   function createInvoice(deal) {

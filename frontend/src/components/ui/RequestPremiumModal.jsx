@@ -55,13 +55,13 @@ export default function RequestPremiumModal({ isOpen, onClose, isPending, onSubm
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--space-3)', textAlign: 'center', padding: 'var(--space-4) 0' }}>
           <Clock size={28} style={{ color: 'var(--accent)' }} aria-hidden="true" />
           <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-body)', margin: 0 }}>
-            Your request is pending review. We’ll email you as soon as your 28 days of Pro are unlocked.
+            Your request is pending review — we approve requests within 24 hours and email you as soon as your 28 days of Pro are unlocked.
           </p>
         </div>
       ) : (
         <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
           <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)', margin: 0 }}>
-            Get 28 days of full Pro access, free. Tell us a little about you and we’ll review your request.
+            Get 28 days of full Pro access, free. Tell us a little about you — we review every request within 24 hours.
           </p>
 
           <fieldset style={{ border: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>

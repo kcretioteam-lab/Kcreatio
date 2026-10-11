@@ -1,7 +1,7 @@
 import puppeteer, { Browser } from 'puppeteer-core';
 import { format } from 'date-fns';
 
-import { STATE_CODES as STATE_MAP, supplierStateCode } from '../lib/gst.js';
+import { STATE_CODES as STATE_MAP, supplierStateCode, supplierName, supplierTradeName } from '../lib/gst.js';
 
 const ones = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine',
   'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
@@ -96,6 +96,8 @@ export interface UserForPdf {
   name: string;
   email?: string | null;
   business_name?: string | null;
+  legal_name?: string | null;
+  trade_name?: string | null;
   gstin?: string | null;
   pan?: string | null;
   business_address?: string | null;
@@ -196,7 +198,8 @@ function buildInvoiceHtml(inv: InvoiceForPdf, user: UserForPdf, plan?: string): 
   <div class="parties">
     <div>
       <div class="party-label">Supplier (From)</div>
-      <div class="party-name">${esc(user.business_name || user.name)}</div>
+      <div class="party-name">${esc(supplierName(user))}</div>
+      ${supplierTradeName(user) ? `<div class="party-detail">Trade name: ${esc(supplierTradeName(user))}</div>` : ''}
       ${user.gstin ? `<div class="party-detail">GSTIN: <strong>${esc(user.gstin)}</strong></div>` : ''}
       ${user.pan ? `<div class="party-detail">PAN: ${esc(user.pan)}</div>` : ''}
       ${displayEmail ? `<div class="party-detail">Email: ${esc(displayEmail)}</div>` : ''}
@@ -271,7 +274,7 @@ function buildInvoiceHtml(inv: InvoiceForPdf, user: UserForPdf, plan?: string): 
     <div style="text-align:center;min-width:180px">
       ${inv.signatory_image_url ? `<img src="${inv.signatory_image_url}" style="height:48px;max-width:160px;object-fit:contain;margin-bottom:4px;border:1px solid #ddd;border-radius:4px;background:#fff;padding:4px" />` : ''}
       <div style="border-top:1px solid #1a1a1a;padding-top:6px;font-size:10px;color:#333">
-        <div><strong>For ${esc(inv.seller_business_name || user.business_name || user.name)}</strong></div>
+        <div><strong>For ${esc(inv.seller_business_name || supplierName(user))}</strong></div>
         ${inv.signatory_name ? `<div style="color:#666">Authorized Signatory: ${esc(inv.signatory_name)}</div>` : '<div style="color:#666">Authorized Signatory</div>'}
       </div>
     </div>
