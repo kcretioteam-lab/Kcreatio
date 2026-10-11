@@ -12,7 +12,7 @@ import LogoMark from '../components/ui/LogoMark.jsx';
 import TwoFactorStep from '../components/auth/TwoFactorStep.jsx';
 
 const BRAND_BULLETS = [
-  { icon: FileText,   text: 'GST-compliant invoices in 30 seconds' },
+  { icon: FileText,   text: 'GST invoices with every Rule 46 field' },
   { icon: Receipt,    text: 'TDS tracking from every brand' },
   { icon: Calculator, text: 'Advance tax planning — no March shock' },
 ];
@@ -248,8 +248,8 @@ export default function AuthPage({ defaultMode = 'register' }) {
                 <span style={{ fontWeight: 700, fontSize: 'var(--text-md)', color: 'var(--text-primary)' }}>Kcreatio</span>
               </div>
               <h2 style={{ fontFamily: "'Instrument Serif', Georgia, serif", fontSize: 'clamp(22px, 2vw, 30px)', fontWeight: 400, lineHeight: 1.2, color: 'var(--text-primary)', marginBottom: 'var(--space-6)', letterSpacing: '-0.01em' }}>
-                Your financial OS.<br />
-                <em style={{ color: 'var(--accent)', fontStyle: 'italic' }}>Built for Indian creators.</em>
+                Brand deal to tax return.<br />
+                <em style={{ color: 'var(--accent)', fontStyle: 'italic' }}>Sorted.</em>
               </h2>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
                 {BRAND_BULLETS.map(({ icon: Icon, text }) => (
@@ -263,7 +263,7 @@ export default function AuthPage({ defaultMode = 'register' }) {
               </div>
             </div>
             <p style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', lineHeight: 1.5 }}>
-              Join 200+ Indian creators who handle GST, TDS & advance tax without a CA.
+              Built for Indian creators who work with brands. Works alongside your CA.
             </p>
           </div>
         )}
