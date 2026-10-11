@@ -7,6 +7,7 @@ const REQUIRED: { table: string; column: string; migration: string; impact: stri
   { table: 'invoices', column: 'line_items', migration: '016_payment_integrity_tax_profile.sql', impact: 'multi-line invoices can’t be saved' },
   { table: 'tds_records', column: 'deal_id', migration: '016_payment_integrity_tax_profile.sql', impact: 'deal payments can’t record TDS' },
   { table: 'invoice_payments', column: 'id', migration: '018_creator_features.sql', impact: 'part payments fail' },
+  { table: 'premium_requests', column: 'reminded_at', migration: '020_no_double_income.sql', impact: 'paying a deal and then its invoice counts the income and TDS twice' },
 ];
 
 export async function checkSchema(): Promise<string[]> {

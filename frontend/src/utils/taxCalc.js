@@ -147,11 +147,8 @@ export function quickTaxEstimate(monthlyIncome, brandCount = 1) {
   const estimatedTds = Math.round(annual * 0.10);
   const r = computeTax({ grossReceipts: annual, tdsPaid: estimatedTds });
   const q2Due = r.advanceTaxRequired ? r.instalments[1].cumulativeDue : 0;
-  const lateCount = Math.round(brandCount * 0.4);
-  const form16aRisk = brandCount < 3
-    ? `${Math.round(brandCount * 40)}% chance of delay`
-    : `~${lateCount} of ${brandCount} brand${brandCount !== 1 ? 's' : ''} likely late`;
-  return { annual, estimatedTds, incomeTax: r.totalTax, advanceTaxOwed: r.netPayable, itrRefund: r.refund, q2Due, form16aRisk };
+  // brands = Form 16As to collect (one per brand). No made-up delay odds — we have no source for them.
+  return { annual, estimatedTds, incomeTax: r.totalTax, advanceTaxOwed: r.netPayable, itrRefund: r.refund, q2Due, brands: brandCount };
 }
 
 export function getFinancialYear(date) {

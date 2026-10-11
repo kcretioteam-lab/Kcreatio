@@ -10,13 +10,14 @@ const SITE_URL = (process.env.VITE_SITE_URL || 'https://kcreatio.com').replace(/
 const PAGES = [
   {
     route: '/',
-    title: 'Kcreatio — GST invoices, TDS & advance tax for Indian creators',
-    description: 'GST-compliant invoices, TDS tracking with Form 16A, advance tax planning and a brand-deal pipeline, built for Indian YouTubers, Instagram creators and podcasters.',
+    title: 'GST invoices, TDS & advance tax for Indian creators | Kcreatio',
+    description: 'Send GST invoices brands approve, track the TDS they deduct and plan advance tax. Free for Indian YouTubers and Instagram creators who work with brands.',
     priority: '1.0',
     body: `
       <main>
-        <h1>GST, TDS and advance tax for Indian content creators</h1>
-        <p>Kcreatio is the financial workspace for Indian YouTubers, Instagram creators and podcasters. Create GST invoices brands accept, track the TDS they deduct, and know your advance tax before each deadline.</p>
+        <h1>GST, TDS &amp; advance tax for Indian creators</h1>
+        <p><strong>Brand deal to tax return, sorted.</strong></p>
+        <p>Kcreatio is the finance app for Indian YouTubers, Instagram creators and podcasters who work with brands. Send GST invoices finance teams approve, track every rupee of TDS brands deduct, and know your advance tax before each deadline.</p>
         <h2>GST invoices in under a minute</h2>
         <p>Rule 46 fields, CGST + SGST or IGST worked out from your GSTIN and the place of supply, SAC 998399, amount in words, and export invoices under LUT for foreign clients.</p>
         <h2>TDS and Form 16A tracking</h2>
@@ -27,7 +28,7 @@ const PAGES = [
         <p>Track deals from inquiry to payment, including barter deals paid in products, and turn a deal into an invoice in one click.</p>
         <h2>One export for your CA</h2>
         <p>Every invoice as a PDF, an Excel workbook of income, expenses and TDS, and a one-page tax summary.</p>
-        <p><a href="/register">Start free</a> · <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a></p>
+        <p><a href="/register">Make your first invoice free</a> · <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a></p>
       </main>`,
   },
   {
@@ -40,7 +41,7 @@ const PAGES = [
   {
     route: '/terms',
     title: 'Terms of Service — Kcreatio',
-    description: 'The terms for using Kcreatio, the financial workspace for Indian content creators.',
+    description: 'The terms for using Kcreatio, the finance app for Indian creators who work with brands.',
     priority: '0.3',
     body: '<main><h1>Terms of Service</h1><p>The terms for using Kcreatio. Kcreatio is a software tool and does not provide tax advice.</p></main>',
   },

@@ -7,7 +7,7 @@ import { validateBody } from '../middleware/validateBody.js';
 import { getFinancialYear, getFYCode, getAdvanceTaxQuarter } from '../services/invoiceService.js';
 import { renderHtmlToPdf } from '../services/puppeteerPdfService.js';
 import { logInvoiceEvent } from '../services/auditLog.js';
-import { stateLabel, supplierStateCode } from '../lib/gst.js';
+import { stateLabel, supplierStateCode, supplierName } from '../lib/gst.js';
 
 const router = Router();
 router.use(authenticate);
@@ -106,7 +106,7 @@ router.get('/:id/pdf', async (req: AuthRequest, res: Response): Promise<void> =>
   if (!note) { res.status(404).json({ error: 'NOT_FOUND', message: 'Credit note not found' }); return; }
   const [{ data: inv }, { data: user }] = await Promise.all([
     supabase.from('invoices').select('*').eq('id', note.invoice_id).maybeSingle(),
-    supabase.from('users').select('name, business_name, legal_name, gstin, pan, business_address, state_code').eq('id', req.userId!).maybeSingle(),
+    supabase.from('users').select('name, business_name, legal_name, trade_name, gstin, pan, business_address, state_code').eq('id', req.userId!).maybeSingle(),
   ]);
   const supplierState = user ? supplierStateCode(user) : null;
   const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
@@ -118,7 +118,7 @@ router.get('/:id/pdf', async (req: AuthRequest, res: Response): Promise<void> =>
     <h1>CREDIT NOTE</h1>
     <div>${esc(note.credit_note_number)} · Date ${esc(note.note_date)} · Against invoice <b>${esc(inv?.invoice_number)}</b> dated ${esc(inv?.invoice_date)}</div>
     <div class="grid">
-      <div><div class="lbl">Supplier</div><b>${esc(user?.legal_name || user?.business_name || user?.name)}</b><br>${user?.gstin ? `GSTIN: ${esc(user.gstin)}<br>` : ''}${esc(user?.business_address)}<br>${esc(stateLabel(supplierState))}</div>
+      <div><div class="lbl">Supplier</div><b>${esc(user ? supplierName(user) : '')}</b><br>${user?.gstin ? `GSTIN: ${esc(user.gstin)}<br>` : ''}${esc(user?.business_address)}<br>${esc(stateLabel(supplierState))}</div>
       <div><div class="lbl">Recipient</div><b>${esc(inv?.brand_name)}</b><br>${inv?.brand_gstin ? `GSTIN: ${esc(inv.brand_gstin)}<br>` : ''}${esc(inv?.brand_address)}<br>${esc(stateLabel(inv?.brand_state_code))}</div>
     </div>
     <div><span class="lbl">Reason</span><br>${esc(note.reason)}</div>
@@ -128,7 +128,7 @@ router.get('/:id/pdf', async (req: AuthRequest, res: Response): Promise<void> =>
       ${note.igst_amount != null ? `<tr><td>Less: IGST</td><td class="r">${inr(note.igst_amount)}</td></tr>` : ''}
       <tr class="total"><td>Total credit</td><td class="r">${inr(note.total_amount)}</td></tr>
     </table>
-    <p style="margin-top:40px;text-align:right">For ${esc(user?.business_name || user?.name)}<br><br>Authorised signatory</p>
+    <p style="margin-top:40px;text-align:right">For ${esc(user ? supplierName(user) : '')}<br><br>Authorised signatory</p>
   </body></html>`;
   try {
     const pdf = await renderHtmlToPdf(html);

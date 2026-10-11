@@ -9,8 +9,10 @@ export function isNewAct(fy) {
   return getFYStartYear(fy) >= NEW_ACT_FROM;
 }
 
+// One label for every year, so year switchers don't mix "Tax year" and "FY".
+// The law that applies to a year still shows through tdsSectionLabel().
 export function taxYearLabel(fy) {
-  return isNewAct(fy) ? `Tax year ${fy}` : `FY ${fy}`;
+  return `Tax year ${fy}`;
 }
 
 export function tdsSectionLabel(oldSection, fy) {

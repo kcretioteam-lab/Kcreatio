@@ -57,4 +57,10 @@ export function supplierStateCode(user) {
   return user?.state_code || null;
 }
 
+// Rule 46: the invoice names the supplier by legal name (Tax Profile), not the login name.
+// Mirrored in backend/src/lib/gst.ts.
+export function supplierName(user) {
+  return user?.legal_name?.trim() || user?.business_name?.trim() || user?.name?.trim() || '';
+}
+
 export const stateLabel = (code) => (code ? `${STATE_CODES[code] || 'Unknown'} | Code: ${code}` : '');

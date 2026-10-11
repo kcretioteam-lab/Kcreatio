@@ -6,6 +6,7 @@ import { hasFeature } from '../config/plans.js';
 import { startInvoiceJobs } from './invoiceJobs.js';
 import { applyDetection } from '../services/detectionService.js';
 import { getFinancialYear } from '../services/invoiceService.js';
+import { remindPendingPremiumRequests } from '../routes/premiumRequests.js';
 
 // ── Advance Tax Reminder Cron ─────────────────────────────────────────────────
 // Runs daily at 9:00 AM — checks if any instalment is due in X days per user pref.
@@ -182,10 +183,21 @@ export function startGmailScanJob() {
   });
 }
 
+// ── Premium request reminder ──────────────────────────────────────────────────
+// Hourly — emails the admin once about requests pending over 12h (users are promised 24h).
+export function startPremiumReminderJob() {
+  cron.schedule('15 * * * *', () => {
+    remindPendingPremiumRequests()
+      .then(n => { if (n) console.log(`[CRON] premium request reminder sent for ${n} request(s)`); })
+      .catch(err => console.error('[CRON] premium reminder', err));
+  });
+}
+
 export function startAllJobs() {
   startAdvanceTaxReminderJob();
   startInvoiceOverdueJob();
   startGmailScanJob();
   startInvoiceJobs();
-  console.log('[JOBS] Advance tax, invoice overdue, payment reminder, recurring invoice and Gmail scan jobs started');
+  startPremiumReminderJob();
+  console.log('[JOBS] Advance tax, invoice overdue, payment reminder, recurring invoice, premium reminder and Gmail scan jobs started');
 }

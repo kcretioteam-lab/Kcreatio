@@ -227,51 +227,53 @@ function Act1Hero() {
         transform: reduced() ? 'none' : `translateY(${-parallaxY * 0.15}px)`,
         opacity: heroOpacity, transition: 'opacity 0.1s linear',
       }}>
-        <div style={{
+        {/* The H1 carries the search keywords (it matches the prerendered H1 in seo.config.js);
+            the big display line below it carries the message */}
+        <h1 style={{
           display: 'inline-flex', alignItems: 'center', gap: 7,
           padding: '5px 14px', borderRadius: 100,
           background: 'var(--accent-dim)', border: '1px solid var(--accent)',
-          marginBottom: 28, fontSize: 12, fontWeight: 600, color: 'var(--accent)', letterSpacing: '0.08em',
+          margin: '0 0 28px', fontSize: 13, fontWeight: 600, color: 'var(--accent)', lineHeight: 1.4,
         }}>
-          <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--accent)', animation: reduced() ? 'none' : 'v6pulse 2s infinite' }} />
-          BUILT FOR INDIAN CREATORS
-        </div>
+          <span aria-hidden="true" style={{ width: 6, height: 6, flexShrink: 0, borderRadius: '50%', background: 'var(--accent)', animation: reduced() ? 'none' : 'v6pulse 2s infinite' }} />
+          GST, TDS &amp; advance tax for Indian creators
+        </h1>
 
-        <h1 style={{
+        <p style={{
           fontSize: 'clamp(42px, 7vw, 88px)', fontWeight: 900, lineHeight: 1.0,
           letterSpacing: '-0.04em', color: 'var(--text-primary)', margin: '0 0 20px',
         }}>
-          <span style={{ display: 'block' }}>Create.</span>
+          <span style={{ display: 'block', textWrap: 'balance' }}>Brand deal to tax return,</span>
           <span style={{
             display: 'block',
             background: 'linear-gradient(135deg, #E8921A 0%, #f59e0b 50%, #E8921A 100%)',
             WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
             backgroundSize: '200% 100%', animation: 'v6shimmer 4s ease infinite',
           }}>
-            Everything else flows.
+            sorted.
           </span>
-        </h1>
+        </p>
 
         <p style={{
           fontSize: 'clamp(16px, 2vw, 20px)', color: 'var(--text-body)',
-          lineHeight: 1.65, maxWidth: 540, margin: '0 auto 40px', fontWeight: 400,
+          lineHeight: 1.65, maxWidth: 580, margin: '0 auto 40px', fontWeight: 400,
         }}>
-          GST invoices in 30 seconds. Never miss a TDS deduction
-          or an advance-tax deadline again.
+          For creators who work with brands. Send GST invoices finance teams approve,
+          track every rupee of TDS brands deduct, and know your advance tax before each deadline.
         </p>
 
         <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
           <Link to="/register" className="v2-btn v2-btn--primary">
-            Start free — no card needed
+            Make your first invoice free
             <ChevronRight size={16} aria-hidden="true" />
           </Link>
           <a href="#tax-calculator" className="v2-btn v2-btn--ghost">
-            Check your tax risk <ArrowDown size={16} aria-hidden="true" />
+            Do I owe tax or get a refund? <ArrowDown size={16} aria-hidden="true" />
           </a>
         </div>
 
         <ul className="v2-proof" aria-label="What you get">
-          {['Rule 46 compliant invoices', 'Tax year 2026-27 rules', 'Free forever plan'].map(t => (
+          {['Every Rule 46 invoice field', 'Tax year 2026-27 rules', 'Free forever plan, no card'].map(t => (
             <li key={t}><Check size={13} aria-hidden="true" /> {t}</li>
           ))}
         </ul>
@@ -392,12 +394,12 @@ function Navbar() {
 
 const CHAOS_ITEMS = [
   { label: 'Invoice #38 — overdue 12 days', color: '#f87171', icon: FileText },
-  { label: 'GST portal: deadline today',    color: '#fb923c', icon: Shield },
+  { label: 'Brand: "Resend, GSTIN missing"', color: '#fb923c', icon: Shield },
   { label: 'TDS mismatch — Soundwave invoice', color: '#f59e0b', icon: TrendingDown },
   { label: 'Excel sheet: #REF! error',      color: '#f87171', icon: BarChart2 },
   { label: 'CA needs advance tax now',      color: '#fb923c', icon: Calendar },
   { label: 'Brand payment: still pending',  color: '#ef4444', icon: IndianRupee },
-  { label: 'GSTR-1: 3 invoices missing',    color: '#f59e0b', icon: FileText },
+  { label: 'Which brand cut TDS? No idea.', color: '#f59e0b', icon: FileText },
   { label: 'Form 16A: still not received',  color: '#fb923c', icon: Download },
   { label: '5 spreadsheets. None agree.',   color: '#f87171', icon: BarChart2 },
   { label: 'Glowleaf PO: wrong GST no.',    color: '#ef4444', icon: Briefcase },

@@ -75,7 +75,9 @@ export function AuthProvider({ children }) {
     const controller = new AbortController();
     fetchAbortRef.current = controller;
     try {
-      const res = await api.get('/auth/me', { signal: controller.signal });
+      // silent: boot-time session check — public pages (landing) must not be blocked by it;
+      // ProtectedRoute already waits on state.loading
+      const res = await api.get('/auth/me', { signal: controller.signal, silent: true });
       dispatch({ type: 'SET_USER', payload: res.data });
     } catch (e) {
       if (e?.code === 'ERR_CANCELED') return; // superseded by login/register, ignore

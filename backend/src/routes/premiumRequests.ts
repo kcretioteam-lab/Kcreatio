@@ -5,7 +5,7 @@ import { supabase } from '../lib/supabase.js';
 import { authenticate, AuthRequest } from '../middleware/auth.js';
 import { validateBody } from '../middleware/validateBody.js';
 import { getFrontendUrl } from '../lib/env.js';
-import { sendPremiumRequestAdminEmail, sendPremiumApprovedEmail } from '../services/emailService.js';
+import { sendPremiumRequestAdminEmail, sendPremiumApprovedEmail, sendPremiumReminderAdminEmail } from '../services/emailService.js';
 
 // Premium access by request — replaces paid upgrades while payments are disabled.
 // User requests → row in premium_requests + email to ADMIN_EMAIL with a signed approve link
@@ -27,6 +27,38 @@ const RequestSchema = z.object({
   platform: z.enum(['youtube', 'instagram', 'other']),
   followerCount: z.number().int().min(0).max(1_000_000_000),
 });
+
+// Signed link the admin email's "Approve" button opens
+function approveUrlFor(requestId: string): string {
+  const token = jwt.sign({ requestId, purpose: 'premium_approve' }, process.env.JWT_ACCESS_SECRET!, { algorithm: 'HS256', expiresIn: '7d' });
+  const apiUrl = process.env.API_URL || 'http://localhost:4000';
+  return `${apiUrl}/api/v1/premium-requests/approve?token=${encodeURIComponent(token)}`;
+}
+
+// Users are promised an answer within 24 hours. Requests still pending after 12 get one reminder
+// email to the admin (run hourly from scheduledJobs.ts). Returns how many were included.
+export async function remindPendingPremiumRequests(): Promise<number> {
+  const cutoff = new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString();
+  const { data: pending, error } = await supabase
+    .from('premium_requests')
+    .select('id, platform, follower_count, created_at, user:users(name, email)')
+    .eq('status', 'pending')
+    .is('reminded_at', null)
+    .lte('created_at', cutoff)
+    .order('created_at');
+  if (error || !pending?.length) return 0;
+
+  await sendPremiumReminderAdminEmail(pending.map((r: any) => ({
+    name: r.user?.name || '—',
+    email: r.user?.email || '—',
+    platform: r.platform || 'other',
+    followerCount: r.follower_count || 0,
+    hoursWaiting: Math.floor((Date.now() - new Date(r.created_at).getTime()) / 3_600_000),
+    approveUrl: approveUrlFor(r.id),
+  })));
+  await supabase.from('premium_requests').update({ reminded_at: new Date().toISOString() }).in('id', pending.map(r => r.id));
+  return pending.length;
+}
 
 const esc = (v: string) => v.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
 
@@ -148,11 +180,9 @@ router.post('/', validateBody(RequestSchema), async (req: AuthRequest, res: Resp
     return;
   }
 
-  const token = jwt.sign({ requestId: request.id, purpose: 'premium_approve' }, process.env.JWT_ACCESS_SECRET!, { algorithm: 'HS256', expiresIn: '7d' });
-  const apiUrl = process.env.API_URL || 'http://localhost:4000';
   sendPremiumRequestAdminEmail({
     name: user.name, email: user.email, features, platform, followerCount,
-    approveUrl: `${apiUrl}/api/v1/premium-requests/approve?token=${encodeURIComponent(token)}`,
+    approveUrl: approveUrlFor(request.id),
     appUrl: getFrontendUrl(),
   }).catch(err => console.error('[premium] admin email failed', err));
 
