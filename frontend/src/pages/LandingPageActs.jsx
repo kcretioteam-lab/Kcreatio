@@ -411,7 +411,7 @@ const PLANS = [
   // Paid plans disabled for now — premium is granted on request
   // { name: 'Starter', price: '₹299', period: '/month', desc: 'For creators with regular brand deals.', color: '#34d399', features: ['Watermark-free invoices, all 7 templates', 'Unlimited TDS + Form 16A tracker', 'Smart Inbox (Gmail auto-detect)', 'All 4 advance tax reminders', 'Expense tracker'], cta: 'Start 28-day free trial', href: '/register' },
   // { name: 'Creator Pro', price: '₹599', period: '/month', desc: 'For serious creators managing real brand business.', color: '#E8921A', highlight: true, features: ['Everything in Starter', 'Advance tax calculator', 'P&L + income dashboard', 'ITR-ready export (ZIP)', 'Smart Inbox auto-apply'], cta: 'Start 28-day free trial', href: '/register' },
-  { name: 'Creator Pro', price: '₹0', period: ' for 28 days', desc: 'Request 28 days of Pro from inside the app — free, no card needed. We review every request personally.', color: '#E8921A', highlight: true, features: ['Watermark-free invoices, all 7 templates', 'Unlimited TDS + Form 16A tracker', 'Advance tax calculator', 'P&L + income dashboard', 'ITR-ready export (ZIP)', 'Smart Inbox (Gmail auto-detect)'], cta: 'Start free · request Pro', href: '/register' },
+  { name: 'Creator Pro', price: '₹0', period: ' for 28 days', desc: 'Request 28 days of Pro from inside the app — free, no card needed. We approve requests within 24 hours.', color: '#E8921A', highlight: true, features: ['Watermark-free invoices, all 7 templates', 'Unlimited TDS + Form 16A tracker', 'Advance tax calculator', 'P&L + income dashboard', 'ITR-ready export (ZIP)', 'Smart Inbox (Gmail auto-detect)'], cta: 'Start free · request Pro', href: '/register' },
   // Business/Agency plan paused
   // { name: 'Agency', price: '₹1,999', period: '/month', desc: 'For MCNs, talent managers, and creator agencies.', color: '#a78bfa', features: ['Everything in Pro', 'Up to 20 creators', 'Team access', 'White-label invoices', 'Dedicated account manager'], cta: 'Contact us', href: '/register' },
 ];
@@ -996,7 +996,7 @@ export function TaxRiskCalculator() {
                   {inrFmt(result.q2Due)} advance tax due by Sep 15 (Q2)
                 </div>
                 <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
-                  Income tax ({inrFmt(result.incomeTax)}) exceeds TDS ({inrFmt(result.estimatedTds)}) — {inrFmt(result.advanceTaxOwed)} still owed this FY.
+                  Income tax ({inrFmt(result.incomeTax)}) exceeds TDS ({inrFmt(result.estimatedTds)}) — {inrFmt(result.advanceTaxOwed)} still owed this tax year.
                   Missing Q2 triggers 234C interest.
                 </div>
               </div>
@@ -1015,7 +1015,7 @@ export function TaxRiskCalculator() {
             }}>
               <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
                 <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>Form 16A: </span>
-                {result.form16aRisk} beyond Jun 30 — collect before filing to claim your refund
+                collect one from each of your {result.brands} brand{result.brands !== 1 ? 's' : ''} (due within 15 days of their quarterly TDS return) and check the TDS shows in your AIS before you file
               </div>
             </div>
           </div>

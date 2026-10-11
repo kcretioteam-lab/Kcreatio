@@ -147,6 +147,29 @@ export async function sendPremiumRequestAdminEmail(opts: {
   await send(admin, `Premium request: ${opts.name} (${opts.platform}, ${opts.followerCount.toLocaleString('en-IN')})`, html);
 }
 
+// Requests still pending after 12 hours — we promise users an answer within 24
+export async function sendPremiumReminderAdminEmail(pending: { name: string; email: string; platform: string; followerCount: number; hoursWaiting: number; approveUrl: string }[]) {
+  const admin = process.env.ADMIN_EMAIL;
+  if (!admin) {
+    console.log(`[EMAIL-DEV] ADMIN_EMAIL not set — ${pending.length} premium request(s) waiting over 12h`);
+    return;
+  }
+  const rows = pending.map(p => `
+      <div style="border-top:1px solid #1e293b;padding:12px 0;">
+        <p style="margin:0 0 4px;"><strong>${esc(p.name)}</strong> · ${esc(p.email)}</p>
+        <p style="color:#94a3b8;margin:0 0 8px;">${esc(p.platform)} · ${p.followerCount.toLocaleString('en-IN')} followers · waiting ${p.hoursWaiting}h</p>
+        <a href="${esc(p.approveUrl)}" style="color:#E8921A;font-weight:700;">Approve 28 days of Pro →</a>
+      </div>`).join('');
+  const html = `
+    <div style="font-family:Inter,sans-serif;max-width:480px;margin:0 auto;padding:32px;background:#07080F;color:#F0F1F8;border-radius:12px;">
+      <div style="font-size:22px;font-weight:700;margin-bottom:8px;color:#E8921A;">Kcreatio</div>
+      <h2 style="font-size:18px;font-weight:600;margin:0 0 8px;">${pending.length} premium request${pending.length === 1 ? '' : 's'} waiting</h2>
+      <p style="color:#94a3b8;margin:0 0 16px;">Users are told requests are approved within 24 hours.</p>
+      ${rows}
+    </div>`;
+  await send(admin, `Reminder: ${pending.length} premium request${pending.length === 1 ? '' : 's'} waiting over 12h`, html);
+}
+
 export async function sendPremiumApprovedEmail(to: string, name: string, endsAt: Date) {
   const html = `
     <div style="font-family:Inter,sans-serif;max-width:480px;margin:0 auto;padding:32px;background:#07080F;color:#F0F1F8;border-radius:12px;">

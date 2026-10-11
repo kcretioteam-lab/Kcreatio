@@ -10,6 +10,10 @@ export const MarkPaidSchema = z.object({
   amountReceived: z.number().min(0, 'Enter the amount you received').max(99999999),
   tdsDeducted: z.number().min(0, 'TDS can’t be negative').max(99999999).default(0),
   tdsSection: z.string().max(60).optional(),
+  // Invoice not linked to a deal, but a paid deal for the same brand looks like this payment (POSSIBLE_DUPLICATE):
+  // linkDealId = it's the same payment, link the invoice to that deal; separatePayment = count it as new income.
+  linkDealId: z.string().uuid().optional(),
+  separatePayment: z.boolean().optional(),
 });
 
 export type MarkPaidBody = z.infer<typeof MarkPaidSchema>;
@@ -21,6 +25,7 @@ const ERRORS: Record<string, { status: number; message: string }> = {
   ALREADY_PAID: { status: 409, message: 'This is already marked as paid' },
   TDS_TOO_HIGH: { status: 422, message: 'TDS can’t be more than the taxable value' },
   OVERPAID: { status: 422, message: 'That’s more than is still owed on this invoice' },
+  HAS_INVOICE: { status: 409, message: 'This deal has an invoice — mark the invoice as paid instead, so the income isn’t counted twice.' },
 };
 
 // Records a payment against an invoice (full or part — migration 018) or marks a deal paid,

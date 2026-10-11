@@ -25,6 +25,8 @@ const round2 = (n) => Math.round(n * 100) / 100;
  * taxableValue: amount before GST — income and TDS are based on this.
  * total: what the brand owes in full (incl. GST).
  * onSubmit({ paymentDate, amountReceived, tdsDeducted, tdsSection }) must return a promise.
+ * If it rejects with POSSIBLE_DUPLICATE (a paid deal for this brand already logged the payment), the user
+ * says whether it's the same payment (resubmits with linkDealId) or a separate one (separatePayment).
  */
 export default function MarkPaidDialog({ isOpen, onClose, title, brandName, taxableValue, total, defaultSection = '194J', barter = false, onSubmit }) {
   const [paymentDate, setPaymentDate] = useState(today());
@@ -33,6 +35,7 @@ export default function MarkPaidDialog({ isOpen, onClose, title, brandName, taxa
   const [received, setReceived] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [duplicate, setDuplicate] = useState(null); // { message, dealId, body }
 
   const rateFor = (s) => TDS_OPTIONS.find(o => o.value === s)?.rate ?? 0;
 
@@ -46,6 +49,7 @@ export default function MarkPaidDialog({ isOpen, onClose, title, brandName, taxa
     // Barter: no money arrives — the products are the payment
     setReceived(String(barter ? 0 : round2(total - t)));
     setError('');
+    setDuplicate(null);
   }, [isOpen, taxableValue, total, defaultSection, barter]);
 
   function pickSection(s) {
@@ -69,18 +73,25 @@ export default function MarkPaidDialog({ isOpen, onClose, title, brandName, taxa
     if (!Number.isFinite(receivedNum) || receivedNum < 0) { setError('Enter the amount you received'); return; }
     if (tdsNum < 0) { setError('TDS can’t be negative'); return; }
     if (tdsNum > taxableValue) { setError(`TDS can’t be more than the taxable value (${formatINRDecimal(taxableValue)})`); return; }
+    const code = section.split('-')[0];
+    await send({
+      paymentDate,
+      amountReceived: receivedNum,
+      tdsDeducted: tdsNum,
+      tdsSection: tdsNum > 0 && section !== 'none' ? tdsSectionLabel(code, getFinancialYear(new Date(paymentDate))).replace(/^Sec /, '') : undefined,
+    });
+  }
+
+  async function send(body) {
     setSaving(true);
     setError('');
+    setDuplicate(null);
     try {
-      const code = section.split('-')[0];
-      await onSubmit({
-        paymentDate,
-        amountReceived: receivedNum,
-        tdsDeducted: tdsNum,
-        tdsSection: tdsNum > 0 && section !== 'none' ? tdsSectionLabel(code, getFinancialYear(new Date(paymentDate))).replace(/^Sec /, '') : undefined,
-      });
+      await onSubmit(body);
     } catch (err) {
-      setError(getErrorMessage(err, 'Couldn’t record the payment. Please try again.'));
+      const data = err?.response?.data;
+      if (data?.error === 'POSSIBLE_DUPLICATE') setDuplicate({ message: data.message, dealId: data.dealId, body });
+      else setError(getErrorMessage(err, 'Couldn’t record the payment. Please try again.'));
     } finally {
       setSaving(false);
     }
@@ -131,6 +142,22 @@ export default function MarkPaidDialog({ isOpen, onClose, title, brandName, taxa
         </div>
 
         {error && <p role="alert" style={{ color: 'var(--danger)', fontSize: 'var(--text-sm)', margin: 0 }}>{error}</p>}
+
+        {duplicate && (
+          <div role="alert" style={{ background: 'var(--warning-dim)', border: '1px solid var(--warning)', borderRadius: 'var(--radius-md)', padding: 'var(--space-3)', display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+            <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-primary)', margin: 0 }}>{duplicate.message}</p>
+            <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
+              <button type="button" disabled={saving} onClick={() => send({ ...duplicate.body, linkDealId: duplicate.dealId })}
+                style={{ flex: '1 1 160px', padding: 'var(--space-2) var(--space-3)', background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 'var(--radius-md)', fontWeight: 600, fontFamily: 'inherit', cursor: saving ? 'wait' : 'pointer' }}>
+                Same payment — don’t count again
+              </button>
+              <button type="button" disabled={saving} onClick={() => send({ ...duplicate.body, separatePayment: true })}
+                style={{ flex: '1 1 160px', padding: 'var(--space-2) var(--space-3)', background: 'var(--surface-2)', color: 'var(--text-primary)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', fontWeight: 600, fontFamily: 'inherit', cursor: saving ? 'wait' : 'pointer' }}>
+                Separate payment
+              </button>
+            </div>
+          </div>
+        )}
 
         <button type="submit" disabled={saving} style={{ padding: 'var(--space-3)', background: 'var(--accent)', color: '#fff', borderRadius: 'var(--radius-md)', fontWeight: 600, cursor: saving ? 'wait' : 'pointer', border: 'none', fontFamily: 'inherit' }}>
           {saving ? 'Saving…' : 'Mark as paid'}
