@@ -4,8 +4,15 @@ import * as apiActivity from './apiActivity';
 const DEV_USER_ID = 'dev-bypass-user';
 const isDev = import.meta.env.DEV;
 
+// Production calls the API on this same site: Netlify proxies /api/* to the backend (netlify.toml).
+// Calling the backend's own domain made the login cookie a third-party cookie, which Safari,
+// Incognito and stricter Chrome settings block, so sign-in bounced straight back to /login.
+export const API_BASE = import.meta.env.PROD
+  ? '/api/v1'
+  : (import.meta.env.VITE_API_URL || 'http://localhost:4000/api/v1');
+
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:4000/api/v1',
+  baseURL: API_BASE,
   withCredentials: true,
   // Without a timeout a stalled request never rejects — e.g. in dev with the backend down, Chrome can
   // leave requests to localhost:4000 pending forever, so the localStorage fallbacks never run and

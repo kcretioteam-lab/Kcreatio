@@ -39,6 +39,11 @@ describe('authenticate', () => {
     expect(check(sign({ requestId: 'r1', purpose: 'premium_approve' }))).toMatchObject({ passed: false, status: 401 });
   });
 
+  it('rejects the Google sign-in ticket and the Gmail-connect state', () => {
+    expect(check(sign({ sub: 'user-1', state: 'n1', purpose: 'google_login' }))).toMatchObject({ passed: false, status: 401 });
+    expect(check(sign({ sub: 'user-1', purpose: 'gmail_connect' }))).toMatchObject({ passed: false, status: 401 });
+  });
+
   it('rejects a token without a user', () => {
     expect(check(sign({ plan: 'pro' }))).toMatchObject({ passed: false, status: 401 });
   });

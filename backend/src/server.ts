@@ -30,13 +30,14 @@ class CorsRejected extends Error {}
 const app = express();
 const PORT = process.env.PORT || 4000;
 
-// Trust Render's reverse proxy (one hop) so req.ip resolves to the real client
-// IP from X-Forwarded-For, not the proxy's own address. Without this, every
-// request looked like it came from the same IP, which both broke per-client
-// accuracy for express-rate-limit (see ERR_ERL_UNEXPECTED_X_FORWARDED_FOR) and
-// meant the auth rate limiter below was effectively shared across ALL visitors
-// instead of limiting each one individually.
-app.set('trust proxy', 1);
+// Trust the proxies in front of us so req.ip resolves to the real client IP from
+// X-Forwarded-For, not a proxy's own address. Without this, every request looked
+// like it came from the same IP, which both broke per-client accuracy for
+// express-rate-limit (see ERR_ERL_UNEXPECTED_X_FORWARDED_FOR) and meant the auth
+// rate limiter below was effectively shared across ALL visitors instead of
+// limiting each one individually. Site traffic now arrives through two hops:
+// the Netlify proxy on kcreatio.com (netlify.toml), then Render's own proxy.
+app.set('trust proxy', 2);
 
 // Security headers
 app.use(
