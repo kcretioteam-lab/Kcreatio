@@ -28,12 +28,14 @@
   status = 301
   force  = true
 
-# The API is served by the backend (VITE_API_URL), never by this site. Without this rule the
-# SPA fallback answered /api/* with index.html and a 200, which hid broken API calls.
+# The API is proxied through this site so the login cookie belongs to kcreatio.com. Calling the
+# backend's own domain made it a third-party cookie, which Safari, Incognito and stricter Chrome
+# settings block, so sign-in bounced back to /login. Must stay above the SPA fallback, which would
+# otherwise answer /api/* with index.html and a 200.
 [[redirects]]
   from   = "/api/*"
-  to     = "/404.html"
-  status = 404
+  to     = "https://kcreatio-backend.onrender.com/api/:splat"
+  status = 200
   force  = true
 
 [[redirects]]

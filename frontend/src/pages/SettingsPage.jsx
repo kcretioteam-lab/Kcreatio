@@ -5,7 +5,7 @@ import { useIsMobile } from '../hooks/useIsMobile.js';
 import Input from '../components/ui/Input.jsx';
 import Modal from '../components/ui/Modal.jsx';
 import { useToast } from '../hooks/useToast.jsx';
-import api, { getErrorMessage } from '../utils/api.js';
+import api, { getErrorMessage, API_BASE } from '../utils/api.js';
 // import { openSubscriptionCheckout } from '../utils/razorpay.js'; // Payments disabled — premium is granted on request
 import { usePremiumRequest } from '../hooks/usePremiumRequest.jsx';
 import { PLAN_DISPLAY, PLAN_HIERARCHY } from '../utils/planConfig.js';
@@ -1254,8 +1254,7 @@ function IntegrationsSection({ user, onRefresh }) {
   const [savingPrefs, setSavingPrefs] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [lastScanLabel, setLastScanLabel] = useState('');
-  const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:4000/api/v1';
-  const backendBase = apiBase.replace('/api/v1', '');
+  const backendBase = API_BASE.replace('/api/v1', '');
 
   const gmailConnected = !!user?.gmail_connected_email;
   const isProPlus = ['pro', 'business', 'trial'].includes(user?.plan);
