@@ -22,6 +22,11 @@ export function signTwoFactorChallenge(userId: string, plan: string): string {
 
 const router = Router();
 
+// Google sign-in: the state nonce cookie must reach both /google/callback and /google/complete.
+const GOOGLE_STATE_PATH = '/api/v1/auth/google';
+const GOOGLE_TICKET_PURPOSE = 'google_login';
+const GMAIL_STATE_PURPOSE = 'gmail_connect';
+
 const authRateLimit = rateLimit({
   windowMs: 60 * 1000,
   max: 10,
@@ -691,14 +696,14 @@ router.get('/google', (req: Request, res: Response): void => {
   // attacker's authorization code — logging the victim into the attacker's
   // account without either of them intending it ("login CSRF"). We generate a
   // one-time value, hand it to Google as `state`, and store it in a short-lived
-  // cookie scoped to the callback path; the callback rejects anything that
-  // doesn't match.
+  // cookie; the sign-in is only completed (in /google/callback or /google/complete)
+  // when it matches.
   const stateNonce = crypto.randomBytes(16).toString('hex');
   res.cookie('google_oauth_state', stateNonce, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax', // must still be sent on the top-level redirect back from accounts.google.com
-    path: '/api/v1/auth/google/callback',
+    path: GOOGLE_STATE_PATH,
     maxAge: 5 * 60 * 1000,
   });
 
@@ -714,14 +719,45 @@ router.get('/google', (req: Request, res: Response): void => {
   res.redirect(`https://accounts.google.com/o/oauth2/v2/auth?${params}`);
 });
 
+// Sign the user in on this browser once their Google identity and the state nonce are checked:
+// a 2FA challenge if they use it, else a session with cookies, then the dashboard.
+async function finishGoogleSignIn(req: Request, res: Response, userId: string): Promise<void> {
+  const frontendUrl = getFrontendUrl();
+  const { data: user } = await supabase
+    .from('users')
+    .select('id, name, email, plan, trial_ends_at, token_version, totp_enabled')
+    .eq('id', userId)
+    .maybeSingle();
+  if (!user) {
+    res.redirect(`${frontendUrl}/login?error=oauth_failed`);
+    return;
+  }
+
+  // Check trial expiry
+  let plan = user.plan;
+  if (plan === 'trial' && user.trial_ends_at && new Date(user.trial_ends_at) < new Date()) {
+    plan = 'basic';
+    await supabase.from('users').update({ plan: 'basic' }).eq('id', user.id);
+  }
+
+  if (user.totp_enabled) {
+    res.redirect(`${frontendUrl}/login?twofa=${encodeURIComponent(signTwoFactorChallenge(user.id, plan))}`);
+    return;
+  }
+  await startSession(req, res, user, plan, user.token_version || 0);
+  res.redirect(`${frontendUrl}/dashboard`);
+}
+
 // GET /auth/google/callback — exchange code for tokens, upsert user
 router.get('/google/callback', async (req: Request, res: Response): Promise<void> => {
   const { code, state } = req.query as { code?: string; state?: string };
   const frontendUrl = getFrontendUrl();
+  // Present only when sign-in started on this backend's own domain. When it started on the site
+  // (through the Netlify proxy), the nonce cookie belongs to the site and is checked in /google/complete.
   const expectedState = req.cookies?.google_oauth_state;
-  res.clearCookie('google_oauth_state', { path: '/api/v1/auth/google/callback' });
+  res.clearCookie('google_oauth_state', { path: GOOGLE_STATE_PATH });
 
-  if (!code || !state || !expectedState || state !== expectedState) {
+  if (!code || !state || (expectedState && state !== expectedState)) {
     res.redirect(`${frontendUrl}/login?error=oauth_failed`);
     return;
   }
@@ -801,22 +837,44 @@ router.get('/google/callback', async (req: Request, res: Response): Promise<void
       return;
     }
 
-    // Check trial expiry
-    let plan = user.plan;
-    if (plan === 'trial' && user.trial_ends_at && new Date(user.trial_ends_at) < new Date()) {
-      plan = 'basic';
-      await supabase.from('users').update({ plan: 'basic' }).eq('id', user.id);
-    }
-
-    if (user.totp_enabled) {
-      res.redirect(`${frontendUrl}/login?twofa=${encodeURIComponent(signTwoFactorChallenge(user.id, plan))}`);
+    if (expectedState) {
+      await finishGoogleSignIn(req, res, user.id);
       return;
     }
-    await startSession(req, res, user, plan, user.token_version || 0);
-    res.redirect(`${frontendUrl}/dashboard`);
+    // Cookies set here would belong to this backend's domain, which the site can only use as
+    // third-party cookies. Hand the sign-in back to the site with a short-lived signed ticket;
+    // /google/complete runs there (through the proxy) and checks it against the state cookie.
+    const signInTicket = jwt.sign({ sub: user.id, state, purpose: GOOGLE_TICKET_PURPOSE }, process.env.JWT_ACCESS_SECRET!, { expiresIn: '2m' });
+    res.redirect(`${frontendUrl}/api/v1/auth/google/complete?ticket=${encodeURIComponent(signInTicket)}`);
   } catch (err) {
     console.error('Google OAuth error:', err);
     res.redirect(`${frontendUrl}/login?error=oauth_failed`);
+  }
+});
+
+// GET /auth/google/complete — finish a Google sign-in on the site's own domain (see /google/callback)
+router.get('/google/complete', async (req: Request, res: Response): Promise<void> => {
+  const { ticket } = req.query as { ticket?: string };
+  const expectedState = req.cookies?.google_oauth_state;
+  res.clearCookie('google_oauth_state', { path: GOOGLE_STATE_PATH });
+
+  let userId: string;
+  try {
+    const payload = jwt.verify(ticket || '', process.env.JWT_ACCESS_SECRET!, { algorithms: ['HS256'] }) as { sub?: string; state?: string; purpose?: string };
+    // The state must match this browser's nonce, or someone else's ticket could sign the visitor
+    // into the wrong account (login CSRF).
+    if (payload.purpose !== GOOGLE_TICKET_PURPOSE || !payload.sub || !expectedState || payload.state !== expectedState) throw new Error('bad ticket');
+    userId = payload.sub;
+  } catch {
+    res.redirect(`${getFrontendUrl()}/login?error=oauth_failed`);
+    return;
+  }
+
+  try {
+    await finishGoogleSignIn(req, res, userId);
+  } catch (err) {
+    console.error('Google OAuth error:', err);
+    res.redirect(`${getFrontendUrl()}/login?error=oauth_failed`);
   }
 });
 
@@ -830,7 +888,9 @@ router.get('/gmail/connect', authenticate, (req: AuthRequest, res: Response): vo
     scope: 'https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/gmail.readonly email profile',
     access_type: 'offline',
     prompt: 'consent',
-    state: Buffer.from(JSON.stringify({ userId: req.userId })).toString('base64'),
+    // Signed, so the callback can trust whose account to connect without reading the session cookie,
+    // which lives on the site's domain, not this one.
+    state: jwt.sign({ sub: req.userId, purpose: GMAIL_STATE_PURPOSE }, process.env.JWT_ACCESS_SECRET!, { expiresIn: '10m' }),
   });
   res.redirect(`https://accounts.google.com/o/oauth2/v2/auth?${params}`);
 });
@@ -845,29 +905,19 @@ router.get('/gmail/callback', async (req: Request, res: Response): Promise<void>
     return;
   }
 
-  // `state` is plain, unsigned base64 — anyone could craft one embedding an
-  // arbitrary victim's userId, complete their OWN Google consent, and hit this
-  // callback directly to attach their Gmail account to someone else's Kcreatio
-  // profile (this route had no login check of its own). We don't use the shared
-  // `authenticate` middleware here because a failed check should send the user
-  // back to Settings with a friendly error, not a raw 401 — so it's verified
-  // inline instead, and cross-checked against who `state` claims to be.
-  const sessionToken = req.cookies?.access_token;
-  let sessionUserId: string | null = null;
+  // `state` names the account to connect, signed by /gmail/connect for a signed-in user. An unsigned
+  // state would let anyone attach their own Gmail to a victim's profile by putting the victim's id in it.
+  let userId: string;
   try {
-    const sessionPayload = jwt.verify(sessionToken, process.env.JWT_ACCESS_SECRET!, { algorithms: ['HS256'] }) as { sub: string };
-    sessionUserId = sessionPayload.sub;
+    const payload = jwt.verify(state, process.env.JWT_ACCESS_SECRET!, { algorithms: ['HS256'] }) as { sub?: string; purpose?: string };
+    if (payload.purpose !== GMAIL_STATE_PURPOSE || !payload.sub) throw new Error('bad state');
+    userId = payload.sub;
   } catch {
     res.redirect(`${frontendUrl}/settings?gmail=error`);
     return;
   }
 
   try {
-    const { userId } = JSON.parse(Buffer.from(state, 'base64').toString());
-    if (userId !== sessionUserId) {
-      res.redirect(`${frontendUrl}/settings?gmail=error`);
-      return;
-    }
     const { OAuth2Client } = await import('google-auth-library');
     const callbackUrl = `${req.protocol}://${req.get('host')}/api/v1/auth/gmail/callback`;
     const oauthClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID, process.env.GOOGLE_CLIENT_SECRET, callbackUrl);
